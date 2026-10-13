@@ -49,6 +49,7 @@ export function validateProposal(input: unknown, part: Part): string[] {
   const productTypeIds = new Set<string>();
   const register = (id: string, owner: string) => {
     if (!ID_FORMAT.test(id)) errors.push(`${owner} id "${id}" is not a lowercase hyphenated slug`);
+    if (id === EXCLUDED_CANDIDATE) errors.push(`${owner} id "${id}" is reserved for exclusion`);
     if (ids.has(id)) errors.push(`${owner} id "${id}" is used more than once`);
     ids.add(id);
   };

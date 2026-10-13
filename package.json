@@ -16,7 +16,9 @@
     "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
     "product-types": "tsx scripts/validate-product-types.ts",
     "seed:split": "tsx scripts/seed-split.ts",
-    "seed:check-proposal": "tsx scripts/seed-check-proposal.ts"
+    "seed:check-proposal": "tsx scripts/seed-check-proposal.ts",
+    "seed:consolidate": "tsx scripts/seed-consolidate.ts",
+    "seed:coverage": "tsx scripts/seed-coverage.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

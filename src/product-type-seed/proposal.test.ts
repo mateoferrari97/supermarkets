@@ -129,6 +129,24 @@ describe("validateProposal", () => {
     ]);
   });
 
+  it("rejects the reserved id excluded", () => {
+    const reserved = withPowderTipo({
+      groups: [
+        {
+          ...proposal.groups[0]!,
+          productTypes: [
+            proposal.groups[0]!.productTypes[0]!,
+            { id: "excluded", name: "Excluido", tipos: ["Leche en polvo"] },
+          ],
+        },
+      ],
+      doubts: [{ ...proposal.doubts[0]!, candidates: ["leche-entera", "excluded"] }],
+    });
+    assert.deepEqual(validateProposal(reserved, partWithPowder), [
+      'Product Type id "excluded" is reserved for exclusion',
+    ]);
+  });
+
   it("rejects a doubt with a single candidate", () => {
     const single = {
       ...proposal,

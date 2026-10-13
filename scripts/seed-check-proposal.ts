@@ -1,9 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { validateProposal } from "../src/product-type-seed/proposal.ts";
 import type { Part } from "../src/product-type-seed/split.ts";
-
-const PARTS_DIR = ".data/carrefour/seed/parts";
-const PROPOSALS_DIR = ".data/carrefour/seed/proposals";
+import { PARTS_DIR, PROPOSALS_DIR, readJson } from "./seed-files.ts";
 
 const partId = process.argv[2];
 if (!partId) {
@@ -20,8 +18,8 @@ for (const path of [partPath, proposalPath]) {
   }
 }
 
-const part = JSON.parse(readFileSync(partPath, "utf8")) as Part;
-const errors = validateProposal(JSON.parse(readFileSync(proposalPath, "utf8")), part);
+const part = readJson(partPath) as Part;
+const errors = validateProposal(readJson(proposalPath), part);
 
 for (const error of errors) console.error(error);
 if (errors.length > 0) process.exit(1);

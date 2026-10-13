@@ -1,10 +1,5 @@
-import { readFileSync } from "node:fs";
 import { validateProductTypes } from "../src/product-types/validate.ts";
-
-const VOCABULARY_PATH = "vocabulary/product-types.json";
-const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
-
-const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
+import { CARREFOUR_MAPPING_PATH, VOCABULARY_PATH, readJson } from "./seed-files.ts";
 
 const errors = validateProductTypes(readJson(VOCABULARY_PATH), readJson(CARREFOUR_MAPPING_PATH));
 

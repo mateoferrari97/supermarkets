@@ -13,7 +13,7 @@ Rules for classifying a part of Carrefour's grocery Tipos into Product Type Grou
 
 ## Excluded
 
-Exclude a Tipo when nobody would order it in a supermarket order: clothing, shoe laces, hair accessories, toys, pest poison, or a Tipo whose products are something else than its name says (Leche balsámica is a body cream). Household goods a supermarket shopper buys (bin bags, sponges, mops, charcoal, firewood) stay. Give a short reason in Spanish.
+Exclude a Tipo when nobody would order it in a supermarket order: clothing, shoe laces, hair accessories, toys, appliances and spare parts sold by marketplace sellers, or a Tipo whose products are something else than its name says (Leche balsámica is a body cream). Household goods a supermarket shopper buys (bin bags, sponges, mops, charcoal, firewood, household insecticides and repellents) stay. Give a short reason in Spanish.
 
 ## Doubts
 
@@ -34,3 +34,12 @@ Write one JSON object:
 - `doubts`: `[{ "tipo", "candidates": ["<product type id>" | "excluded", ...], "reason" }]`
 
 Every Tipo of the part appears exactly once across `productTypes[].tipos`, `excluded` and `doubts`, spelled exactly as in the part. Every Product Type has at least one Tipo or is named by a doubt; every Group has at least one Product Type.
+
+## Consolidation
+
+The coordinator joins every part's proposal into one tree. Parts are classified apart, so the same idea can come back under two ids or two Groups.
+
+- Merge two Product Types from different parts when they pass the replacement test together ("Leche larga vida entera" in one part and "Leche entera" in another). Keep the id an Owner would guess first.
+- Merge two Groups that are the same loose word ("Leche" and "Leches"). When the same Product Type id sits in two Groups that are different loose words, move it to the one an Owner would reach for.
+- Place a doubt when another part's Product Types make the answer clear: one candidate is now a real Product Type with Tipos and the other is not, or the examples clearly match one Product Type of the whole tree. Leave it a doubt when it is still a coin-flip; the Owner answers those.
+- Do not undo a part's confident placements unless the whole tree shows them wrong (the same Tipo kind mapped two ways in two parts).
