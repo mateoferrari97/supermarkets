@@ -1,0 +1,8 @@
+node_modules
+pnpm-lock.yaml
+.scratch
+.claude
+.data
+docs
+GLOSSARY.md
+CLAUDE.md
