@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { tipoMappingSchema, vocabularySchema } from "./schema.ts";
 
-const ID_FORMAT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const ID_FORMAT = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function validateProductTypes(vocabularyInput: unknown, mappingInput: unknown): string[] {
   const vocabulary = vocabularySchema.safeParse(vocabularyInput);

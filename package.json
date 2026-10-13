@@ -15,7 +15,8 @@
     "carrefour:catalog": "tsx scripts/carrefour-catalog.ts",
     "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
     "product-types": "tsx scripts/validate-product-types.ts",
-    "seed:split": "tsx scripts/seed-split.ts"
+    "seed:split": "tsx scripts/seed-split.ts",
+    "seed:check-proposal": "tsx scripts/seed-check-proposal.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
