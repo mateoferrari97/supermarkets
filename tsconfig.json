@@ -11,8 +11,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["scripts", "*.ts"],
+  "include": ["scripts", "src", "*.ts"],
   "exclude": ["node_modules"]
 }

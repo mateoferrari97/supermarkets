@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A test runner is added and `pnpm check` runs it.
-- [ ] Schemas exist for the vocabulary and the Carrefour mapping.
-- [ ] The vocabulary and mapping files are committed empty and pass validation.
-- [ ] Validation fails, naming the offending entry, when: a mapping id is not in the vocabulary; an id is duplicated; an id is not a lowercase ASCII hyphenated slug; a Product Type belongs to no Group or to more than one; a Group is empty.
-- [ ] Tests cover the valid case and each failure above.
-- [ ] `pnpm check` exits 0.
+- [x] A test runner is added and `pnpm check` runs it.
+- [x] Schemas exist for the vocabulary and the Carrefour mapping.
+- [x] The vocabulary and mapping files are committed empty and pass validation.
+- [x] Validation fails, naming the offending entry, when: a mapping id is not in the vocabulary; an id is duplicated; an id is not a lowercase ASCII hyphenated slug; a Product Type belongs to no Group or to more than one; a Group is empty.
+- [x] Tests cover the valid case and each failure above.
+- [x] `pnpm check` exits 0.

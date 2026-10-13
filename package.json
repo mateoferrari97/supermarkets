@@ -10,9 +10,11 @@
     "lint": "eslint .",
     "format": "node scripts/format.mjs",
     "no-comments": "tsx scripts/no-comments.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm format --check && pnpm no-comments",
+    "check": "pnpm typecheck && pnpm lint && pnpm format --check && pnpm no-comments && pnpm test && pnpm product-types",
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
-    "carrefour:catalog": "tsx scripts/carrefour-catalog.ts"
+    "carrefour:catalog": "tsx scripts/carrefour-catalog.ts",
+    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
+    "product-types": "tsx scripts/validate-product-types.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
