@@ -7,11 +7,11 @@ A retailer with a public catalog and an online cart, such as Carrefour. The Assi
 _Avoid_: Shop, supermarket, retailer
 
 **Branch**:
-The Online Store location whose prices, stock and promotions a cart is built against. It is chosen per Owner, not fixed.
+The Online Store location whose prices, stock and promotions a cart is built against. It follows from the postal code the Owner writes in each order; Carrefour resolves it from the postal code.
 _Avoid_: Region, seller, store, sucursal
 
 **Catalog Snapshot**:
-The state of an Online Store's catalog at one moment for one Branch: products, prices, stock and promotions. The same Product Types and Selection Policy against the same Catalog Snapshot always give the same cart.
+The state of an Online Store's catalog at one moment, downloaded to the local machine: products, prices, stock and promotions. It is used to understand an order (evidence, terms, sizes), not to pick products, which are picked from live search and checkout simulation (ADR 0005).
 _Avoid_: Cache, crawl, scrape
 
 **Product Type**:
@@ -23,5 +23,13 @@ A named set of Product Types that one loose word can refer to, such as "leche" o
 _Avoid_: Category, parent type, family, department
 
 **Selection Policy**:
-The ordered rules that choose one product per Item from an Online Store, such as "only these brands, then promotions first". The Owner states a preference in their own words; the Selection Policy is that preference in a fixed form, so the same Items on the same Catalog Snapshot always get the same products.
+The ordered rules that choose one product per Item from an Online Store, such as "only these brands, then promotions first". The Owner states a preference in their own words; the Selection Policy is that preference in a fixed form, so the same Items with the same search and simulation answers always get the same products.
 _Avoid_: Strategy, criteria, mode, preference profile
+
+**Candidate**:
+A product of an Item's Product Types that live search returns for the Owner's region, available, and that is simulated at the quantity bought before one is picked. Each Item has at most two.
+_Avoid_: Option, hit, result
+
+**Payment Card**:
+The card the Owner says they will pay with, such as "Tarjeta Carrefour Mastercard". It is passed to the checkout simulation so that card promotions count when picking products; the Owner names it, never its number.
+_Avoid_: Payment method, BIN, tarjeta
