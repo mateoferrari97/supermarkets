@@ -1,0 +1,70 @@
+{
+  "cases": [
+    {
+      "id": "leche-is-a-group",
+      "order": "necesito leche",
+      "items": [{ "question": { "group": "grupo-leche" } }]
+    },
+    {
+      "id": "cindor-brand-only",
+      "order": "un Cindor",
+      "items": [{ "productType": "leche-chocolatada", "brand": "Cindor" }]
+    },
+    {
+      "id": "dos-cocas-grandes",
+      "order": "dos cocas grandes",
+      "items": [{ "productType": "gaseosa", "quantity": 2, "brand": "Coca-Cola" }]
+    },
+    {
+      "id": "nada-de-huevos",
+      "order": "yerba y nada de huevos",
+      "items": [{ "productType": "yerba" }, { "noItem": "huevo" }]
+    },
+    {
+      "id": "conos-de-queso",
+      "order": "conos de queso",
+      "expectedToFail": "resolves to the Snack salado Group instead of the broad snacks Product Type (ticket 01 run); decide in ticket 06",
+      "items": [{ "productType": "snacks" }]
+    },
+    {
+      "id": "medio-sachet-de-leche",
+      "order": "medio sachet de leche",
+      "items": [{ "question": { "group": "grupo-leche" }, "quantity": 0.5, "terms": ["sachet"] }]
+    },
+    {
+      "id": "ticket-01-order",
+      "order": "yerba, dos leches enteras y nada de huevos",
+      "items": [
+        { "productType": "yerba" },
+        { "productType": "leche-entera", "quantity": 2 },
+        { "noItem": "huevo" }
+      ]
+    },
+    {
+      "id": "coca-de-2-25",
+      "order": "dos cocas de 2,25",
+      "items": [
+        { "productType": "gaseosa", "quantity": 2, "brand": "Coca-Cola", "terms": ["2,25"] }
+      ]
+    },
+    {
+      "id": "leche-descremada-with-brand",
+      "order": "leche descremada La Serenísima",
+      "items": [{ "productType": "leche-descremada", "brand": "La Serenísima" }]
+    },
+    {
+      "id": "un-par-de-yogures",
+      "order": "un par de yogures",
+      "items": [{ "question": { "group": "grupo-yogur" }, "quantity": 2 }]
+    },
+    {
+      "id": "adr-0004-order",
+      "order": "necesito leche, dos cocas grandes y nada de huevos",
+      "items": [
+        { "question": { "group": "grupo-leche" } },
+        { "productType": "gaseosa", "quantity": 2, "brand": "Coca-Cola" },
+        { "noItem": "huevo" }
+      ]
+    }
+  ]
+}
