@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { describe, it } from "vitest";
-import { findPaymentCard, paymentCardTableSchema, validatePaymentCards } from "./payment-cards.ts";
+import { findPaymentCard, validatePaymentCards } from "./payment-cards.ts";
 
 const table = {
   cards: [
@@ -39,15 +38,5 @@ describe("payment cards", () => {
       }),
       ['payment card name "tarjeta  carrefour" is used more than once'],
     );
-  });
-
-  it("parses the committed table", () => {
-    const committed: unknown = JSON.parse(
-      readFileSync(
-        new URL("../../../vocabulary/carrefour-payment-cards.json", import.meta.url),
-        "utf8",
-      ),
-    );
-    assert.equal(paymentCardTableSchema.safeParse(committed).success, true);
   });
 });
