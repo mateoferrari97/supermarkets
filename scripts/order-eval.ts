@@ -71,7 +71,7 @@ const llm = createClaudeCodeLlm({
   promptsDir: PROMPTS_DIR,
   onCall: (call) => calls.push(call),
 });
-const resolveOrder = createOrderResolver({ products, vocabulary, mapping, llm });
+const { resolveOrder } = createOrderResolver({ products, vocabulary, mapping, llm });
 
 const startedAt = new Date();
 const runs: CaseRun[] = [];

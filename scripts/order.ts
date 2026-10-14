@@ -1,7 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { createClaudeCodeLlm, type LlmCall } from "../src/order-resolution/claude-code-llm.ts";
 import {
-  answerQuestions,
   createOrderResolver,
   type OrderResolution,
 } from "../src/order-resolution/resolve-order.ts";
@@ -21,7 +20,12 @@ const llm = createClaudeCodeLlm({
   promptsDir: PROMPTS_DIR,
   onCall: (call) => calls.push(call),
 });
-const resolveOrder = createOrderResolver({ products, vocabulary, mapping, llm });
+const { resolveOrder, answerQuestions } = createOrderResolver({
+  products,
+  vocabulary,
+  mapping,
+  llm,
+});
 
 const started = Date.now();
 const show = (resolution: OrderResolution) => {
@@ -39,7 +43,7 @@ while (resolution.message) {
   const line = await lines.next();
   const answer = line.done ? "" : line.value.trim();
   if (!answer) break;
-  resolution = await answerQuestions(resolution, answer, { llm });
+  resolution = await answerQuestions(resolution, answer);
   console.log("");
   show(resolution);
 }

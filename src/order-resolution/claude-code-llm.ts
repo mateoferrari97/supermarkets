@@ -7,6 +7,7 @@ import type { Vocabulary } from "../product-types/schema.ts";
 import {
   mapAnswerOutputSchema,
   resolveItemOutputSchema,
+  rewordItemOutputSchema,
   splitOrderOutputSchema,
   type Llm,
   type ResolveItemInput,
@@ -103,6 +104,13 @@ export function createClaudeCodeLlm({
         "resolve-item",
         `${prompt("resolve-item")}\n\n# Product Type tree\n\n${tree}`,
         resolveItemOutputSchema,
+        input,
+      ),
+    rewordItem: (input) =>
+      ask(
+        "reword-item",
+        `${prompt("reword-item")}\n\n# Product Type tree\n\n${tree}`,
+        rewordItemOutputSchema,
         input,
       ),
     mapAnswer: (input) => ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input),
