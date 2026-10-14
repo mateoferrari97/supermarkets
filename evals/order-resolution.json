@@ -23,7 +23,7 @@
     {
       "id": "conos-de-queso",
       "order": "conos de queso",
-      "expectedToFail": "resolves to the Snack salado Group instead of the broad snacks Product Type (ticket 01 run); decide in ticket 06",
+      "expectedToFail": "comes back as the Snack salado Group or Snack de maíz instead of the broad snacks Product Type; decide in ticket 06",
       "items": [{ "productType": "snacks" }]
     },
     {

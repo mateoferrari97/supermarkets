@@ -12,6 +12,7 @@ import {
   answerQuestions,
   resolveOrder,
   type CatalogProduct,
+  type OrderItem,
   type OrderResolution,
 } from "./resolve-order.ts";
 
@@ -27,6 +28,7 @@ const vocabulary = {
       ],
     },
     { id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] },
+    { id: "grupo-gaseosa", name: "Gaseosa", productTypes: [{ id: "gaseosa", name: "Gaseosa" }] },
   ],
 };
 
@@ -35,16 +37,32 @@ const mapping = {
   "Leche descremada": "leche-descremada",
   "Leche chocolatada": "leche-chocolatada",
   Yerba: "yerba",
+  Gaseosa: "gaseosa",
   "Leche balsámica": null,
 };
 
+const product = (name: string, brand: string | null, tipo: string | null, inStock = true) => ({
+  name,
+  brand,
+  tipo,
+  inStock,
+});
+
 const products: CatalogProduct[] = [
-  { name: "Leche entera La Serenísima 1 l", brand: "La Serenísima", tipo: "Leche entera" },
-  { name: "Leche descremada Sancor 1 l", brand: "Sancor", tipo: "Leche descremada" },
-  { name: "Leche chocolatada Cindor 1 l", brand: "Cindor", tipo: "Leche chocolatada" },
-  { name: "Yerba mate Playadito 1 kg", brand: "Playadito", tipo: "Yerba" },
-  { name: "Leche balsámica corporal 200 ml", brand: "Nivea", tipo: "Leche balsámica" },
-  { name: "Huevos blancos x 12", brand: null, tipo: null },
+  product("Leche entera La Serenísima 1 l", "La Serenísima", "Leche entera"),
+  product("Leche entera La Serenísima sachet 1 l", "La Serenísima", "Leche entera"),
+  product("Leche descremada Sancor 1 l", "Sancor", "Leche descremada"),
+  product("Leche chocolatada Cindor 1 l", "Cindor", "Leche chocolatada"),
+  product("Yerba mate Playadito 1 kg", "Playadito", "Yerba"),
+  product("Yerba mate Playadito 500 g", "Playadito", "Yerba"),
+  product("Gaseosa cola Coca Cola sabor original 2,25 lts", "Coca Cola", "Gaseosa"),
+  product("Gaseosa cola Coca Cola sabor original 1,5 lts", "Coca Cola", "Gaseosa"),
+  product("Gaseosa cola Coca Cola light 1,5 lts", "Coca Cola", "Gaseosa"),
+  product("Gaseosa cola Coca Cola sabor original 354 ml", "Coca Cola", "Gaseosa"),
+  product("Gaseosa cola Coca Cola sabor original 3 lts", "Coca Cola", "Gaseosa", false),
+  product("Gaseosa cola Pepsi 2 lts", "Pepsi", "Gaseosa"),
+  product("Leche balsámica corporal 200 ml", "Nivea", "Leche balsámica"),
+  product("Huevos blancos x 12", null, null),
 ];
 
 const item = (phrase: string, overrides: Partial<Item> = {}): Item => ({
@@ -55,6 +73,31 @@ const item = (phrase: string, overrides: Partial<Item> = {}): Item => ({
   vagueWords: [],
   ...overrides,
 });
+
+const type = (id: string) => {
+  const found = vocabulary.groups
+    .flatMap(({ productTypes }) => productTypes)
+    .find((ref) => ref.id === id);
+  return found!;
+};
+
+const resolved = (phrase: string, id: string, overrides: Partial<Item> = {}): OrderItem => ({
+  ...item(phrase, overrides),
+  productTypes: [type(id)],
+  question: null,
+});
+
+const optionIds = (orderItem: OrderItem | undefined) =>
+  orderItem?.question?.kind === "productType" ? orderItem.question.options.map(({ id }) => id) : [];
+
+const yerba: ResolveItemOutput = { kind: "match", candidates: ["yerba"] };
+const leche: ResolveItemOutput = { kind: "match", candidates: ["grupo-leche"] };
+const liviana: ResolveItemOutput = {
+  kind: "ambiguous",
+  candidates: ["leche-descremada", "leche-entera"],
+};
+const gaseosa: ResolveItemOutput = { kind: "match", candidates: ["gaseosa"] };
+const nothing: ResolveItemOutput = { kind: "none", candidates: [] };
 
 type Script = {
   items: Item[];
@@ -118,31 +161,30 @@ const reply = (...answers: Partial<MapAnswerOutput["answers"][number]>[]): MapAn
 
 describe("resolveOrder", () => {
   it("resolves clear Items with their quantity, brand and terms", async () => {
-    const { resolution } = await run({
-      items: [
-        item("yerba"),
-        item("leche entera", { quantity: 2, brand: "La Serenísima", terms: ["1 l"] }),
-      ],
-      answers: {
-        yerba: { kind: "match", candidates: ["yerba"] },
-        "leche entera": { kind: "match", candidates: ["leche-entera"] },
-      },
+    const lecheEntera = item("leche entera", {
+      quantity: 2,
+      brand: "La Serenísima",
+      terms: ["1 l"],
     });
-    assert.deepEqual(resolution.items, [
-      { ...item("yerba"), status: "resolved", productTypes: [{ id: "yerba", name: "Yerba" }] },
-      {
-        ...item("leche entera", { quantity: 2, brand: "La Serenísima", terms: ["1 l"] }),
-        status: "resolved",
-        productTypes: [{ id: "leche-entera", name: "Leche entera" }],
-      },
-    ]);
+    const { resolution } = await run({
+      items: [item("yerba"), lecheEntera],
+      answers: { yerba, "leche entera": { kind: "match", candidates: ["leche-entera"] } },
+    });
+    assert.deepEqual(resolution, {
+      items: [
+        resolved("yerba", "yerba"),
+        resolved("leche entera", "leche-entera", {
+          quantity: 2,
+          brand: "La Serenísima",
+          terms: ["1 l"],
+        }),
+      ],
+      message: null,
+    });
   });
 
   it("keeps only the Items the split returns, so exclusions never become Items", async () => {
-    const { resolution } = await run({
-      items: [item("yerba")],
-      answers: { yerba: { kind: "match", candidates: ["yerba"] } },
-    });
+    const { resolution } = await run({ items: [item("yerba")], answers: { yerba } });
     assert.deepEqual(
       resolution.items.map(({ phrase }) => phrase),
       ["yerba"],
@@ -172,50 +214,33 @@ describe("resolveOrder", () => {
       },
       rewordings: { "dulce de leche": "dulce de leche" },
     });
-    const [yerba, dulce] = resolution.items;
-    assert.equal(yerba?.status, "resolved");
-    assert.deepEqual(dulce, {
-      ...item("dulce de leche"),
-      status: "pending",
-      reason: "none",
-      candidates: [],
-    });
+    assert.deepEqual(resolution.items, [
+      resolved("yerba", "yerba"),
+      { ...item("dulce de leche"), productTypes: [], question: { kind: "phrase" } },
+    ]);
   });
 
-  it("leaves a Group or an ambiguous answer pending with its Product Types as candidates", async () => {
+  it("asks which Product Type for a Group or an ambiguous answer", async () => {
     const { resolution } = await run({
       items: [item("leche"), item("leche liviana")],
-      answers: {
-        leche: { kind: "match", candidates: ["grupo-leche"] },
-        "leche liviana": { kind: "ambiguous", candidates: ["leche-descremada", "leche-entera"] },
-      },
+      answers: { leche, "leche liviana": liviana },
     });
-    const [leche, liviana] = resolution.items;
-    assert.equal(leche?.status === "pending" && leche.reason, "group");
-    assert.deepEqual(leche?.status === "pending" && leche.candidates.map(({ id }) => id), [
-      "leche-entera",
-      "leche-descremada",
-      "leche-chocolatada",
-    ]);
-    assert.equal(liviana?.status === "pending" && liviana.reason, "ambiguous");
+    const [group, ambiguous] = resolution.items;
+    assert.equal(group?.question?.kind === "productType" && group.question.reason, "group");
+    assert.deepEqual(optionIds(group), ["leche-entera", "leche-descremada", "leche-chocolatada"]);
+    assert.equal(
+      ambiguous?.question?.kind === "productType" && ambiguous.question.reason,
+      "ambiguous",
+    );
   });
 
   it("rewords an Item with no match exactly once and resolves the rewording", async () => {
     const { resolution, seen } = await run({
       items: [item("yerva", { quantity: 2 })],
-      answers: {
-        yerva: { kind: "none", candidates: [] },
-        yerba: { kind: "match", candidates: ["yerba"] },
-      },
+      answers: { yerva: nothing, yerba },
       rewordings: { yerva: "yerba" },
     });
-    assert.deepEqual(resolution.items, [
-      {
-        ...item("yerva", { quantity: 2 }),
-        status: "resolved",
-        productTypes: [{ id: "yerba", name: "Yerba" }],
-      },
-    ]);
+    assert.deepEqual(resolution.items, [resolved("yerva", "yerba", { quantity: 2 })]);
     assert.deepEqual(
       seen.resolved.map(({ item: { phrase } }) => phrase),
       ["yerva", "yerba"],
@@ -224,16 +249,61 @@ describe("resolveOrder", () => {
     assert.equal(seen.resolved[1]!.evidence[0]?.productTypeId, "yerba");
   });
 
-  it("asks every pending Item in one message, with numbered options or what the Owner means", async () => {
+  it("asks about a term no product of the Product Type has, and keeps terms some product has", async () => {
+    const { resolution } = await run({
+      items: [
+        item("leche entera", { terms: ["sachet"] }),
+        item("yerba", { terms: ["sin TACC", "1 kg"] }),
+        item("coca", { brand: "Coca-Cola", terms: ["2,25"] }),
+      ],
+      answers: {
+        "leche entera": { kind: "match", candidates: ["leche-entera"] },
+        yerba,
+        coca: gaseosa,
+      },
+    });
+    assert.deepEqual(
+      resolution.items.map(({ question }) => question),
+      [null, { kind: "term", term: "sin TACC" }, null],
+    );
+    assert.match(
+      resolution.message ?? "",
+      /1\. Para "yerba", no hay Yerba con "sin TACC"\. ¿Lo saco o lo cambio por otra cosa\?/,
+    );
+  });
+
+  it("offers for a vague word only the sizes in stock of that Product Type and brand", async () => {
+    const { resolution } = await run({
+      items: [item("coca", { quantity: 2, brand: "Coca-Cola", vagueWords: ["grandes"] })],
+      answers: { coca: gaseosa },
+    });
+    assert.deepEqual(resolution.items[0]?.question, {
+      kind: "size",
+      options: ["354 ml", "1,5 l", "2,25 l"],
+    });
+    assert.deepEqual(resolution.items[0]?.productTypes, [type("gaseosa")]);
+    assert.equal(
+      resolution.message,
+      [
+        "Tengo una pregunta:",
+        '1. Para "coca" (grandes), ¿qué tamaño?\n   1) 354 ml\n   2) 1,5 l\n   3) 2,25 l',
+        'Respondé con el número o con palabras ("la 2", "entera"), o "cualquiera" si te da igual.',
+      ].join("\n\n"),
+    );
+  });
+
+  it("narrows the size options by the Item's terms", async () => {
+    const { resolution } = await run({
+      items: [item("coca", { brand: "Coca-Cola", terms: ["light"], vagueWords: ["grande"] })],
+      answers: { coca: gaseosa },
+    });
+    assert.deepEqual(resolution.items[0]?.question, { kind: "size", options: ["1,5 l"] });
+  });
+
+  it("asks every question of the order in one message", async () => {
     const { resolution } = await run({
       items: [item("yerba"), item("leche"), item("leche liviana"), item("pan")],
-      answers: {
-        yerba: { kind: "match", candidates: ["yerba"] },
-        leche: { kind: "match", candidates: ["grupo-leche"] },
-        "leche liviana": { kind: "ambiguous", candidates: ["leche-descremada", "leche-entera"] },
-        pan: { kind: "none", candidates: [] },
-        "pan de molde": { kind: "none", candidates: [] },
-      },
+      answers: { yerba, leche, "leche liviana": liviana, pan: nothing, "pan de molde": nothing },
       rewordings: { pan: "pan de molde" },
     });
     assert.equal(
@@ -247,24 +317,12 @@ describe("resolveOrder", () => {
       ].join("\n\n"),
     );
   });
-
-  it("has no message when nothing is asked", async () => {
-    const { resolution } = await run({
-      items: [item("yerba")],
-      answers: { yerba: { kind: "match", candidates: ["yerba"] } },
-    });
-    assert.equal(resolution.message, null);
-  });
 });
 
 describe("answerQuestions", () => {
   const script = (replies: Record<string, MapAnswerOutput>): Script => ({
     items: [item("yerba"), item("leche"), item("leche liviana")],
-    answers: {
-      yerba: { kind: "match", candidates: ["yerba"] },
-      leche: { kind: "match", candidates: ["grupo-leche"] },
-      "leche liviana": { kind: "ambiguous", candidates: ["leche-descremada", "leche-entera"] },
-    },
+    answers: { yerba, leche, "leche liviana": liviana },
     replies,
   });
 
@@ -273,7 +331,7 @@ describe("answerQuestions", () => {
       ({ resolution }) => resolution,
     );
 
-  it("offers the LLM only the questions and their numbered options", async () => {
+  it("offers the LLM only the questions, what they ask and their numbered options", async () => {
     const { seen } = await runAndAnswer(script({ respuesta: reply() }), "respuesta");
     assert.deepEqual(seen.asked, [
       {
@@ -282,6 +340,8 @@ describe("answerQuestions", () => {
           {
             question: 1,
             phrase: "leche",
+            asks: "productType",
+            term: null,
             options: [
               { option: 1, name: "Leche entera" },
               { option: 2, name: "Leche descremada" },
@@ -291,6 +351,8 @@ describe("answerQuestions", () => {
           {
             question: 2,
             phrase: "leche liviana",
+            asks: "productType",
+            term: null,
             options: [
               { option: 1, name: "Leche descremada" },
               { option: 2, name: "Leche entera" },
@@ -303,17 +365,11 @@ describe("answerQuestions", () => {
 
   it("resolves the answered Item, keeps resolved Items untouched and asks the rest again", async () => {
     const { items, message } = await answer(reply({ question: 1, options: [2] }));
-    assert.deepEqual(items[0], {
-      ...item("yerba"),
-      status: "resolved",
-      productTypes: [{ id: "yerba", name: "Yerba" }],
-    });
-    assert.deepEqual(items[1], {
-      ...item("leche"),
-      status: "resolved",
-      productTypes: [{ id: "leche-descremada", name: "Leche descremada" }],
-    });
-    assert.equal(items[2]?.status, "pending");
+    assert.deepEqual(items.slice(0, 2), [
+      resolved("yerba", "yerba"),
+      resolved("leche", "leche-descremada"),
+    ]);
+    assert.equal(items[2]?.question?.kind, "productType");
     assert.match(message ?? "", /^Tengo una pregunta:\n\n1\. Para "leche liviana"/);
   });
 
@@ -322,9 +378,7 @@ describe("answerQuestions", () => {
       reply({ question: 1, options: [1, 2] }, { question: 2, kind: "any" }),
     );
     assert.deepEqual(
-      items.map(
-        (resolved) => resolved.status === "resolved" && resolved.productTypes.map(({ id }) => id),
-      ),
+      items.map(({ productTypes }) => productTypes.map(({ id }) => id)),
       [["yerba"], ["leche-entera", "leche-descremada"], ["leche-descremada", "leche-entera"]],
     );
     assert.equal(message, null);
@@ -339,38 +393,90 @@ describe("answerQuestions", () => {
       ),
     );
     assert.deepEqual(
-      items.map(({ status }) => status),
-      ["resolved", "pending", "pending"],
+      items.map(({ question }) => question?.kind ?? null),
+      [null, "productType", "productType"],
     );
+  });
+
+  it("checks terms once the Owner picks the Product Type", async () => {
+    const { resolution } = await runAndAnswer(
+      {
+        items: [item("leche", { terms: ["sachet"] })],
+        answers: { leche },
+        replies: { descremada: reply({ options: [2] }), entera: reply({ options: [1] }) },
+      },
+      "descremada",
+    );
+    assert.deepEqual(resolution.items[0]?.question, { kind: "term", term: "sachet" });
+    assert.deepEqual(resolution.items[0]?.productTypes, [type("leche-descremada")]);
+  });
+
+  it("drops a term the Owner lets go and replaces one the Owner rewords", async () => {
+    const yerbaSinTacc = item("yerba", { terms: ["sin TACC"] });
+    const dropped = await runAndAnswer(
+      { items: [yerbaSinTacc], answers: { yerba }, replies: { sacalo: reply({ kind: "any" }) } },
+      "sacalo",
+    );
+    assert.deepEqual(dropped.resolution.items, [resolved("yerba", "yerba")]);
+    const reworded = await runAndAnswer(
+      {
+        items: [yerbaSinTacc],
+        answers: { yerba },
+        replies: { "de medio kilo": reply({ kind: "rephrased", phrase: "500 g" }) },
+      },
+      "de medio kilo",
+    );
+    assert.deepEqual(reworded.resolution.items, [resolved("yerba", "yerba", { terms: ["500 g"] })]);
+  });
+
+  it("turns the chosen size into a term and leaves the size open on cualquiera", async () => {
+    const coca = item("coca", { brand: "Coca-Cola", vagueWords: ["grande"] });
+    const chosen = await runAndAnswer(
+      {
+        items: [coca],
+        answers: { coca: gaseosa },
+        replies: { "la de 2,25": reply({ options: [3] }) },
+      },
+      "la de 2,25",
+    );
+    assert.deepEqual(chosen.resolution.items, [
+      resolved("coca", "gaseosa", { brand: "Coca-Cola", terms: ["2,25 l"] }),
+    ]);
+    const any = await runAndAnswer(
+      {
+        items: [coca],
+        answers: { coca: gaseosa },
+        replies: { cualquiera: reply({ kind: "any" }) },
+      },
+      "cualquiera",
+    );
+    assert.deepEqual(any.resolution.items, [resolved("coca", "gaseosa", { brand: "Coca-Cola" })]);
+    const two = await runAndAnswer(
+      {
+        items: [coca],
+        answers: { coca: gaseosa },
+        replies: { "1 o 2": reply({ options: [1, 2] }) },
+      },
+      "1 o 2",
+    );
+    assert.equal(two.resolution.items[0]?.question?.kind, "size");
   });
 
   it("resolves the Owner's answer to what they mean as a new phrase, keeping the Item's details", async () => {
     const { resolution, seen } = await runAndAnswer(
       {
         items: [item("lo del mate", { quantity: 2 })],
-        answers: {
-          "lo del mate": { kind: "none", candidates: [] },
-          "cosa del mate": { kind: "none", candidates: [] },
-          "yerba mate": { kind: "match", candidates: ["yerba"] },
-        },
+        answers: { "lo del mate": nothing, "cosa del mate": nothing, "yerba mate": yerba },
         rewordings: { "lo del mate": "cosa del mate" },
-        replies: {
-          "la yerba": reply({ kind: "rephrased", phrase: "yerba mate" }),
-        },
+        replies: { "la yerba": reply({ kind: "rephrased", phrase: "yerba mate" }) },
       },
       "la yerba",
     );
     assert.deepEqual(seen.asked[0]?.questions, [
-      { question: 1, phrase: "lo del mate", options: [] },
+      { question: 1, phrase: "lo del mate", asks: "phrase", term: null, options: [] },
     ]);
     assert.deepEqual(resolution, {
-      items: [
-        {
-          ...item("yerba mate", { quantity: 2 }),
-          status: "resolved",
-          productTypes: [{ id: "yerba", name: "Yerba" }],
-        },
-      ],
+      items: [resolved("yerba mate", "yerba", { quantity: 2 })],
       message: null,
     });
   });
@@ -379,10 +485,7 @@ describe("answerQuestions", () => {
     const { resolution, seen } = await runAndAnswer(
       {
         items: [item("lo del mate")],
-        answers: {
-          "lo del mate": { kind: "none", candidates: [] },
-          bombilla: { kind: "none", candidates: [] },
-        },
+        answers: { "lo del mate": nothing, bombilla: nothing },
         rewordings: { "lo del mate": "lo del mate", bombilla: "bombilla" },
         replies: {
           "una bombilla": reply({ kind: "rephrased", phrase: "bombilla" }),
@@ -397,6 +500,5 @@ describe("answerQuestions", () => {
       'Tengo una pregunta:\n\n1. No encontré "bombilla". ¿A qué te referís?',
     );
     assert.equal(seen.reworded.length, 2);
-    assert.equal(resolution.items[0]?.status, "pending");
   });
 });

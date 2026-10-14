@@ -44,6 +44,8 @@ export type ResolveItemInput = { item: Item; evidence: Evidence[] };
 export type QuestionInput = {
   question: number;
   phrase: string;
+  asks: "productType" | "phrase" | "term" | "size";
+  term: string | null;
   options: { option: number; name: string }[];
 };
 

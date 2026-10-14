@@ -18,7 +18,12 @@ export function readOrderData() {
   const grocery = new Set<string>(GROCERY_DEPARTMENTS);
   const products: CatalogProduct[] = readCatalogProducts()
     .filter((product) => grocery.has(product.department))
-    .map((product) => ({ name: product.name, brand: product.brand ?? null, tipo: product.tipo }));
+    .map((product) => ({
+      name: product.name,
+      brand: product.brand ?? null,
+      tipo: product.tipo,
+      inStock: product.availableQuantity > 0,
+    }));
   const mapping = tipoMappingSchema.parse(readJson(CARREFOUR_MAPPING_PATH));
   return { products, vocabulary: readVocabulary(), mapping };
 }
@@ -32,9 +37,18 @@ export function renderItem(item: OrderResolution["items"][number]): string {
   ]
     .filter(Boolean)
     .join("; ");
-  const outcome =
-    item.status === "resolved"
-      ? item.productTypes.map(({ id, name }) => `${name} \`${id}\``).join(" o ")
-      : `pending (${item.reason}): ${item.candidates.map(({ id }) => id).join(", ") || "no candidates"}`;
+  const types = item.productTypes.map(({ id, name }) => `${name} \`${id}\``).join(" o ");
+  const { question } = item;
+  const asked =
+    question === null
+      ? null
+      : question.kind === "productType"
+        ? `asks ${question.reason}: ${question.options.map(({ id }) => id).join(", ")}`
+        : question.kind === "size"
+          ? `asks size: ${question.options.join(", ")}`
+          : question.kind === "term"
+            ? `asks term "${question.term}"`
+            : "asks what it means";
+  const outcome = [types, asked].filter(Boolean).join("; ");
   return `${item.phrase}${details ? ` [${details}]` : ""} → ${outcome}`;
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Item } from "./llm.ts";
 import { scoreCase, validateEvalSet, type EvalCase } from "./eval-set.ts";
-import type { OrderResolution } from "./resolve-order.ts";
+import type { OrderItem, OrderResolution } from "./resolve-order.ts";
 
 const vocabulary = {
   groups: [
@@ -27,17 +27,16 @@ const item = (phrase: string, overrides: Partial<Item> = {}): Item => ({
   ...overrides,
 });
 
-const resolved = (phrase: string, id: string, overrides: Partial<Item> = {}) => ({
+const resolved = (phrase: string, id: string, overrides: Partial<Item> = {}): OrderItem => ({
   ...item(phrase, overrides),
-  status: "resolved" as const,
   productTypes: [{ id, name: id }],
+  question: null,
 });
 
-const pending = (phrase: string, ids: string[], overrides: Partial<Item> = {}) => ({
+const pending = (phrase: string, ids: string[], overrides: Partial<Item> = {}): OrderItem => ({
   ...item(phrase, overrides),
-  status: "pending" as const,
-  reason: "group" as const,
-  candidates: ids.map((id) => ({ id, name: id })),
+  productTypes: [],
+  question: { kind: "productType", reason: "group", options: ids.map((id) => ({ id, name: id })) },
 });
 
 const score = (
@@ -152,5 +151,13 @@ describe("scoreCase", () => {
       score({ items: [{ productType: "yerba", brand: "playadito" }] }, resolution).hit,
       true,
     );
+  });
+
+  it("hits a Product Type whose Item still asks about a size or a term", () => {
+    const sized = {
+      ...resolved("coca", "gaseosa"),
+      question: { kind: "size" as const, options: ["2,25 l"] },
+    };
+    assert.equal(score({ items: [{ productType: "gaseosa" }] }, { items: [sized] }).hit, true);
   });
 });

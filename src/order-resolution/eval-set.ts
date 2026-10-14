@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Vocabulary } from "../product-types/schema.ts";
 import type { OrderResolution } from "./resolve-order.ts";
+import { normalize } from "./text.ts";
 
 const itemDetails = {
   quantity: z.number().positive().optional(),
@@ -136,16 +137,15 @@ function satisfies(
   groupChildren: Map<string, string[]>,
 ): boolean {
   if ("productType" in expected) {
-    if (actual.status !== "resolved") return false;
     const [only, ...others] = actual.productTypes;
     if (only?.id !== expected.productType || others.length > 0) return false;
   } else {
-    if (actual.status !== "pending" || actual.reason === "none") return false;
+    if (actual.question?.kind !== "productType") return false;
     const wanted = [
       ...(expected.question.group ? (groupChildren.get(expected.question.group) ?? []) : []),
       ...(expected.question.includes ?? []),
     ];
-    const offered = new Set(actual.candidates.map(({ id }) => id));
+    const offered = new Set(actual.question.options.map(({ id }) => id));
     if (!wanted.every((id) => offered.has(id))) return false;
   }
   if (expected.quantity !== undefined && actual.quantity !== expected.quantity) return false;
@@ -190,13 +190,4 @@ export function describe(expected: ExpectedItem): string {
     expected.terms === undefined ? null : `terms ${expected.terms.join(", ")}`,
   ].filter(Boolean);
   return details.length > 0 ? `${target} [${details.join("; ")}]` : target;
-}
-
-function normalize(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
 }

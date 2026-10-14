@@ -1,22 +1,26 @@
 import type { TipoMapping, Vocabulary } from "../product-types/schema.ts";
 import { buildBm25Index } from "./bm25.ts";
-import type { Evidence, Item, Llm, QuestionInput } from "./llm.ts";
+import { distinctSizes, nameMatchesTerm, productMatchesBrand } from "./catalog.ts";
+import type { Evidence, Item, Llm, MapAnswerOutput, QuestionInput } from "./llm.ts";
 
 export const EVIDENCE_LIMIT = 10;
 
-export type CatalogProduct = { name: string; brand: string | null; tipo: string | null };
+export type CatalogProduct = {
+  name: string;
+  brand: string | null;
+  tipo: string | null;
+  inStock: boolean;
+};
 
 export type ProductTypeRef = { id: string; name: string };
 
-export type ResolvedItem = Item & { status: "resolved"; productTypes: ProductTypeRef[] };
+export type Question =
+  | { kind: "productType"; reason: "group" | "ambiguous"; options: ProductTypeRef[] }
+  | { kind: "phrase" }
+  | { kind: "term"; term: string }
+  | { kind: "size"; options: string[] };
 
-export type PendingItem = Item & {
-  status: "pending";
-  reason: "group" | "ambiguous" | "none";
-  candidates: ProductTypeRef[];
-};
-
-export type OrderItem = ResolvedItem | PendingItem;
+export type OrderItem = Item & { productTypes: ProductTypeRef[]; question: Question | null };
 
 export type OrderResolution = { items: OrderItem[]; message: string | null };
 
@@ -31,6 +35,8 @@ export type OrderResolver = {
   resolveOrder: (orderText: string) => Promise<OrderResolution>;
   answerQuestions: (resolution: OrderResolution, answerText: string) => Promise<OrderResolution>;
 };
+
+type Answer = MapAnswerOutput["answers"][number];
 
 export function createOrderResolver({
   products,
@@ -79,27 +85,101 @@ export function createOrderResolver({
     return [...refs.values()];
   };
 
+  const candidateProducts = (item: Item, types: ProductTypeRef[]) => {
+    const ids = new Set(types.map(({ id }) => id));
+    return indexed
+      .filter(({ productType }) => ids.has(productType.id))
+      .map(({ product }) => product)
+      .filter((product) => !item.brand || productMatchesBrand(product, item.brand));
+  };
+
+  const settle = (item: Item, types: ProductTypeRef[]): OrderItem => {
+    const candidates = candidateProducts(item, types);
+    const missing = item.terms.find(
+      (term) => !candidates.some(({ name }) => nameMatchesTerm(name, term)),
+    );
+    if (missing !== undefined) {
+      return { ...item, productTypes: types, question: { kind: "term", term: missing } };
+    }
+    if (item.vagueWords.length > 0) {
+      const inStock = candidates.filter(
+        (product) =>
+          product.inStock && item.terms.every((term) => nameMatchesTerm(product.name, term)),
+      );
+      const sizes = distinctSizes(inStock.map(({ name }) => name)).map(({ label }) => label);
+      if (sizes.length > 0) {
+        return { ...item, productTypes: types, question: { kind: "size", options: sizes } };
+      }
+    }
+    return { ...item, productTypes: types, question: null };
+  };
+
   const attempt = async (item: Item, phrase: string): Promise<OrderItem> => {
     const query = { ...item, phrase };
     const answer = await llm.resolveItem({ item: query, evidence: evidenceFor(query) });
     const known = answer.candidates.filter((id) => productTypes.has(id) || groupChildren.has(id));
     const candidates = expand(known);
     if (candidates.length === 0 || answer.kind === "none") {
-      return { ...item, status: "pending", reason: "none", candidates: [] };
+      return { ...item, productTypes: [], question: { kind: "phrase" } };
     }
     const [only] = candidates;
     if (answer.kind === "match" && candidates.length === 1 && only && productTypes.has(known[0]!)) {
-      return { ...item, status: "resolved", productTypes: [only] };
+      return settle(item, [only]);
     }
     const reason = known.some((id) => groupChildren.has(id)) ? "group" : "ambiguous";
-    return { ...item, status: "pending", reason, candidates };
+    return {
+      ...item,
+      productTypes: [],
+      question: { kind: "productType", reason, options: candidates },
+    };
   };
 
   const resolveItem = async (item: Item): Promise<OrderItem> => {
     const first = await attempt(item, item.phrase);
-    if (first.status === "resolved" || first.reason !== "none") return first;
+    if (first.question?.kind !== "phrase") return first;
     const { phrase } = await llm.rewordItem({ item, evidence: evidenceFor(item) });
     return attempt(item, phrase);
+  };
+
+  const apply = (orderItem: OrderItem, answer: Answer): Promise<OrderItem> | null => {
+    const { question } = orderItem;
+    const item = itemFields(orderItem);
+    if (!question) return null;
+    switch (question.kind) {
+      case "productType": {
+        const chosen =
+          answer.kind === "any"
+            ? question.options
+            : answer.kind === "chosen"
+              ? question.options.filter((_, index) => answer.options.includes(index + 1))
+              : [];
+        return chosen.length > 0 ? Promise.resolve(settle(item, chosen)) : null;
+      }
+      case "phrase":
+        return answer.kind === "rephrased" && answer.phrase
+          ? resolveItem({ ...item, phrase: answer.phrase })
+          : null;
+      case "term": {
+        const others = item.terms.filter((term) => term !== question.term);
+        if (answer.kind === "any") {
+          return Promise.resolve(settle({ ...item, terms: others }, orderItem.productTypes));
+        }
+        if (answer.kind === "rephrased" && answer.phrase) {
+          const terms = [...others, answer.phrase];
+          return Promise.resolve(settle({ ...item, terms }, orderItem.productTypes));
+        }
+        return null;
+      }
+      case "size": {
+        if (answer.kind === "any") {
+          return Promise.resolve(settle({ ...item, vagueWords: [] }, orderItem.productTypes));
+        }
+        const chosen = question.options.filter((_, index) => answer.options.includes(index + 1));
+        if (answer.kind !== "chosen" || chosen.length !== 1) return null;
+        const terms = [...item.terms, ...chosen];
+        return Promise.resolve(settle({ ...item, terms, vagueWords: [] }, orderItem.productTypes));
+      }
+    }
   };
 
   const answerQuestions = async (
@@ -109,46 +189,20 @@ export function createOrderResolver({
     const questions = questionsOf(resolution.items);
     if (questions.length === 0) return resolution;
     const { answers } = await llm.mapAnswer({
-      questions: questions.map(({ question, item }) => ({
-        question,
-        phrase: item.phrase,
-        options: item.candidates.map(({ name }, index) => ({ option: index + 1, name })),
-      })),
+      questions: questions.map(({ question, item }) => questionInput(question, item)),
       answer: answerText,
     });
 
-    const updates = new Map<PendingItem, Promise<OrderItem>>();
+    const updates = new Map<OrderItem, Promise<OrderItem>>();
     for (const answer of answers) {
       const item = questions.find(({ question }) => question === answer.question)?.item;
       if (!item || updates.has(item)) continue;
-      if (item.candidates.length === 0) {
-        if (answer.kind === "rephrased" && answer.phrase) {
-          updates.set(item, resolveItem({ ...pendingItemFields(item), phrase: answer.phrase }));
-        }
-        continue;
-      }
-      const chosen =
-        answer.kind === "any"
-          ? item.candidates
-          : answer.kind === "chosen"
-            ? item.candidates.filter((_, index) => answer.options.includes(index + 1))
-            : [];
-      if (chosen.length > 0) {
-        updates.set(
-          item,
-          Promise.resolve({ ...pendingItemFields(item), status: "resolved", productTypes: chosen }),
-        );
-      }
+      const update = apply(item, answer);
+      if (update) updates.set(item, update);
     }
 
     return withMessage(
-      await Promise.all(
-        resolution.items.map((item) =>
-          item.status === "pending"
-            ? (updates.get(item) ?? Promise.resolve(item))
-            : Promise.resolve(item),
-        ),
-      ),
+      await Promise.all(resolution.items.map((item) => updates.get(item) ?? Promise.resolve(item))),
     );
   };
 
@@ -161,31 +215,61 @@ export function createOrderResolver({
   };
 }
 
-function pendingItemFields(pending: PendingItem): Item {
-  const { reason: _reason, candidates: _candidates, status: _status, ...item } = pending;
+function itemFields(orderItem: OrderItem): Item {
+  const { productTypes: _productTypes, question: _question, ...item } = orderItem;
   return item;
 }
 
-type Question = Pick<QuestionInput, "question"> & { item: PendingItem };
+type Asked = { question: number; item: OrderItem & { question: Question } };
 
-function questionsOf(items: OrderItem[]): Question[] {
+function questionsOf(items: OrderItem[]): Asked[] {
   return items
-    .filter((item): item is PendingItem => item.status === "pending")
+    .filter((item): item is Asked["item"] => item.question !== null)
     .map((item, index) => ({ question: index + 1, item }));
+}
+
+function optionNames(question: Question): string[] {
+  if (question.kind === "productType") return question.options.map(({ name }) => name);
+  if (question.kind === "size") return question.options;
+  return [];
+}
+
+function questionInput(number: number, item: Asked["item"]): QuestionInput {
+  return {
+    question: number,
+    phrase: item.phrase,
+    asks: item.question.kind,
+    term: item.question.kind === "term" ? item.question.term : null,
+    options: optionNames(item.question).map((name, index) => ({ option: index + 1, name })),
+  };
+}
+
+function questionText(number: number, item: Asked["item"]): string {
+  const { question, phrase } = item;
+  const options = optionNames(question).map((name, index) => `   ${index + 1}) ${name}`);
+  switch (question.kind) {
+    case "productType":
+      return [`${number}. Para "${phrase}", ¿cuál querés?`, ...options].join("\n");
+    case "phrase":
+      return `${number}. No encontré "${phrase}". ¿A qué te referís?`;
+    case "term": {
+      const names = item.productTypes.map(({ name }) => name).join(" ni ");
+      return `${number}. Para "${phrase}", no hay ${names} con "${question.term}". ¿Lo saco o lo cambio por otra cosa?`;
+    }
+    case "size":
+      return [
+        `${number}. Para "${phrase}" (${item.vagueWords.join(", ")}), ¿qué tamaño?`,
+        ...options,
+      ].join("\n");
+  }
 }
 
 function withMessage(items: OrderItem[]): OrderResolution {
   const questions = questionsOf(items);
   if (questions.length === 0) return { items, message: null };
-  const asked = questions.map(({ question, item }) => {
-    if (item.candidates.length === 0) {
-      return `${question}. No encontré "${item.phrase}". ¿A qué te referís?`;
-    }
-    const options = item.candidates.map(({ name }, index) => `   ${index + 1}) ${name}`);
-    return [`${question}. Para "${item.phrase}", ¿cuál querés?`, ...options].join("\n");
-  });
+  const asked = questions.map(({ question, item }) => questionText(question, item));
   const intro = questions.length === 1 ? "Tengo una pregunta:" : "Tengo unas preguntas:";
-  const outro = questions.some(({ item }) => item.candidates.length > 0)
+  const outro = questions.some(({ item }) => optionNames(item.question).length > 0)
     ? 'Respondé con el número o con palabras ("la 2", "entera"), o "cualquiera" si te da igual.'
     : null;
   const parts = [intro, ...asked, ...(outro ? [outro] : [])];
