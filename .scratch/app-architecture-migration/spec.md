@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Move to a layered Next.js app with a chat and an agent-first knowledge base
 
