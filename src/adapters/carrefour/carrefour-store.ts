@@ -15,7 +15,12 @@ import type {
 
 export const CARREFOUR_URL = "https://www.carrefour.com.ar";
 
-export type HttpRequest = { method: "GET" | "POST"; url: string; body?: unknown };
+export type HttpRequest = {
+  method: "GET" | "POST";
+  url: string;
+  body?: unknown;
+  signal?: AbortSignal;
+};
 export type HttpClient = (request: HttpRequest) => Promise<unknown>;
 
 export class HttpError extends Error {
@@ -118,11 +123,11 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
   const search = (path: string, params: Record<string, string>) =>
     `${CARREFOUR_URL}/api/intelligent-search/v1/${path}?${new URLSearchParams({ sc: "1", ...params })}`;
 
-  const regionFor = (postalCode: string) => {
+  const regionFor = (postalCode: string, signal: AbortSignal) => {
     const known = regions.get(postalCode);
     if (known) return known;
     const url = `${CARREFOUR_URL}/api/checkout/pub/regions?${new URLSearchParams({ country: "ARG", postalCode })}`;
-    const region = http({ method: "GET", url }).then(
+    const region = http({ method: "GET", url, signal }).then(
       (body) => regionsSchema.parse(body)[0] ?? null,
     );
     regions.set(postalCode, region);
@@ -130,9 +135,9 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     return region;
   };
 
-  const checkDelivery = async (postalCode: string): Promise<Delivery> => {
+  const checkDelivery = async (postalCode: string, signal: AbortSignal): Promise<Delivery> => {
     try {
-      const region = await regionFor(postalCode);
+      const region = await regionFor(postalCode, signal);
       return region && region.sellers.length > 0 ? "delivers" : "does-not-deliver";
     } catch (error) {
       if (error instanceof HttpError && error.status === 400) {
@@ -150,8 +155,11 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     params: Record<string, string>,
     key: string,
     name: string,
+    signal: AbortSignal,
   ) => {
-    const body = facetsSchema.parse(await http({ method: "GET", url: search(path, params) }));
+    const body = facetsSchema.parse(
+      await http({ method: "GET", url: search(path, params), signal }),
+    );
     const wanted = normalize(name);
     const values = body.facets.find((candidate) => candidate.key === key)?.values ?? [];
     const exact = values.find((value) => normalize(value.name ?? "") === wanted);
@@ -160,11 +168,18 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     return (exact ?? close)?.value ?? null;
   };
 
-  const slugForTipo = (tipo: string) => {
+  const slugForTipo = (tipo: string, signal: AbortSignal) => {
     const known = tipoSlugs.get(tipo);
     if (known) return known;
-    const slug = facetValue("facets/trade-policy/1", { query: tipo }, "tipo-de-producto", tipo);
+    const slug = facetValue(
+      "facets/trade-policy/1",
+      { query: tipo },
+      "tipo-de-producto",
+      tipo,
+      signal,
+    );
     tipoSlugs.set(tipo, slug);
+    slug.catch(() => tipoSlugs.delete(tipo));
     return slug;
   };
 
@@ -172,17 +187,24 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     tipoPath: string,
     region: Record<string, string>,
     brands: string[],
+    signal: AbortSignal,
   ) => {
     const slugs = await Promise.all(
       brands.map((brand) =>
-        facetValue(`facets/trade-policy/1/${tipoPath}`, region, "brand", brand),
+        facetValue(`facets/trade-policy/1/${tipoPath}`, region, "brand", brand, signal),
       ),
     );
     return slugs.filter((slug): slug is string => slug !== null);
   };
 
-  const findCandidates = async ({ postalCode, tipos, brands, sort, limit }: CandidateQuery) => {
-    const [found, ...slugs] = await Promise.all([regionFor(postalCode), ...tipos.map(slugForTipo)]);
+  const findCandidates = async (
+    { postalCode, tipos, brands, sort, limit }: CandidateQuery,
+    signal: AbortSignal,
+  ) => {
+    const [found, ...slugs] = await Promise.all([
+      regionFor(postalCode, signal),
+      ...tipos.map((tipo) => slugForTipo(tipo, signal)),
+    ]);
     if (!found) throw new Error(`Carrefour has no region for postal code ${postalCode}`);
     const tipoPath = slugs
       .filter((slug): slug is string => slug !== null)
@@ -192,7 +214,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     const region = { regionId: found.id };
     let facets = tipoPath;
     if (brands.length > 0) {
-      const brandSlugs = await slugsForBrands(tipoPath, region, brands);
+      const brandSlugs = await slugsForBrands(tipoPath, region, brands, signal);
       if (brandSlugs.length === 0) return [];
       facets = [tipoPath, ...brandSlugs.map((slug) => `brand/${slug}`)].join("/");
     }
@@ -203,7 +225,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
       count: String(limit),
       page: "1",
     });
-    const body = searchSchema.parse(await http({ method: "GET", url }));
+    const body = searchSchema.parse(await http({ method: "GET", url, signal }));
     return body.products.flatMap((product): StoreProduct[] => {
       const item = product.items[0];
       if (!item) return [];
@@ -226,7 +248,10 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     });
   };
 
-  const simulate = async ({ postalCode, card, items }: SimulationRequest): Promise<Simulation> => {
+  const simulate = async (
+    { postalCode, card, items }: SimulationRequest,
+    signal: AbortSignal,
+  ): Promise<Simulation> => {
     const url = `${CARREFOUR_URL}/api/checkout/pub/orderForms/simulation?sc=1&RnbBehavior=0`;
     const body = simulationSchema.parse(
       await http({
@@ -238,6 +263,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
           postalCode,
           ...(card ? { paymentData: { payments: [payment(card)] } } : {}),
         },
+        signal,
       }),
     );
     const benefits = body.ratesAndBenefitsData?.rateAndBenefitsIdentifiers ?? [];
@@ -338,9 +364,10 @@ function measureOf(
 }
 
 const fetchJson: HttpClient = async (request) => {
-  const { method, url, body } = request;
+  const { method, url, body, signal } = request;
   const response = await fetch(url, {
     method,
+    signal,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

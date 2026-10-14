@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, it } from "vitest";
+import { afterEach, describe, it, vi } from "vitest";
 import {
   createCarrefourStore,
   HttpError,
@@ -12,6 +12,8 @@ const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
 
 type Route = [RegExp, string] | [RegExp, string, number];
+
+const signal = new AbortController().signal;
 
 const recorded = (routes: Route[]) => {
   const seen: HttpRequest[] = [];
@@ -53,42 +55,45 @@ const regionRoutes: Route[] = [
 describe("createCarrefourStore", () => {
   it("delivers to a postal code whose region has stores", async () => {
     const { store, seen } = recorded(regionRoutes);
-    assert.equal(await store.checkDelivery("1425"), "delivers");
+    assert.equal(await store.checkDelivery("1425", signal), "delivers");
     assert.equal(seen.length, 1);
   });
 
   it("does not deliver to a postal code whose region has no stores", async () => {
     const { store } = recorded(regionRoutes);
-    assert.equal(await store.checkDelivery("C1425ABC"), "does-not-deliver");
+    assert.equal(await store.checkDelivery("C1425ABC", signal), "does-not-deliver");
   });
 
   it("does not deliver to a postal code with no region", async () => {
     const store = createCarrefourStore(() => Promise.resolve([]));
-    assert.equal(await store.checkDelivery("1425"), "does-not-deliver");
+    assert.equal(await store.checkDelivery("1425", signal), "does-not-deliver");
   });
 
   it("tells a postal code Carrefour rejects", async () => {
     const { store } = recorded(regionRoutes);
-    assert.equal(await store.checkDelivery("abc"), "postal-code-rejected");
+    assert.equal(await store.checkDelivery("abc", signal), "postal-code-rejected");
   });
 
   it("fails the delivery check when Carrefour answers with another error", async () => {
     const store = createCarrefourStore((request) =>
       Promise.reject(new HttpError(request, 503, "Service Unavailable")),
     );
-    await assert.rejects(store.checkDelivery("1425"), /answered 503/);
+    await assert.rejects(store.checkDelivery("1425", signal), /answered 503/);
   });
 
   it("searches in the region it checked delivery for, asking for the region once", async () => {
     const { store, seen } = recorded(searchRoutes);
-    await store.checkDelivery("1425");
-    await store.findCandidates({
-      postalCode: "1425",
-      tipos: ["Gaseosa"],
-      brands: ["Coca-Cola"],
-      sort: "discount:desc",
-      limit: 2,
-    });
+    await store.checkDelivery("1425", signal);
+    await store.findCandidates(
+      {
+        postalCode: "1425",
+        tipos: ["Gaseosa"],
+        brands: ["Coca-Cola"],
+        sort: "discount:desc",
+        limit: 2,
+      },
+      signal,
+    );
     assert.equal(seen.filter(({ url }) => url.includes("/checkout/pub/regions")).length, 1);
   });
 
@@ -100,13 +105,16 @@ describe("createCarrefourStore", () => {
       return Promise.resolve(fixture("facets-query-gaseosa"));
     });
     await assert.rejects(
-      store.findCandidates({
-        postalCode: "1425",
-        tipos: ["Gaseosa"],
-        brands: [],
-        sort: "discount:desc",
-        limit: 2,
-      }),
+      store.findCandidates(
+        {
+          postalCode: "1425",
+          tipos: ["Gaseosa"],
+          brands: [],
+          sort: "discount:desc",
+          limit: 2,
+        },
+        signal,
+      ),
       /no region for postal code 1425/,
     );
     assert.ok(seen.every(({ url }) => !url.includes("/product-search/")));
@@ -114,13 +122,16 @@ describe("createCarrefourStore", () => {
 
   it("lists available products of a Tipo and brand in the postal code's region", async () => {
     const { store, seen } = recorded(searchRoutes);
-    const candidates = await store.findCandidates({
-      postalCode: "1425",
-      tipos: ["Gaseosa"],
-      brands: ["Coca-Cola"],
-      sort: "discount:desc",
-      limit: 2,
-    });
+    const candidates = await store.findCandidates(
+      {
+        postalCode: "1425",
+        tipos: ["Gaseosa"],
+        brands: ["Coca-Cola"],
+        sort: "discount:desc",
+        limit: 2,
+      },
+      signal,
+    );
     assert.deepEqual(candidates, [
       {
         productId: "393964",
@@ -162,24 +173,30 @@ describe("createCarrefourStore", () => {
     const { store } = recorded(searchRoutes);
     const query = { postalCode: "1425", sort: "discount:desc" as const, limit: 2 };
     assert.deepEqual(
-      await store.findCandidates({ ...query, tipos: ["Gaseosa"], brands: ["Marca Inventada"] }),
+      await store.findCandidates(
+        { ...query, tipos: ["Gaseosa"], brands: ["Marca Inventada"] },
+        signal,
+      ),
       [],
     );
     assert.deepEqual(
-      await store.findCandidates({ ...query, tipos: ["Tipo inventado"], brands: [] }),
+      await store.findCandidates({ ...query, tipos: ["Tipo inventado"], brands: [] }, signal),
       [],
     );
   });
 
   it("lists products of any of several brands in one search", async () => {
     const { store, seen } = recorded(searchRoutes);
-    const candidates = await store.findCandidates({
-      postalCode: "1425",
-      tipos: ["Gaseosa"],
-      brands: ["Coca-Cola", "Pepsi", "Marca Inventada"],
-      sort: "price:asc",
-      limit: 3,
-    });
+    const candidates = await store.findCandidates(
+      {
+        postalCode: "1425",
+        tipos: ["Gaseosa"],
+        brands: ["Coca-Cola", "Pepsi", "Marca Inventada"],
+        sort: "price:asc",
+        limit: 3,
+      },
+      signal,
+    );
     assert.deepEqual(
       candidates.map(({ brand }) => brand),
       ["Coca Cola", "Pepsi", "Pepsi"],
@@ -189,13 +206,16 @@ describe("createCarrefourStore", () => {
 
   it("finds a brand written with one letter wrong", async () => {
     const { store, seen } = recorded(searchRoutes);
-    const candidates = await store.findCandidates({
-      postalCode: "1425",
-      tipos: ["Gaseosa"],
-      brands: ["Coca Kola"],
-      sort: "discount:desc",
-      limit: 2,
-    });
+    const candidates = await store.findCandidates(
+      {
+        postalCode: "1425",
+        tipos: ["Gaseosa"],
+        brands: ["Coca Kola"],
+        sort: "discount:desc",
+        limit: 2,
+      },
+      signal,
+    );
     assert.equal(candidates.length, 2);
     assert.match(seen.at(-1)!.url, /\/brand\/coca-cola\?/);
   });
@@ -206,13 +226,16 @@ describe("createCarrefourStore", () => {
       [/\/facets\/trade-policy\/1\?/, "facets-query-banana"],
       [/\/product-search\/trade-policy\/1\/tipo-de-producto\/banana\?/, "search-banana"],
     ]);
-    const [banana] = await store.findCandidates({
-      postalCode: "1425",
-      tipos: ["Banana"],
-      brands: [],
-      sort: "discount:desc",
-      limit: 2,
-    });
+    const [banana] = await store.findCandidates(
+      {
+        postalCode: "1425",
+        tipos: ["Banana"],
+        brands: [],
+        sort: "discount:desc",
+        limit: 2,
+      },
+      signal,
+    );
     assert.deepEqual(banana, {
       productId: "719074",
       itemId: "185818",
@@ -229,18 +252,24 @@ describe("createCarrefourStore", () => {
       Promise.reject(new Error("Carrefour GET answered 503")),
     );
     await assert.rejects(
-      store.simulate({ postalCode: "1425", card: null, items: [{ itemId: "3807", quantity: 1 }] }),
+      store.simulate(
+        { postalCode: "1425", card: null, items: [{ itemId: "3807", quantity: 1 }] },
+        signal,
+      ),
       /503/,
     );
   });
 
   it("simulates with all promotions, the postal code and seller 1, in pesos", async () => {
     const { store, seen } = recorded([[/orderForms\/simulation/, "simulation-promotion"]]);
-    const simulation = await store.simulate({
-      postalCode: "1425",
-      card: null,
-      items: [{ itemId: "3807", quantity: 2 }],
-    });
+    const simulation = await store.simulate(
+      {
+        postalCode: "1425",
+        card: null,
+        items: [{ itemId: "3807", quantity: 2 }],
+      },
+      signal,
+    );
     assert.deepEqual(simulation, {
       lines: [
         {
@@ -266,11 +295,14 @@ describe("createCarrefourStore", () => {
 
   it("simulates with the Payment Card's payment system and BIN so its promotions apply", async () => {
     const { store, seen } = recorded([[/orderForms\/simulation/, "simulation-card"]]);
-    const simulation = await store.simulate({
-      postalCode: "1425",
-      card: { paymentSystem: "502", bin: "507858" },
-      items: [{ itemId: "3807", quantity: 2 }],
-    });
+    const simulation = await store.simulate(
+      {
+        postalCode: "1425",
+        card: { paymentSystem: "502", bin: "507858" },
+        items: [{ itemId: "3807", quantity: 2 }],
+      },
+      signal,
+    );
     assert.deepEqual(simulation.lines[0]?.promotions, [
       "2do al 70% Tarjeta Carrefour o Cuenta digital Max 48 Combinable 9 al 15.10 COCA COLA",
     ]);
@@ -284,11 +316,14 @@ describe("createCarrefourStore", () => {
 
   it("marks an item checkout cannot deliver as unavailable and leaves it out of the total", async () => {
     const { store } = recorded([[/orderForms\/simulation/, "simulation-unavailable"]]);
-    const simulation = await store.simulate({
-      postalCode: "1425",
-      card: null,
-      items: [{ itemId: "11187", quantity: 1 }],
-    });
+    const simulation = await store.simulate(
+      {
+        postalCode: "1425",
+        card: null,
+        items: [{ itemId: "11187", quantity: 1 }],
+      },
+      signal,
+    );
     assert.equal(simulation.lines[0]?.available, false);
     assert.equal(simulation.total, 0);
   });
@@ -343,5 +378,71 @@ describe("createCarrefourStore", () => {
         tipo: "Banana",
       },
     ]);
+  });
+});
+
+describe("createCarrefourStore and its signal", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("passes the signal of each call to every request it makes", async () => {
+    const { store, seen } = recorded([
+      ...searchRoutes,
+      [/orderForms\/simulation/, "simulation-banana"],
+    ]);
+    const controller = new AbortController();
+    await store.checkDelivery("1425", controller.signal);
+    await store.findCandidates(
+      {
+        postalCode: "1425",
+        tipos: ["Gaseosa"],
+        brands: ["Coca-Cola"],
+        sort: "discount:desc",
+        limit: 2,
+      },
+      controller.signal,
+    );
+    await store.simulate(
+      { postalCode: "1425", card: null, items: [{ itemId: "7870", quantity: 1 }] },
+      controller.signal,
+    );
+    assert.ok(seen.length >= 5);
+    assert.ok(seen.every((request) => request.signal === controller.signal));
+  });
+
+  it("asks again for a Tipo whose lookup failed instead of keeping the failure", async () => {
+    let failFacets = true;
+    const http = (request: HttpRequest) => {
+      if (failFacets && request.url.includes("/facets/trade-policy/1?")) {
+        failFacets = false;
+        return Promise.reject(new Error("aborted"));
+      }
+      const route = searchRoutes.find(([pattern]) => pattern.test(request.url));
+      return route
+        ? Promise.resolve(fixture(route[1]))
+        : Promise.reject(new Error(`no recorded response for ${request.url}`));
+    };
+    const store = createCarrefourStore(http);
+    const query = {
+      postalCode: "1425",
+      tipos: ["Gaseosa"],
+      brands: ["Coca-Cola"],
+      sort: "discount:desc" as const,
+      limit: 2,
+    };
+    await assert.rejects(store.findCandidates(query, signal), /aborted/);
+    assert.equal((await store.findCandidates(query, signal)).length > 0, true);
+  });
+
+  it("hands the signal to fetch", async () => {
+    const signals: (AbortSignal | null | undefined)[] = [];
+    vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+      signals.push(init.signal);
+      return Promise.resolve(Response.json(fixture("regions")));
+    });
+    const controller = new AbortController();
+    assert.equal(await createCarrefourStore().checkDelivery("1425", controller.signal), "delivers");
+    assert.deepEqual(signals, [controller.signal]);
   });
 });

@@ -37,9 +37,12 @@ export type MapAnswerInput = { questions: QuestionInput[]; answer: string };
 export type TranslatePreferenceInput = { preference: string };
 
 export type Llm = {
-  splitOrder(orderText: string): Promise<SplitOrderOutput>;
-  resolveItem(input: ResolveItemInput): Promise<ResolveItemOutput>;
-  rewordItem(input: ResolveItemInput): Promise<RewordItemOutput>;
-  mapAnswer(input: MapAnswerInput): Promise<MapAnswerOutput>;
-  translatePreference(input: TranslatePreferenceInput): Promise<SelectionPolicy>;
+  splitOrder(orderText: string, signal: AbortSignal): Promise<SplitOrderOutput>;
+  resolveItem(input: ResolveItemInput, signal: AbortSignal): Promise<ResolveItemOutput>;
+  rewordItem(input: ResolveItemInput, signal: AbortSignal): Promise<RewordItemOutput>;
+  mapAnswer(input: MapAnswerInput, signal: AbortSignal): Promise<MapAnswerOutput>;
+  translatePreference(
+    input: TranslatePreferenceInput,
+    signal: AbortSignal,
+  ): Promise<SelectionPolicy>;
 };

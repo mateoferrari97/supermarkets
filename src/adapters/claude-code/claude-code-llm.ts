@@ -17,7 +17,11 @@ export const DEFAULT_MODEL = "claude-haiku-5-5";
 export const DEFAULT_BUDGET_USD = 0.25;
 
 export type ProcessResult = { exitCode: number; stdout: string; stderr: string };
-export type ProcessRunner = (args: string[], input: string) => Promise<ProcessResult>;
+export type ProcessRunner = (
+  args: string[],
+  input: string,
+  signal: AbortSignal,
+) => Promise<ProcessResult>;
 
 export type LlmCall = { task: string; costUsd: number; durationMs: number };
 
@@ -44,7 +48,7 @@ export function createClaudeCodeLlm({
   promptsDir,
   model = DEFAULT_MODEL,
   budgetUsd = DEFAULT_BUDGET_USD,
-  run = runClaude,
+  run = createProcessRunner("claude"),
   onCall,
 }: ClaudeCodeLlmOptions): Llm {
   const prompt = (task: string) => readFileSync(join(promptsDir, `${task}.md`), "utf8");
@@ -55,6 +59,7 @@ export function createClaudeCodeLlm({
     systemPrompt: string,
     schema: z.ZodType<T>,
     input: unknown,
+    signal: AbortSignal,
   ): Promise<T> => {
     const args = [
       "-p",
@@ -74,7 +79,8 @@ export function createClaudeCodeLlm({
       "--output-format",
       "json",
     ];
-    const result = await run(args, JSON.stringify(input));
+    signal.throwIfAborted();
+    const result = await run(args, JSON.stringify(input), signal);
     if (result.exitCode !== 0) {
       throw new Error(
         `Claude Code session for ${task} exited with ${result.exitCode}: ${result.stderr.trim()}`,
@@ -97,25 +103,40 @@ export function createClaudeCodeLlm({
   };
 
   return {
-    splitOrder: (orderText) =>
-      ask("split-order", prompt("split-order"), splitOrderOutputSchema, { order: orderText }),
-    resolveItem: (input: ResolveItemInput) =>
+    splitOrder: (orderText, signal) =>
+      ask(
+        "split-order",
+        prompt("split-order"),
+        splitOrderOutputSchema,
+        { order: orderText },
+        signal,
+      ),
+    resolveItem: (input: ResolveItemInput, signal) =>
       ask(
         "resolve-item",
         `${prompt("resolve-item")}\n\n# Product Type tree\n\n${tree}`,
         resolveItemOutputSchema,
         input,
+        signal,
       ),
-    rewordItem: (input) =>
+    rewordItem: (input, signal) =>
       ask(
         "reword-item",
         `${prompt("reword-item")}\n\n# Product Type tree\n\n${tree}`,
         rewordItemOutputSchema,
         input,
+        signal,
       ),
-    mapAnswer: (input) => ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input),
-    translatePreference: (input) =>
-      ask("translate-preference", prompt("translate-preference"), selectionPolicySchema, input),
+    mapAnswer: (input, signal) =>
+      ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input, signal),
+    translatePreference: (input, signal) =>
+      ask(
+        "translate-preference",
+        prompt("translate-preference"),
+        selectionPolicySchema,
+        input,
+        signal,
+      ),
   };
 }
 
@@ -133,14 +154,31 @@ export function renderTree(vocabulary: Vocabulary): string {
     .join("\n");
 }
 
-const runClaude: ProcessRunner = (args, input) =>
-  new Promise((resolve, reject) => {
-    const child = spawn("claude", args, { cwd: tmpdir(), stdio: ["pipe", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
-    child.on("error", reject);
-    child.on("close", (exitCode) => resolve({ exitCode: exitCode ?? 1, stdout, stderr }));
-    child.stdin.end(input);
-  });
+export function createProcessRunner(command: string): ProcessRunner {
+  return (args, input, signal) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        cwd: tmpdir(),
+        stdio: ["pipe", "pipe", "pipe"],
+        signal,
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+      child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+      const fail = (error: Error) => {
+        if (!signal.aborted) reject(error);
+      };
+      child.stdin.on("error", fail);
+      child.on("error", fail);
+      child.on("close", (exitCode) => {
+        if (signal.aborted) reject(abortReason(signal));
+        else resolve({ exitCode: exitCode ?? 1, stdout, stderr });
+      });
+      child.stdin.end(input);
+    });
+}
+
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason));
+}

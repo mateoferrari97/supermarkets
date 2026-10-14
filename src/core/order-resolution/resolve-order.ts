@@ -1,3 +1,4 @@
+import { stepsFrom, type StepOptions, type Steps } from "../order-conversation/steps.ts";
 import type { TipoMapping, Vocabulary } from "../product-types/schema.ts";
 import { buildBm25Index } from "./bm25.ts";
 import { distinctSizes, nameMatchesTerm, productMatchesBrand } from "../catalog/catalog.ts";
@@ -38,8 +39,12 @@ export type OrderDependencies = {
 };
 
 export type OrderResolver = {
-  resolveOrder: (orderText: string) => Promise<OrderResolution>;
-  answerQuestions: (resolution: OrderResolution, answerText: string) => Promise<OrderResolution>;
+  resolveOrder: (orderText: string, options?: StepOptions) => Promise<OrderResolution>;
+  answerQuestions: (
+    resolution: OrderResolution,
+    answerText: string,
+    options?: StepOptions,
+  ) => Promise<OrderResolution>;
 };
 
 type Answer = MapAnswerOutput["answers"][number];
@@ -120,9 +125,9 @@ export function createOrderResolver({
     return { ...item, productTypes: types, question: null };
   };
 
-  const attempt = async (item: Item, phrase: string): Promise<OrderItem> => {
+  const attempt = async (item: Item, phrase: string, signal: AbortSignal): Promise<OrderItem> => {
     const query = { ...item, phrase };
-    const answer = await llm.resolveItem({ item: query, evidence: evidenceFor(query) });
+    const answer = await llm.resolveItem({ item: query, evidence: evidenceFor(query) }, signal);
     const known = answer.candidates.filter((id) => productTypes.has(id) || groupChildren.has(id));
     const candidates = expand(known);
     if (candidates.length === 0 || answer.kind === "none") {
@@ -140,14 +145,15 @@ export function createOrderResolver({
     };
   };
 
-  const resolveItem = async (item: Item): Promise<OrderItem> => {
-    const first = await attempt(item, item.phrase);
-    if (first.question?.kind !== "phrase") return first;
-    const { phrase } = await llm.rewordItem({ item, evidence: evidenceFor(item) });
-    return attempt(item, phrase);
-  };
+  const resolveItem = (item: Item, steps: Steps): Promise<OrderItem> =>
+    steps.run({ kind: "search-item", phrase: item.phrase }, async () => {
+      const first = await attempt(item, item.phrase, steps.signal);
+      if (first.question?.kind !== "phrase") return first;
+      const { phrase } = await llm.rewordItem({ item, evidence: evidenceFor(item) }, steps.signal);
+      return attempt(item, phrase, steps.signal);
+    });
 
-  const apply = (orderItem: OrderItem, answer: Answer): Promise<OrderItem> | null => {
+  const apply = (orderItem: OrderItem, answer: Answer, steps: Steps): Promise<OrderItem> | null => {
     const { question } = orderItem;
     const item = itemFields(orderItem);
     if (!question) return null;
@@ -163,7 +169,7 @@ export function createOrderResolver({
       }
       case "phrase":
         return answer.kind === "rephrased" && answer.phrase
-          ? resolveItem({ ...item, phrase: answer.phrase })
+          ? resolveItem({ ...item, phrase: answer.phrase }, steps)
           : null;
       case "term": {
         const others = item.terms.filter((term) => term !== question.term);
@@ -191,19 +197,26 @@ export function createOrderResolver({
   const answerQuestions = async (
     resolution: OrderResolution,
     answerText: string,
+    options?: StepOptions,
   ): Promise<OrderResolution> => {
     const questions = questionsOf(resolution.items);
     if (questions.length === 0) return resolution;
-    const { answers } = await llm.mapAnswer({
-      questions: questions.map(({ question, item }) => questionInput(question, item)),
-      answer: answerText,
-    });
+    const steps = stepsFrom(options);
+    const { answers } = await steps.run({ kind: "understand-answer" }, () =>
+      llm.mapAnswer(
+        {
+          questions: questions.map(({ question, item }) => questionInput(question, item)),
+          answer: answerText,
+        },
+        steps.signal,
+      ),
+    );
 
     const updates = new Map<OrderItem, Promise<OrderItem>>();
     for (const answer of answers) {
       const item = questions.find(({ question }) => question === answer.question)?.item;
       if (!item || updates.has(item)) continue;
-      const update = apply(item, answer);
+      const update = apply(item, answer, steps);
       if (update) updates.set(item, update);
     }
 
@@ -214,9 +227,15 @@ export function createOrderResolver({
   };
 
   return {
-    resolveOrder: async (orderText) => {
-      const { items, paymentCard, preference } = await llm.splitOrder(orderText);
-      return withMessage(await Promise.all(items.map(resolveItem)), { paymentCard, preference });
+    resolveOrder: async (orderText, options) => {
+      const steps = stepsFrom(options);
+      const { items, paymentCard, preference } = await steps.run({ kind: "understand-order" }, () =>
+        llm.splitOrder(orderText, steps.signal),
+      );
+      return withMessage(await Promise.all(items.map((item) => resolveItem(item, steps))), {
+        paymentCard,
+        preference,
+      });
     },
     answerQuestions,
   };
@@ -290,14 +309,16 @@ function withMessage(items: OrderItem[], details: OrderDetails): OrderResolution
 export function resolveOrder(
   orderText: string,
   dependencies: OrderDependencies,
+  options?: StepOptions,
 ): Promise<OrderResolution> {
-  return createOrderResolver(dependencies).resolveOrder(orderText);
+  return createOrderResolver(dependencies).resolveOrder(orderText, options);
 }
 
 export function answerQuestions(
   resolution: OrderResolution,
   answerText: string,
   dependencies: OrderDependencies,
+  options?: StepOptions,
 ): Promise<OrderResolution> {
-  return createOrderResolver(dependencies).answerQuestions(resolution, answerText);
+  return createOrderResolver(dependencies).answerQuestions(resolution, answerText, options);
 }

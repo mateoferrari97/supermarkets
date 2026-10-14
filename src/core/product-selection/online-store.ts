@@ -46,8 +46,8 @@ export type Simulation = { lines: SimulatedLine[]; total: number };
 export type Delivery = "delivers" | "does-not-deliver" | "postal-code-rejected";
 
 export type OnlineStore = {
-  checkDelivery: (postalCode: string) => Promise<Delivery>;
-  findCandidates: (query: CandidateQuery) => Promise<StoreProduct[]>;
-  simulate: (request: SimulationRequest) => Promise<Simulation>;
+  checkDelivery: (postalCode: string, signal: AbortSignal) => Promise<Delivery>;
+  findCandidates: (query: CandidateQuery, signal: AbortSignal) => Promise<StoreProduct[]>;
+  simulate: (request: SimulationRequest, signal: AbortSignal) => Promise<Simulation>;
   cartLink: (items: SimulationItem[]) => string;
 };

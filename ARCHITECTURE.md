@@ -10,6 +10,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
 
 - `src/core/<feature>/`: domain rules, use cases and port types of one feature. It imports only `core` and zod.
   - `src/core/catalog/`: text normalization, sizes in product names and brand matching.
+  - `src/core/order-conversation/`: the conversation of an order, `takeTurn` (`take-turn.ts`), and the step events it reports while it works (`steps.ts`).
   - `src/core/order-resolution/`: from the order text to resolved Items and questions; the `Llm` port; the eval set and its scoring.
   - `src/core/product-selection/`: from resolved Items to a cart; the `OnlineStore` port; Payment Cards and postal codes.
   - `src/core/product-types/`: the schema and validation of the Product Type vocabulary and the Carrefour Tipo mapping.
@@ -21,7 +22,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
   - `src/adapters/files/`: every read and write of the data folders (`data-files.ts`). It is the only place that knows their paths and layout, and each loader of `vocabulary/` and `evals/` data runs the full validation of `core` (schema plus cross-references) and returns the data or the errors.
 - `src/compose.ts`: the composition root. It wires adapters into the ports (`createLlm`, `createOnlineStore`, `createOrderResolver({ model? })`), exposes the named loaders and savers of `src/adapters/files/` (`loadOrderData`, `loadProductTypes`, `saveParts`, `saveEvalRun`, ...) and `downloadCatalog(outputDir?)`, and imports only `core` and `adapters`.
 - `src/cli/`: one file per operator command, run by `package.json` through `tsx`. A command reads its arguments from `process`, loads and saves only through `compose`, never imports `node:fs` or `adapters`, and reports through `src/cli/report.ts` (print the errors and exit 1, or print the success line).
-- `scripts/`: repo tooling outside the architecture (`format.mjs`, `no-comments.ts`, `check-docs.ts`), plus `order.ts` until the chat replaces `pnpm order`.
+- `scripts/`: repo tooling outside the architecture (`format.mjs`, `no-comments.ts`, `check-docs.ts`).
 
 ## Ports and the dependency rule
 
@@ -30,20 +31,22 @@ Only two things vary per adapter, so only they are ports (ADR 0006):
 - `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer, translate a preference.
 - `OnlineStore` (`src/core/product-selection/online-store.ts`): check delivery to a postal code, find candidates, simulate a cart, build the cart link.
 
+Every method of both ports that calls out takes an `AbortSignal`: the Claude Code adapter kills its `claude` process on abort and the Carrefour adapter passes the signal to `fetch`. `cartLink` only builds a URL and takes none.
+
 Static data (Catalog Snapshot, vocabulary, mapping, Payment Cards, eval set) has no port: it is loaded outside `core` and passed in as arguments. ESLint's `no-restricted-imports` in `eslint.config.js` enforces the rule in `pnpm lint`: `core` imports only `core` and zod; adapters import `core`, `node:*` and zod; `compose` imports `core` and adapters; `cli` and `app` never import adapters, and `cli` never imports `node:fs`. Imports between features inside `core` are free.
 
 ## An order end to end
 
-Today an order runs in the terminal with `pnpm order` (`scripts/order.ts`):
+An order is a conversation: `takeTurn(state, replyText, deps, onStep)` (`src/core/order-conversation/take-turn.ts`) takes the conversation's state and the Owner's reply and returns the next state and the reply to show. `deps` holds the order data, both ports and the turn's `AbortSignal`, which reaches every port call; an aborted turn rejects and the caller keeps the state it had. `onStep` receives each step started and done (`src/core/order-conversation/steps.ts`): understanding the order or the answer, searching each Item, translating the preference, Carrefour candidates for each Item, simulating the cart. No command places an order: the chat of ADR 0008 holds the conversation once it is built.
 
-1. **Postal code.** `postalCodeFrom` (`src/core/product-selection/postal-code.ts`) reads the code from the Owner's text; `OnlineStore.checkDelivery` asks Carrefour's regions endpoint (`src/adapters/carrefour/carrefour-store.ts`) whether it delivers there. A refusal asks again.
-2. **Data.** `loadOrderData` (`src/compose.ts`, reading through `src/adapters/files/data-files.ts`) loads the Catalog Snapshot's grocery products, the vocabulary, the Tipo mapping and the Payment Cards, and stops with every validation error before the order is read.
+1. **Data.** Before the first turn, `loadOrderData` (`src/compose.ts`, reading through `src/adapters/files/data-files.ts`) loads the Catalog Snapshot's grocery products, the vocabulary, the Tipo mapping and the Payment Cards, and stops with every validation error before any order is read.
+2. **Postal code.** A new conversation asks "¿A qué código postal es el envío?". `postalCodeFrom` (`src/core/product-selection/postal-code.ts`) reads the code from the Owner's reply; `OnlineStore.checkDelivery` asks Carrefour's regions endpoint (`src/adapters/carrefour/carrefour-store.ts`) whether it delivers there. A refusal asks again; once accepted, the next reply is the order text.
 3. **Resolver.** `createOrderResolver` (`src/core/order-resolution/resolve-order.ts`) builds a BM25 index (`src/core/order-resolution/bm25.ts`) over the names of the products whose Tipo is mapped to a Product Type.
 4. **Split.** `resolveOrder` calls `Llm.splitOrder`, which turns the text into Items (phrase, quantity, terms, vague words, brand), the Payment Card and the preference.
 5. **Resolve each Item.** The BM25 evidence and the Item go to `Llm.resolveItem`, which answers `match`, `ambiguous` or `none` with Product Type ids; code drops unknown ids. `none` is retried once with `Llm.rewordItem`. Code then checks the Item's terms against product names and builds size options for vague words from the Catalog Snapshot (`src/core/catalog/catalog.ts`).
 6. **Questions.** Every open doubt becomes one numbered message. `answerQuestions` maps the Owner's free-text answer onto the options with `Llm.mapAnswer` and asks again what still does not match.
 7. **Pick.** `pickProducts` (`src/core/product-selection/pick-products.ts`) translates the preference into a Selection Policy with `Llm.translatePreference`, finds the Payment Card (`src/core/product-selection/payment-cards.ts`), and for each Item asks `OnlineStore.findCandidates` for available products of the mapped Tipos in the Owner's region, simulates the first candidates one by one with `OnlineStore.simulate`, and ranks them with the policy. When search finds nothing it falls back to Catalog Snapshot products.
-8. **Cart.** The whole cart is simulated again; an unavailable product is replaced by the Item's next candidate. `OnlineStore.cartLink` builds the link, and the script prints each line, the notices, the preferences no rule could apply, the total and the link.
+8. **Cart.** The whole cart is simulated again; an unavailable product is replaced by the Item's next candidate. `OnlineStore.cartLink` builds the link, and the turn's reply is the Product Selection: each line, the notices, the preferences no rule could apply, the total and the link.
 
 ## Data
 

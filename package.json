@@ -22,7 +22,6 @@
     "seed:consolidate": "tsx src/cli/seed-consolidate.ts",
     "seed:coverage": "tsx src/cli/seed-coverage.ts",
     "seed:doubts": "tsx src/cli/seed-doubts.ts",
-    "order": "tsx scripts/order.ts",
     "order:eval": "tsx src/cli/order-eval.ts",
     "order:eval-set": "tsx src/cli/order-eval-set.ts"
   },

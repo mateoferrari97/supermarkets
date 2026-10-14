@@ -3,7 +3,12 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vitest";
-import { createClaudeCodeLlm, type LlmCall, type ProcessResult } from "./claude-code-llm.ts";
+import {
+  createClaudeCodeLlm,
+  createProcessRunner,
+  type LlmCall,
+  type ProcessResult,
+} from "./claude-code-llm.ts";
 
 const promptsDir = mkdtempSync(join(tmpdir(), "prompts-"));
 writeFileSync(join(promptsDir, "split-order.md"), "Split the order.");
@@ -27,12 +32,20 @@ const session = (fields: Record<string, unknown>): ProcessResult => ({
   }),
 });
 
-const llmWith = (result: ProcessResult, calls: LlmCall[] = [], argsSeen: string[][] = []) =>
+const signal = new AbortController().signal;
+
+const llmWith = (
+  result: ProcessResult,
+  calls: LlmCall[] = [],
+  argsSeen: string[][] = [],
+  signalsSeen: AbortSignal[] = [],
+) =>
   createClaudeCodeLlm({
     vocabulary,
     promptsDir,
-    run: (args) => {
+    run: (args, _input, runSignal) => {
       argsSeen.push(args);
+      signalsSeen.push(runSignal);
       return Promise.resolve(result);
     },
     onCall: (call) => calls.push(call),
@@ -47,10 +60,13 @@ describe("createClaudeCodeLlm", () => {
       calls,
       argsSeen,
     );
-    const answer = await llm.resolveItem({
-      item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
-      evidence: [],
-    });
+    const answer = await llm.resolveItem(
+      {
+        item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
+        evidence: [],
+      },
+      signal,
+    );
     assert.deepEqual(answer, { kind: "match", candidates: ["yerba"] });
     assert.deepEqual(calls, [{ task: "resolve-item", costUsd: 0.0137, durationMs: 3039 }]);
     const args = argsSeen[0]!;
@@ -74,7 +90,10 @@ describe("createClaudeCodeLlm", () => {
     };
     const llm = llmWith(session({ structured_output: policy }), [], argsSeen);
     assert.deepEqual(
-      await llm.translatePreference({ preference: "lo más barato, prefiero Sancor o Ilolay" }),
+      await llm.translatePreference(
+        { preference: "lo más barato, prefiero Sancor o Ilolay" },
+        signal,
+      ),
       policy,
     );
     const args = argsSeen[0]!;
@@ -98,14 +117,14 @@ describe("createClaudeCodeLlm", () => {
       }),
     );
     await assert.rejects(
-      llm.translatePreference({ preference: "lo mejor" }),
+      llm.translatePreference({ preference: "lo mejor" }, signal),
       /translate-preference returned an invalid answer/,
     );
   });
 
   it("fails on an answer that does not match the task's schema", async () => {
     const llm = llmWith(session({ structured_output: { items: [{ phrase: "" }] } }));
-    await assert.rejects(llm.splitOrder("yerba"), /split-order returned an invalid answer/);
+    await assert.rejects(llm.splitOrder("yerba", signal), /split-order returned an invalid answer/);
   });
 
   it("fails when the session reports an error such as an exhausted budget", async () => {
@@ -117,13 +136,65 @@ describe("createClaudeCodeLlm", () => {
       }),
     );
     await assert.rejects(
-      llm.splitOrder("yerba"),
+      llm.splitOrder("yerba", signal),
       /split-order failed \(error_max_budget_usd\): Reached maximum budget/,
     );
   });
 
   it("fails when the CLI exits with an error", async () => {
     const llm = llmWith({ exitCode: 1, stdout: "", stderr: "Not logged in\n" });
-    await assert.rejects(llm.splitOrder("yerba"), /exited with 1: Not logged in/);
+    await assert.rejects(llm.splitOrder("yerba", signal), /exited with 1: Not logged in/);
+  });
+
+  it("passes the signal of the call to the session it runs", async () => {
+    const signalsSeen: AbortSignal[] = [];
+    const controller = new AbortController();
+    const llm = llmWith(
+      session({ structured_output: { kind: "none", candidates: [] } }),
+      [],
+      [],
+      signalsSeen,
+    );
+    await llm.resolveItem(
+      {
+        item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
+        evidence: [],
+      },
+      controller.signal,
+    );
+    assert.deepEqual(signalsSeen, [controller.signal]);
+  });
+
+  it("starts no session once the signal is aborted", async () => {
+    const argsSeen: string[][] = [];
+    const controller = new AbortController();
+    controller.abort();
+    const llm = llmWith(session({ structured_output: {} }), [], argsSeen);
+    await assert.rejects(llm.splitOrder("yerba", controller.signal), { name: "AbortError" });
+    assert.equal(argsSeen.length, 0);
+  });
+});
+
+describe("createProcessRunner", () => {
+  it("returns what the process wrote and its exit code", async () => {
+    const run = createProcessRunner(process.execPath);
+    const result = await run(
+      ["-e", "process.stdin.pipe(process.stdout); process.exitCode = 3"],
+      "hola",
+      signal,
+    );
+    assert.deepEqual(result, { exitCode: 3, stdout: "hola", stderr: "" });
+  });
+
+  it("kills the process when the signal is aborted and rejects once it has exited", async () => {
+    const run = createProcessRunner(process.execPath);
+    const controller = new AbortController();
+    const running = run(
+      ["-e", "process.stdout.write('started'); setInterval(() => {}, 1000)"],
+      "",
+      controller.signal,
+    );
+    setTimeout(() => controller.abort(), 200);
+    await assert.rejects(running, { name: "AbortError" });
   });
 });

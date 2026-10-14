@@ -581,9 +581,9 @@ describe("pickProducts", () => {
       const { store } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
       const finalStore: OnlineStore = {
         ...store,
-        simulate: (request) => {
+        simulate: (request, signal) => {
           calls += 1;
-          if (calls === 1) return store.simulate(request);
+          if (calls === 1) return store.simulate(request, signal);
           return Promise.resolve({
             lines: [
               {
@@ -610,8 +610,8 @@ describe("pickProducts", () => {
 
     const goneInCart = (store: OnlineStore, gone: string): OnlineStore => ({
       ...store,
-      simulate: async (request) => {
-        const simulation = await store.simulate(request);
+      simulate: async (request, signal) => {
+        const simulation = await store.simulate(request, signal);
         if (request.items.length < 2) return simulation;
         const lines = simulation.lines.map((line) =>
           line.itemId === gone ? { ...line, available: false } : line,

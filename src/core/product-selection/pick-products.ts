@@ -1,3 +1,4 @@
+import { stepsFrom, type StepOptions } from "../order-conversation/steps.ts";
 import type { TipoMapping } from "../product-types/schema.ts";
 import { nameMatchesTerm, productMatchesBrand, sizesIn } from "../catalog/catalog.ts";
 import { DEFAULT_SELECTION_POLICY, type SelectionPolicy } from "../order-resolution/concepts.ts";
@@ -54,7 +55,10 @@ export async function pickProducts(
   resolution: OrderResolution,
   postalCode: string,
   { mapping, store, llm, paymentCards, snapshot }: PickDependencies,
+  options?: StepOptions,
 ): Promise<ProductSelection> {
+  const steps = stepsFrom(options);
+  const { signal } = steps;
   const { paymentCard, preference } = resolution;
   if (resolution.message !== null) {
     throw new Error("Products can only be picked once every question of the order is answered");
@@ -64,13 +68,17 @@ export async function pickProducts(
   }
 
   const policy =
-    preference === null ? DEFAULT_SELECTION_POLICY : await llm.translatePreference({ preference });
+    preference === null
+      ? DEFAULT_SELECTION_POLICY
+      : await steps.run({ kind: "translate-preference", preference }, () =>
+          llm.translatePreference({ preference }, signal),
+        );
   const card = paymentCard === null ? null : findPaymentCard(paymentCards, paymentCard);
   const orderNotices =
     paymentCard !== null && card === null
       ? [`No conozco la tarjeta "${paymentCard}": elegí los productos sin sus promociones.`]
       : [];
-  const simulate = (items: SimulationItem[]) => store.simulate({ postalCode, card, items });
+  const simulate = (items: SimulationItem[]) => store.simulate({ postalCode, card, items }, signal);
 
   const tiposOf = (item: OrderItem) => {
     const ids = new Set(item.productTypes.map(({ id }) => id));
@@ -113,13 +121,17 @@ export async function pickProducts(
     const notices: string[] = [];
 
     for (const [attempt, brands] of rules.searches.entries()) {
-      const found = await store.findCandidates({
-        postalCode,
-        tipos,
-        brands,
-        sort: policy.ranking === "cheapest-per-unit" ? "price:asc" : "discount:desc",
-        limit: item.terms.length > 0 || rules.excluded.length > 0 ? SEARCH_LIMIT : SIMULATION_LIMIT,
-      });
+      const found = await store.findCandidates(
+        {
+          postalCode,
+          tipos,
+          brands,
+          sort: policy.ranking === "cheapest-per-unit" ? "price:asc" : "discount:desc",
+          limit:
+            item.terms.length > 0 || rules.excluded.length > 0 ? SEARCH_LIMIT : SIMULATION_LIMIT,
+        },
+        signal,
+      );
       const available = await firstAvailable(item, found.filter(wanted), CANDIDATES_PER_ITEM);
       if (available.length > 0) {
         if (attempt > 0) {
@@ -145,7 +157,11 @@ export async function pickProducts(
     return { item, ranked: rank(available, policy.ranking), chosen: 0, notices };
   };
 
-  const picks = await Promise.all(resolution.items.map(pick));
+  const picks = await Promise.all(
+    resolution.items.map((item) =>
+      steps.run({ kind: "find-candidates", phrase: item.phrase }, () => pick(item)),
+    ),
+  );
 
   const inCart = () => picks.filter(({ ranked, chosen }) => ranked[chosen] !== undefined);
 
@@ -172,22 +188,27 @@ export async function pickProducts(
     return { lines, total: final.total };
   };
 
-  let cart = await simulateCart(inCart());
-  let missing = inCart().filter((itemPick) => !cart.lines.get(itemPick)?.available);
-  while (missing.length > 0) {
-    for (const missed of missing) {
-      const gone = missed.ranked[missed.chosen]!.product;
-      missed.chosen += 1;
-      const next = missed.ranked[missed.chosen]?.product;
-      missed.notices.push(
-        next
-          ? `"${gone.name}" dejó de estar disponible al armar el carrito: lo cambié por "${next.name}".`
-          : `"${gone.name}" dejó de estar disponible al armar el carrito.`,
-      );
+  const settleCart = async () => {
+    let cart = await simulateCart(inCart());
+    let missing = inCart().filter((itemPick) => !cart.lines.get(itemPick)?.available);
+    while (missing.length > 0) {
+      for (const missed of missing) {
+        const gone = missed.ranked[missed.chosen]!.product;
+        missed.chosen += 1;
+        const next = missed.ranked[missed.chosen]?.product;
+        missed.notices.push(
+          next
+            ? `"${gone.name}" dejó de estar disponible al armar el carrito: lo cambié por "${next.name}".`
+            : `"${gone.name}" dejó de estar disponible al armar el carrito.`,
+        );
+      }
+      cart = await simulateCart(inCart());
+      missing = inCart().filter((itemPick) => !cart.lines.get(itemPick)?.available);
     }
-    cart = await simulateCart(inCart());
-    missing = inCart().filter((itemPick) => !cart.lines.get(itemPick)?.available);
-  }
+    return cart;
+  };
+
+  const cart = await steps.run({ kind: "simulate-cart" }, settleCart);
 
   const lines = await Promise.all(
     picks.map(async (itemPick): Promise<PickedLine> => {
