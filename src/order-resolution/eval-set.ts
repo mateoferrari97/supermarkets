@@ -136,9 +136,9 @@ function satisfies(
   groupChildren: Map<string, string[]>,
 ): boolean {
   if ("productType" in expected) {
-    if (actual.status !== "resolved" || actual.productType.id !== expected.productType) {
-      return false;
-    }
+    if (actual.status !== "resolved") return false;
+    const [only, ...others] = actual.productTypes;
+    if (only?.id !== expected.productType || others.length > 0) return false;
   } else {
     if (actual.status !== "pending" || actual.reason === "none") return false;
     const wanted = [

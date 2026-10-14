@@ -17,15 +17,36 @@ export const resolveItemOutputSchema = z.strictObject({
   candidates: z.array(z.string()),
 });
 
+export const mapAnswerOutputSchema = z.strictObject({
+  answers: z.array(
+    z.strictObject({
+      question: z.number().int().positive(),
+      kind: z.enum(["chosen", "any", "unclear"]),
+      options: z.array(z.number().int().positive()),
+    }),
+  ),
+});
+
 export type SplitOrderOutput = z.infer<typeof splitOrderOutputSchema>;
 export type Item = SplitOrderOutput["items"][number];
 export type ResolveItemOutput = z.infer<typeof resolveItemOutputSchema>;
+
+export type MapAnswerOutput = z.infer<typeof mapAnswerOutputSchema>;
 
 export type Evidence = { product: string; productTypeId: string; productTypeName: string };
 
 export type ResolveItemInput = { item: Item; evidence: Evidence[] };
 
+export type QuestionInput = {
+  question: number;
+  phrase: string;
+  options: { option: number; name: string }[];
+};
+
+export type MapAnswerInput = { questions: QuestionInput[]; answer: string };
+
 export type Llm = {
   splitOrder(orderText: string): Promise<SplitOrderOutput>;
   resolveItem(input: ResolveItemInput): Promise<ResolveItemOutput>;
+  mapAnswer(input: MapAnswerInput): Promise<MapAnswerOutput>;
 };

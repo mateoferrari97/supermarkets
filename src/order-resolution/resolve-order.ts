@@ -1,6 +1,6 @@
 import type { TipoMapping, Vocabulary } from "../product-types/schema.ts";
 import { buildBm25Index } from "./bm25.ts";
-import type { Evidence, Item, Llm } from "./llm.ts";
+import type { Evidence, Item, Llm, QuestionInput } from "./llm.ts";
 
 export const EVIDENCE_LIMIT = 10;
 
@@ -8,7 +8,7 @@ export type CatalogProduct = { name: string; brand: string | null; tipo: string 
 
 export type ProductTypeRef = { id: string; name: string };
 
-export type ResolvedItem = Item & { status: "resolved"; productType: ProductTypeRef };
+export type ResolvedItem = Item & { status: "resolved"; productTypes: ProductTypeRef[] };
 
 export type PendingItem = Item & {
   status: "pending";
@@ -16,7 +16,9 @@ export type PendingItem = Item & {
   candidates: ProductTypeRef[];
 };
 
-export type OrderResolution = { items: (ResolvedItem | PendingItem)[] };
+export type OrderItem = ResolvedItem | PendingItem;
+
+export type OrderResolution = { items: OrderItem[]; message: string | null };
 
 export type OrderDependencies = {
   products: CatalogProduct[];
@@ -83,7 +85,7 @@ export function createOrderResolver({
     }
     const [only] = candidates;
     if (answer.kind === "match" && candidates.length === 1 && only && productTypes.has(known[0]!)) {
-      return { ...item, status: "resolved", productType: only };
+      return { ...item, status: "resolved", productTypes: [only] };
     }
     const reason = known.some((id) => groupChildren.has(id)) ? "group" : "ambiguous";
     return { ...item, status: "pending", reason, candidates };
@@ -91,8 +93,66 @@ export function createOrderResolver({
 
   return async (orderText) => {
     const { items } = await llm.splitOrder(orderText);
-    return { items: await Promise.all(items.map(resolveItem)) };
+    return withMessage(await Promise.all(items.map(resolveItem)));
   };
+}
+
+export async function answerQuestions(
+  resolution: OrderResolution,
+  answerText: string,
+  { llm }: Pick<OrderDependencies, "llm">,
+): Promise<OrderResolution> {
+  const questions = questionsOf(resolution.items);
+  if (questions.length === 0) return resolution;
+  const { answers } = await llm.mapAnswer({
+    questions: questions.map(({ question, item }) => ({
+      question,
+      phrase: item.phrase,
+      options: item.candidates.map(({ name }, index) => ({ option: index + 1, name })),
+    })),
+    answer: answerText,
+  });
+
+  const answered = new Map<PendingItem, ProductTypeRef[]>();
+  for (const answer of answers) {
+    const item = questions.find(({ question }) => question === answer.question)?.item;
+    if (!item || answered.has(item) || answer.kind === "unclear") continue;
+    const chosen =
+      answer.kind === "any"
+        ? item.candidates
+        : item.candidates.filter((_, index) => answer.options.includes(index + 1));
+    if (chosen.length > 0) answered.set(item, chosen);
+  }
+
+  return withMessage(
+    resolution.items.map((item) => {
+      const chosen = item.status === "pending" ? answered.get(item) : undefined;
+      if (!chosen || item.status !== "pending") return item;
+      const { reason: _reason, candidates: _candidates, ...rest } = item;
+      return { ...rest, status: "resolved", productTypes: chosen };
+    }),
+  );
+}
+
+type Question = Pick<QuestionInput, "question"> & { item: PendingItem };
+
+function questionsOf(items: OrderItem[]): Question[] {
+  return items
+    .filter((item): item is PendingItem => item.status === "pending" && item.candidates.length > 0)
+    .map((item, index) => ({ question: index + 1, item }));
+}
+
+function withMessage(items: OrderItem[]): OrderResolution {
+  const questions = questionsOf(items);
+  if (questions.length === 0) return { items, message: null };
+  const asked = questions.map(({ question, item }) => {
+    const options = item.candidates.map(({ name }, index) => `   ${index + 1}) ${name}`);
+    return [`${question}. Para "${item.phrase}", ¿cuál querés?`, ...options].join("\n");
+  });
+  const intro = questions.length === 1 ? "Tengo una pregunta:" : "Tengo unas preguntas:";
+  const outro =
+    'Respondé con el número o con palabras ("la 2", "entera"), o "cualquiera" si te da igual.';
+  return { items, message: [intro, ...asked, outro].join("\n\n") };
 }
 
 export function resolveOrder(

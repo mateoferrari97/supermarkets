@@ -30,7 +30,7 @@ const item = (phrase: string, overrides: Partial<Item> = {}): Item => ({
 const resolved = (phrase: string, id: string, overrides: Partial<Item> = {}) => ({
   ...item(phrase, overrides),
   status: "resolved" as const,
-  productType: { id, name: id },
+  productTypes: [{ id, name: id }],
 });
 
 const pending = (phrase: string, ids: string[], overrides: Partial<Item> = {}) => ({
@@ -40,8 +40,15 @@ const pending = (phrase: string, ids: string[], overrides: Partial<Item> = {}) =
   candidates: ids.map((id) => ({ id, name: id })),
 });
 
-const score = (evalCase: Omit<EvalCase, "id" | "order">, resolution: OrderResolution) =>
-  scoreCase({ id: "case", order: "pedido", ...evalCase }, resolution, vocabulary);
+const score = (
+  evalCase: Omit<EvalCase, "id" | "order">,
+  resolution: Omit<OrderResolution, "message">,
+) =>
+  scoreCase(
+    { id: "case", order: "pedido", ...evalCase },
+    { ...resolution, message: null },
+    vocabulary,
+  );
 
 describe("validateEvalSet", () => {
   it("accepts cases whose expected ids are in the vocabulary", () => {

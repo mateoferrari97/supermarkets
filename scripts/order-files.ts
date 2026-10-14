@@ -34,7 +34,7 @@ export function renderItem(item: OrderResolution["items"][number]): string {
     .join("; ");
   const outcome =
     item.status === "resolved"
-      ? `${item.productType.name} \`${item.productType.id}\``
+      ? item.productTypes.map(({ id, name }) => `${name} \`${id}\``).join(" o ")
       : `pending (${item.reason}): ${item.candidates.map(({ id }) => id).join(", ") || "no candidates"}`;
   return `${item.phrase}${details ? ` [${details}]` : ""} → ${outcome}`;
 }

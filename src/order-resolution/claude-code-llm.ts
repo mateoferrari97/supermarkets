@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Vocabulary } from "../product-types/schema.ts";
 import {
+  mapAnswerOutputSchema,
   resolveItemOutputSchema,
   splitOrderOutputSchema,
   type Llm,
@@ -104,6 +105,7 @@ export function createClaudeCodeLlm({
         resolveItemOutputSchema,
         input,
       ),
+    mapAnswer: (input) => ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input),
   };
 }
 

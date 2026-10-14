@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { Item, Llm, ResolveItemInput, ResolveItemOutput } from "./llm.ts";
-import { resolveOrder, type CatalogProduct } from "./resolve-order.ts";
+import type {
+  Item,
+  Llm,
+  MapAnswerInput,
+  MapAnswerOutput,
+  ResolveItemInput,
+  ResolveItemOutput,
+} from "./llm.ts";
+import { answerQuestions, resolveOrder, type CatalogProduct } from "./resolve-order.ts";
 
 const vocabulary = {
   groups: [
@@ -48,8 +55,16 @@ const fakeLlm = (
   items: Item[],
   answers: Record<string, ResolveItemOutput>,
   seen: ResolveItemInput[] = [],
+  replies: Record<string, MapAnswerOutput> = {},
+  asked: MapAnswerInput[] = [],
 ): Llm => ({
   splitOrder: () => Promise.resolve({ items }),
+  mapAnswer: (input) => {
+    asked.push(input);
+    const reply = replies[input.answer];
+    if (!reply) return Promise.reject(new Error(`no scripted reply for ${input.answer}`));
+    return Promise.resolve(reply);
+  },
   resolveItem: (input) => {
     seen.push(input);
     const answer = answers[input.item.phrase];
@@ -73,11 +88,11 @@ describe("resolveOrder", () => {
       },
     );
     assert.deepEqual((await run(llm)).items, [
-      { ...item("yerba"), status: "resolved", productType: { id: "yerba", name: "Yerba" } },
+      { ...item("yerba"), status: "resolved", productTypes: [{ id: "yerba", name: "Yerba" }] },
       {
         ...item("leche entera", { quantity: 2, brand: "La Serenísima", terms: ["1 l"] }),
         status: "resolved",
-        productType: { id: "leche-entera", name: "Leche entera" },
+        productTypes: [{ id: "leche-entera", name: "Leche entera" }],
       },
     ]);
   });
@@ -135,5 +150,119 @@ describe("resolveOrder", () => {
       "leche-chocolatada",
     ]);
     assert.equal(liviana?.status === "pending" && liviana.reason, "ambiguous");
+  });
+
+  it("asks every Group and ambiguous Item in one message with numbered options", async () => {
+    const llm = fakeLlm([item("yerba"), item("leche"), item("leche liviana"), item("pan")], {
+      yerba: { kind: "match", candidates: ["yerba"] },
+      leche: { kind: "match", candidates: ["grupo-leche"] },
+      "leche liviana": { kind: "ambiguous", candidates: ["leche-descremada", "leche-entera"] },
+      pan: { kind: "none", candidates: [] },
+    });
+    assert.equal(
+      (await run(llm)).message,
+      [
+        "Tengo unas preguntas:",
+        '1. Para "leche", ¿cuál querés?\n   1) Leche entera\n   2) Leche descremada\n   3) Leche chocolatada',
+        '2. Para "leche liviana", ¿cuál querés?\n   1) Leche descremada\n   2) Leche entera',
+        'Respondé con el número o con palabras ("la 2", "entera"), o "cualquiera" si te da igual.',
+      ].join("\n\n"),
+    );
+  });
+
+  it("has no message when nothing is asked", async () => {
+    const llm = fakeLlm([item("yerba")], { yerba: { kind: "match", candidates: ["yerba"] } });
+    assert.equal((await run(llm)).message, null);
+  });
+});
+
+describe("answerQuestions", () => {
+  const split = [item("yerba"), item("leche"), item("leche liviana")];
+  const resolutions: Record<string, ResolveItemOutput> = {
+    yerba: { kind: "match", candidates: ["yerba"] },
+    leche: { kind: "match", candidates: ["grupo-leche"] },
+    "leche liviana": { kind: "ambiguous", candidates: ["leche-descremada", "leche-entera"] },
+  };
+
+  const answer = async (reply: MapAnswerOutput, asked: MapAnswerInput[] = []) => {
+    const llm = fakeLlm(split, resolutions, [], { respuesta: reply }, asked);
+    return answerQuestions(await run(llm), "respuesta", { llm });
+  };
+
+  it("offers the LLM only the questions and their numbered options", async () => {
+    const asked: MapAnswerInput[] = [];
+    await answer({ answers: [] }, asked);
+    assert.deepEqual(asked, [
+      {
+        answer: "respuesta",
+        questions: [
+          {
+            question: 1,
+            phrase: "leche",
+            options: [
+              { option: 1, name: "Leche entera" },
+              { option: 2, name: "Leche descremada" },
+              { option: 3, name: "Leche chocolatada" },
+            ],
+          },
+          {
+            question: 2,
+            phrase: "leche liviana",
+            options: [
+              { option: 1, name: "Leche descremada" },
+              { option: 2, name: "Leche entera" },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("resolves the answered Item, keeps resolved Items untouched and asks the rest again", async () => {
+    const { items, message } = await answer({
+      answers: [{ question: 1, kind: "chosen", options: [2] }],
+    });
+    assert.deepEqual(items[0], {
+      ...item("yerba"),
+      status: "resolved",
+      productTypes: [{ id: "yerba", name: "Yerba" }],
+    });
+    assert.deepEqual(items[1], {
+      ...item("leche"),
+      status: "resolved",
+      productTypes: [{ id: "leche-descremada", name: "Leche descremada" }],
+    });
+    assert.equal(items[2]?.status, "pending");
+    assert.match(message ?? "", /^Tengo una pregunta:\n\n1\. Para "leche liviana"/);
+  });
+
+  it("leaves the choice among the offered options to the Selection Policy on cualquiera", async () => {
+    const { items, message } = await answer({
+      answers: [
+        { question: 1, kind: "chosen", options: [1, 2] },
+        { question: 2, kind: "any", options: [] },
+      ],
+    });
+    assert.deepEqual(
+      items.map(
+        (resolved) => resolved.status === "resolved" && resolved.productTypes.map(({ id }) => id),
+      ),
+      [["yerba"], ["leche-entera", "leche-descremada"], ["leche-descremada", "leche-entera"]],
+    );
+    assert.equal(message, null);
+  });
+
+  it("keeps the question for an answer that maps to nothing or to options never offered", async () => {
+    const { items } = await answer({
+      answers: [
+        { question: 1, kind: "unclear", options: [] },
+        { question: 2, kind: "chosen", options: [7] },
+        { question: 9, kind: "any", options: [] },
+      ],
+    });
+    assert.deepEqual(
+      items.map(({ status }) => status),
+      ["resolved", "pending", "pending"],
+    );
   });
 });
