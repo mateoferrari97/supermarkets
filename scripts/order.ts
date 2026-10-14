@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises";
+import { parseArgs } from "node:util";
 import { createClaudeCodeLlm, type LlmCall } from "../src/order-resolution/claude-code-llm.ts";
 import {
   createOrderResolver,
@@ -6,11 +7,50 @@ import {
 } from "../src/order-resolution/resolve-order.ts";
 import { createCarrefourStore } from "../src/product-selection/carrefour-store.ts";
 import { pickProducts } from "../src/product-selection/pick-products.ts";
+import { postalCodeFrom } from "../src/product-selection/postal-code.ts";
 import { PROMPTS_DIR, readOrderData, renderItem } from "./order-files.ts";
 
-const orderText = process.argv.slice(2).join(" ").trim();
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: { "postal-code": { type: "string" } },
+});
+const orderText = positionals.join(" ").trim();
 if (!orderText) {
-  console.error('Usage: pnpm order "<order text>"');
+  console.error('Usage: pnpm order [--postal-code <code>] "<order text>"');
+  process.exit(1);
+}
+
+const store = createCarrefourStore();
+const terminal = createInterface({ input: process.stdin });
+const lines = terminal[Symbol.asyncIterator]();
+const ask = async (question: string) => {
+  console.log(`\n${question}\n`);
+  process.stdout.write("> ");
+  const line = await lines.next();
+  return line.done ? "" : line.value.trim();
+};
+
+const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
+let postalCode: string | null = null;
+let written = values["postal-code"]?.trim() ?? "";
+if (!written) written = await ask(POSTAL_CODE_QUESTION);
+while (postalCode === null && written) {
+  const candidate = postalCodeFrom(written);
+  const delivery =
+    candidate === null ? "postal-code-rejected" : await store.checkDelivery(candidate);
+  if (delivery === "delivers") {
+    postalCode = candidate;
+    continue;
+  }
+  const refusal =
+    delivery === "does-not-deliver"
+      ? `Carrefour no entrega en el código postal ${candidate}.`
+      : `"${written}" no es un código postal válido.`;
+  written = await ask(`${refusal} ${POSTAL_CODE_QUESTION}`);
+}
+if (postalCode === null) {
+  console.log("\nSin código postal no puedo armar el pedido.");
+  terminal.close();
   process.exit(1);
 }
 
@@ -37,13 +77,8 @@ const show = (resolution: OrderResolution) => {
 let resolution = await resolveOrder(orderText);
 show(resolution);
 
-const terminal = createInterface({ input: process.stdin });
-const lines = terminal[Symbol.asyncIterator]();
 while (resolution.message) {
-  console.log(`\n${resolution.message}\n`);
-  process.stdout.write("> ");
-  const line = await lines.next();
-  const answer = line.done ? "" : line.value.trim();
+  const answer = await ask(resolution.message);
   if (!answer) break;
   resolution = await answerQuestions(resolution, answer);
   console.log("");
@@ -53,16 +88,16 @@ terminal.close();
 
 if (!resolution.message) {
   const picked = Date.now();
-  const selection = await pickProducts(resolution, {
+  const selection = await pickProducts(resolution, postalCode, {
     mapping,
-    store: createCarrefourStore(),
+    store,
     llm,
     paymentCards,
     snapshot,
   });
   const money = (value: number) => `$${value.toFixed(2)}`;
   const card = resolution.paymentCard ? `, pago con ${resolution.paymentCard}` : "";
-  console.log(`\nCarrito (código postal ${resolution.postalCode}${card}):\n`);
+  console.log(`\nCarrito (código postal ${selection.postalCode}${card}):\n`);
   for (const line of selection.lines) {
     const product = line.product
       ? `${line.product.name} (${line.product.itemId}) x${line.quantity}, ${money(line.unitPrice ?? 0)} c/u, ${money(line.total)}`

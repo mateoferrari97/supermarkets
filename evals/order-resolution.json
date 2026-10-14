@@ -21,6 +21,11 @@
       "items": [{ "productType": "yerba" }, { "noItem": "huevo" }]
     },
     {
+      "id": "envio-a-codigo-postal",
+      "order": "yerba, envío a 1425",
+      "items": [{ "productType": "yerba" }, { "noItem": "1425" }, { "noItem": "envío" }]
+    },
+    {
       "id": "conos-de-queso",
       "order": "conos de queso",
       "expectedToFail": "comes back as the Snack salado Group or Snack de maíz instead of the broad snacks Product Type; decide in ticket 06",

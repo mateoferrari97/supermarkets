@@ -7,7 +7,7 @@ A retailer with a public catalog and an online cart, such as Carrefour. The Assi
 _Avoid_: Shop, supermarket, retailer
 
 **Branch**:
-The Online Store location whose prices, stock and promotions a cart is built against. It follows from the postal code the Owner writes in each order; Carrefour resolves it from the postal code.
+The Online Store location whose prices, stock and promotions a cart is built against. It follows from the postal code the Owner gives before the order; Carrefour resolves it from the postal code, and a postal code no Branch serves is refused before the order is read.
 _Avoid_: Region, seller, store, sucursal
 
 **Catalog Snapshot**:

@@ -7,6 +7,7 @@ import {
 } from "../order-resolution/llm.ts";
 import type { OrderItem, OrderResolution } from "../order-resolution/resolve-order.ts";
 import { findPaymentCard, type PaymentCardTable } from "./payment-cards.ts";
+import { postalCodeFrom } from "./postal-code.ts";
 import type {
   OnlineStore,
   SimulatedLine,
@@ -30,6 +31,7 @@ export type PickedLine = {
 };
 
 export type ProductSelection = {
+  postalCode: string;
   lines: PickedLine[];
   total: number;
   notices: string[];
@@ -52,11 +54,15 @@ type ItemPick = { item: OrderItem; ranked: Priced[]; chosen: number; notices: st
 
 export async function pickProducts(
   resolution: OrderResolution,
+  postalCode: string,
   { mapping, store, llm, paymentCards, snapshot }: PickDependencies,
 ): Promise<ProductSelection> {
-  const { postalCode, paymentCard, preference } = resolution;
-  if (resolution.message !== null || postalCode === null) {
+  const { paymentCard, preference } = resolution;
+  if (resolution.message !== null) {
     throw new Error("Products can only be picked once every question of the order is answered");
+  }
+  if (postalCodeFrom(postalCode) !== postalCode) {
+    throw new Error("Products can only be picked for an accepted postal code");
   }
 
   const policy =
@@ -222,6 +228,7 @@ export async function pickProducts(
   );
 
   return {
+    postalCode,
     lines,
     total: cart.total,
     notices: orderNotices,

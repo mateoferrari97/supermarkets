@@ -57,6 +57,7 @@ const fakeStore = (
   const queries: CandidateQuery[] = [];
   const simulations: SimulationRequest[] = [];
   const store: OnlineStore = {
+    checkDelivery: () => Promise.reject(new Error("product picking never checks delivery")),
     findCandidates: (query) => {
       queries.push(query);
       return Promise.resolve(candidates(query));
@@ -101,7 +102,6 @@ const orderItem = (phrase: string, ids: string[], overrides: Partial<Item> = {})
 
 const order = (...items: OrderItem[]): OrderResolution => ({
   items,
-  postalCode: "1425",
   paymentCard: null,
   preference: null,
   message: null,
@@ -127,6 +127,9 @@ const depending = (
   snapshot: [],
   ...overrides,
 });
+
+const pick = (resolution: OrderResolution, dependencies: PickDependencies) =>
+  pickProducts(resolution, "1425", dependencies);
 
 const translating = (translated: SelectionPolicy) => {
   const asked: string[] = [];
@@ -159,18 +162,19 @@ describe("pickProducts", () => {
         orderItem("coca", ["gaseosa"], { brand: "Coca-Cola" }),
         orderItem("yerba", ["yerba", "yerba-compuesta"]),
       ),
+      "5000",
       depending(store),
     );
     assert.deepEqual(queries, [
       {
-        postalCode: "1425",
+        postalCode: "5000",
         tipos: ["Gaseosa", "Gaseosa light"],
         brands: ["Coca-Cola"],
         sort: "discount:desc",
         limit: 10,
       },
       {
-        postalCode: "1425",
+        postalCode: "5000",
         tipos: ["Yerba", "Yerba compuesta"],
         brands: [],
         sort: "discount:desc",
@@ -184,7 +188,7 @@ describe("pickProducts", () => {
       "11324": { unit: 4000 },
       "3807": { unit: 4500, savings: 3000, promotion: "2do al 50%" },
     });
-    const selection = await pickProducts(
+    const selection = await pick(
       order(orderItem("coca", ["gaseosa"], { quantity: 2 })),
       depending(store),
     );
@@ -194,6 +198,7 @@ describe("pickProducts", () => {
     ]);
     assert.deepEqual(items().at(-1), [{ itemId: "3807", quantity: 2 }]);
     assert.deepEqual(selection, {
+      postalCode: "1425",
       lines: [
         {
           phrase: "coca",
@@ -216,7 +221,7 @@ describe("pickProducts", () => {
       "1000": { unit: 1000 },
       "3807": { unit: 6000 },
     });
-    const { lines } = await pickProducts(order(orderItem("coca", ["gaseosa"])), depending(store));
+    const { lines } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
     assert.equal(lines[0]?.product, coca);
     assert.equal(lines[0]?.reason, "Es el más barato por litro.");
   });
@@ -224,15 +229,13 @@ describe("pickProducts", () => {
   it("breaks a tie by the lowest itemId and compares package prices when measures are unknown", async () => {
     const tie = fakeStore(() => [coca, zero], { "3807": { unit: 6000 }, "11324": { unit: 6000 } });
     assert.equal(
-      (await pickProducts(order(orderItem("coca", ["gaseosa"])), depending(tie.store))).lines[0]
-        ?.product,
+      (await pick(order(orderItem("coca", ["gaseosa"])), depending(tie.store))).lines[0]?.product,
       coca,
     );
     const unknown = [product("2", "Yerba A", null), product("1", "Yerba B", null)];
     const plain = fakeStore(() => unknown, { "2": { unit: 3000 }, "1": { unit: 3500 } });
     assert.equal(
-      (await pickProducts(order(orderItem("yerba", ["yerba"])), depending(plain.store))).lines[0]
-        ?.product,
+      (await pick(order(orderItem("yerba", ["yerba"])), depending(plain.store))).lines[0]?.product,
       unknown[0],
     );
   });
@@ -248,7 +251,7 @@ describe("pickProducts", () => {
       "7": { unit: 3000 },
       "8": { unit: 5000 },
     });
-    const { lines } = await pickProducts(
+    const { lines } = await pick(
       order(orderItem("yerba", ["yerba", "yerba-compuesta"])),
       depending(store),
     );
@@ -263,7 +266,7 @@ describe("pickProducts", () => {
       "11324": { unit: 6000 },
       "1000": { unit: 1000 },
     });
-    const { lines } = await pickProducts(order(orderItem("coca", ["gaseosa"])), depending(store));
+    const { lines } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
     assert.deepEqual(
       items()
         .slice(0, 3)
@@ -279,16 +282,32 @@ describe("pickProducts", () => {
       "3807": { unit: 4500, available: false },
       "11324": { unit: 6000 },
     });
-    const { lines } = await pickProducts(order(orderItem("coca", ["gaseosa"])), depending(store));
+    const { lines } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
     assert.equal(lines[0]?.reason, "Es el único disponible entre los candidatos.");
   });
 
-  it("refuses an order that still has questions or no postal code", async () => {
-    const { store } = fakeStore(() => [], {});
-    await assert.rejects(
-      pickProducts({ ...order(), message: "Tengo una pregunta" }, depending(store)),
+  it("refuses an order that still has questions or no accepted postal code", async () => {
+    const { store, queries } = fakeStore(() => [], {});
+    await assert.rejects(pick({ ...order(), message: "Tengo una pregunta" }, depending(store)));
+    const coca = order(orderItem("coca", ["gaseosa"]));
+    await assert.rejects(pickProducts(coca, "", depending(store)));
+    await assert.rejects(pickProducts(coca, "C1425ABC", depending(store)));
+    assert.deepEqual(queries, []);
+  });
+
+  it("simulates every Candidate and the cart for the postal code it was given", async () => {
+    const { store, simulations } = fakeStore(() => [zero, coca], {
+      "11324": { unit: 4000 },
+      "3807": { unit: 4500 },
+    });
+    const selection = await pickProducts(
+      order(orderItem("coca", ["gaseosa"])),
+      "5000",
+      depending(store),
     );
-    await assert.rejects(pickProducts({ ...order(), postalCode: null }, depending(store)));
+    assert.equal(selection.postalCode, "5000");
+    assert.ok(simulations.length > 0);
+    assert.ok(simulations.every(({ postalCode }) => postalCode === "5000"));
   });
 
   it("keeps only products whose name has every term, searching deeper when there are terms", async () => {
@@ -297,7 +316,7 @@ describe("pickProducts", () => {
       "11324": { unit: 6000 },
       "3807": { unit: 5900 },
     });
-    const { lines } = await pickProducts(
+    const { lines } = await pick(
       order(orderItem("coca", ["gaseosa"], { terms: ["2,25 l"] })),
       depending(store),
     );
@@ -308,10 +327,7 @@ describe("pickProducts", () => {
   describe("Selection Policy", () => {
     it("asks the LLM for no policy when the order has no preference", async () => {
       const { store } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const { unexpressed } = await pickProducts(
-        order(orderItem("coca", ["gaseosa"])),
-        depending(store),
-      );
+      const { unexpressed } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
       assert.deepEqual(unexpressed, []);
     });
 
@@ -321,7 +337,7 @@ describe("pickProducts", () => {
         "11324": { unit: 4000 },
         "3807": { unit: 4500, savings: 3000, promotion: "2do al 50%" },
       });
-      const { lines } = await pickProducts(
+      const { lines } = await pick(
         { ...order(orderItem("coca", ["gaseosa"])), preference: "lo más barato por litro" },
         depending(store, { llm }),
       );
@@ -334,7 +350,7 @@ describe("pickProducts", () => {
     it("restricts search to the brands the Owner accepts only", async () => {
       const { llm } = translating(policy({ brandsOnly: ["La Serenísima"] }));
       const { store, queries } = fakeStore(() => [], {});
-      await pickProducts(
+      await pick(
         { ...order(orderItem("leche", ["leche-entera"])), preference: "solo La Serenísima" },
         depending(store, { llm }),
       );
@@ -350,7 +366,7 @@ describe("pickProducts", () => {
         (query) => (query.brands.length > 0 ? [] : [coca, zero]),
         { "3807": { unit: 6000 }, "11324": { unit: 6000 } },
       );
-      const { lines } = await pickProducts(
+      const { lines } = await pick(
         { ...order(orderItem("gaseosa", ["gaseosa"])), preference: "prefiero Pepsi" },
         depending(store, { llm }),
       );
@@ -368,7 +384,7 @@ describe("pickProducts", () => {
         (query) => (query.brands.includes("Pepsi") ? [pepsi] : [coca]),
         { "2000": { unit: 7000 }, "3807": { unit: 5000 } },
       );
-      const { lines } = await pickProducts(
+      const { lines } = await pick(
         { ...order(orderItem("gaseosa", ["gaseosa"])), preference: "prefiero Pepsi" },
         depending(store, { llm }),
       );
@@ -382,7 +398,7 @@ describe("pickProducts", () => {
         "4000": { unit: 1000 },
         "2000": { unit: 5000 },
       });
-      const { lines } = await pickProducts(
+      const { lines } = await pick(
         { ...order(orderItem("gaseosa", ["gaseosa"])), preference: "nada de Manaos" },
         depending(store, { llm }),
       );
@@ -399,7 +415,7 @@ describe("pickProducts", () => {
         policy({ brandsOnly: ["Pepsi"], brandsExcluded: ["Coca-Cola", "Coca Cola"] }),
       );
       const { store, queries } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const { lines } = await pickProducts(
+      const { lines } = await pick(
         {
           ...order(orderItem("coca", ["gaseosa"], { brand: "Coca-Cola" })),
           preference: "solo Pepsi, nada de Coca",
@@ -413,7 +429,7 @@ describe("pickProducts", () => {
     it("reports the preferences no rule could express and goes ahead with the rest", async () => {
       const { llm } = translating(policy({ unexpressed: ["que sea orgánico"] }));
       const { store } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const selection = await pickProducts(
+      const selection = await pick(
         { ...order(orderItem("coca", ["gaseosa"])), preference: "que sea orgánico" },
         depending(store, { llm }),
       );
@@ -431,7 +447,7 @@ describe("pickProducts", () => {
           withCard: { unit: 4800, savings: 1200, promotion: "Tarjeta Carrefour 20% Off Martes" },
         },
       });
-      const selection = await pickProducts(
+      const selection = await pick(
         {
           ...order(orderItem("coca", ["gaseosa"])),
           paymentCard: "tarjeta carrefour mastercard",
@@ -449,7 +465,7 @@ describe("pickProducts", () => {
 
     it("reports a card not in the table and picks products without a card", async () => {
       const { store, simulations } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const selection = await pickProducts(
+      const selection = await pick(
         { ...order(orderItem("coca", ["gaseosa"])), paymentCard: "Visa Galicia" },
         depending(store),
       );
@@ -465,7 +481,7 @@ describe("pickProducts", () => {
       const { store, items } = fakeStore((query) => (query.tipos.includes("Yerba") ? [] : [coca]), {
         "3807": { unit: 6000 },
       });
-      const selection = await pickProducts(
+      const selection = await pick(
         order(
           orderItem("coca", ["gaseosa"]),
           orderItem("media coca", ["gaseosa"], { quantity: 0.5 }),
@@ -493,7 +509,7 @@ describe("pickProducts", () => {
 
     it("buys a product sold by weight in its steps, from a weight term or the quantity in kg", async () => {
       const { store, items } = fakeStore(() => [banana], { "185818": { unit: 999.5 } });
-      const selection = await pickProducts(
+      const selection = await pick(
         order(
           orderItem("banana", ["banana"], { terms: ["500 g"] }),
           orderItem("banana", ["banana"], { quantity: 0.3 }),
@@ -526,7 +542,7 @@ describe("pickProducts", () => {
       const { store } = fakeStore(() => [teased], {
         "3807": { unit: 6000, atLeast: { quantity: 2, unit: 4500, promotion: promo } },
       });
-      const { lines } = await pickProducts(order(orderItem("coca", ["gaseosa"])), depending(store));
+      const { lines } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
       assert.equal(lines[0]?.quantity, 1);
       assert.equal(lines[0]?.total, 6000);
       assert.deepEqual(lines[0]?.notices, [
@@ -559,10 +575,7 @@ describe("pickProducts", () => {
           });
         },
       };
-      const selection = await pickProducts(
-        order(orderItem("coca", ["gaseosa"])),
-        depending(finalStore),
-      );
+      const selection = await pick(order(orderItem("coca", ["gaseosa"])), depending(finalStore));
       assert.equal(selection.total, 5500);
       assert.equal(selection.lines[0]?.unitPrice, 5500);
       assert.equal(selection.lines[0]?.reason, "Promoción: Precio final.");
@@ -589,7 +602,7 @@ describe("pickProducts", () => {
         (query) => (query.tipos.includes("Yerba") ? [product("9", "Yerba", null)] : [coca, zero]),
         { "3807": { unit: 5000 }, "11324": { unit: 6000 }, "9": { unit: 3000 } },
       );
-      const selection = await pickProducts(
+      const selection = await pick(
         order(orderItem("coca", ["gaseosa"]), orderItem("yerba", ["yerba"])),
         depending(goneInCart(store, "3807")),
       );
@@ -610,7 +623,7 @@ describe("pickProducts", () => {
         "3807": { unit: 5000 },
         "9": { unit: 3000 },
       });
-      const selection = await pickProducts(
+      const selection = await pick(
         order(orderItem("coca", ["gaseosa"]), orderItem("yerba", ["yerba"])),
         depending(goneInCart(store, "3807")),
       );
@@ -633,7 +646,7 @@ describe("pickProducts", () => {
         "51": { unit: 3000, available: false },
         "52": { unit: 3200 },
       });
-      const selection = await pickProducts(
+      const selection = await pick(
         order(orderItem("yerba", ["yerba"])),
         depending(store, { snapshot }),
       );

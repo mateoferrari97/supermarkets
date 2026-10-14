@@ -104,7 +104,6 @@ type Script = {
   answers: Record<string, ResolveItemOutput>;
   rewordings?: Record<string, string>;
   replies?: Record<string, MapAnswerOutput>;
-  postalCode?: string | null;
   paymentCard?: string | null;
   preference?: string | null;
 };
@@ -122,13 +121,12 @@ const fakeLlm = ({
   answers,
   rewordings = {},
   replies = {},
-  postalCode = "1425",
   paymentCard = null,
   preference = null,
 }: Script) => {
   const seen: Seen = { resolved: [], reworded: [], asked: [] };
   const llm: Llm = {
-    splitOrder: () => Promise.resolve({ items, postalCode, paymentCard, preference }),
+    splitOrder: () => Promise.resolve({ items, paymentCard, preference }),
     resolveItem: (input) => {
       seen.resolved.push(input);
       return scripted(answers, input.item.phrase, "answer");
@@ -191,7 +189,6 @@ describe("resolveOrder", () => {
           terms: ["1 l"],
         }),
       ],
-      postalCode: "1425",
       paymentCard: null,
       preference: null,
       message: null,
@@ -492,7 +489,6 @@ describe("answerQuestions", () => {
     ]);
     assert.deepEqual(resolution, {
       items: [resolved("yerba mate", "yerba", { quantity: 2 })],
-      postalCode: "1425",
       paymentCard: null,
       preference: null,
       message: null,
@@ -520,45 +516,30 @@ describe("answerQuestions", () => {
     assert.equal(seen.reworded.length, 2);
   });
 
-  it("asks for the postal code last when the order has none, and keeps the one answered", async () => {
-    const { resolution, seen } = await runAndAnswer(
-      {
-        items: [item("yerba"), item("leche")],
-        answers: { yerba, leche },
-        postalCode: null,
-        replies: {
-          "entera, a la 1425": reply(
-            { options: [1] },
-            { question: 2, kind: "rephrased", phrase: "C1425ABC" },
-          ),
-        },
-      },
-      "entera, a la 1425",
-    );
-    assert.deepEqual(seen.asked[0]?.questions.at(-1), {
-      question: 2,
-      phrase: "código postal",
-      asks: "postalCode",
-      term: null,
-      options: [],
-    });
+  it("never asks for a postal code, even when the order has none", async () => {
+    const { resolution } = await run({ items: [item("yerba")], answers: { yerba } });
     assert.deepEqual(resolution, {
-      items: [resolved("yerba", "yerba"), resolved("leche", "leche-entera")],
-      postalCode: "1425",
+      items: [resolved("yerba", "yerba")],
       paymentCard: null,
       preference: null,
       message: null,
     });
   });
 
-  it("keeps asking for the postal code until one is given", async () => {
-    const { resolution } = await run({
-      items: [item("yerba")],
-      answers: { yerba },
-      postalCode: "por casa",
-    });
-    assert.equal(resolution.postalCode, null);
-    assert.equal(resolution.message, "Tengo una pregunta:\n\n1. ¿A qué código postal es el envío?");
+  it("asks only about the Items when the order also has questions", async () => {
+    const { resolution, seen } = await runAndAnswer(
+      {
+        items: [item("yerba"), item("leche")],
+        answers: { yerba, leche },
+        replies: { "no sé": reply({ kind: "unclear" }) },
+      },
+      "no sé",
+    );
+    assert.deepEqual(
+      seen.asked[0]?.questions.map(({ asks }) => asks),
+      ["productType"],
+    );
+    assert.ok(!resolution.message?.includes("código postal"));
   });
 
   it("keeps the order's Payment Card and preference through the questions round", async () => {

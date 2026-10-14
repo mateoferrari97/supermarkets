@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "ORD006",
+    "message": "El campo c\u00f3digo postal (abc) del anexo de env\u00edo es no v\u00e1lido",
+    "exception": null
+  },
+  "operationId": "84c456d8-a75a-4ccf-bb4e-ab40694e0b30",
+  "fields": {}
+}

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { normalize } from "../order-resolution/text.ts";
 import type {
   CandidateQuery,
+  Delivery,
   Measure,
   OnlineStore,
   PaymentCard,
@@ -16,7 +17,24 @@ export const CARREFOUR_URL = "https://www.carrefour.com.ar";
 export type HttpRequest = { method: "GET" | "POST"; url: string; body?: unknown };
 export type HttpClient = (request: HttpRequest) => Promise<unknown>;
 
-const regionsSchema = z.array(z.object({ id: z.string() }));
+export class HttpError extends Error {
+  readonly status: number;
+  readonly body: unknown;
+
+  constructor(request: HttpRequest, status: number, body: unknown) {
+    super(`Carrefour ${request.method} ${request.url} answered ${status}: ${JSON.stringify(body)}`);
+    this.status = status;
+    this.body = body;
+  }
+}
+
+const regionsSchema = z.array(
+  z.object({ id: z.string(), sellers: z.array(z.object({ id: z.string() })).default([]) }),
+);
+
+type Region = z.infer<typeof regionsSchema>[number];
+
+const rejectionSchema = z.object({ error: z.object({ code: z.string() }) });
 
 const facetsSchema = z.object({
   facets: z.array(
@@ -93,7 +111,7 @@ const UNITS: Record<string, { dimension: Measure["dimension"]; factor: number }>
 };
 
 export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore {
-  const regions = new Map<string, Promise<string | null>>();
+  const regions = new Map<string, Promise<Region | null>>();
   const tipoSlugs = new Map<string, Promise<string | null>>();
 
   const search = (path: string, params: Record<string, string>) =>
@@ -104,10 +122,26 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     if (known) return known;
     const url = `${CARREFOUR_URL}/api/checkout/pub/regions?${new URLSearchParams({ country: "ARG", postalCode })}`;
     const region = http({ method: "GET", url }).then(
-      (body) => regionsSchema.parse(body)[0]?.id ?? null,
+      (body) => regionsSchema.parse(body)[0] ?? null,
     );
     regions.set(postalCode, region);
+    region.catch(() => regions.delete(postalCode));
     return region;
+  };
+
+  const checkDelivery = async (postalCode: string): Promise<Delivery> => {
+    try {
+      const region = await regionFor(postalCode);
+      return region && region.sellers.length > 0 ? "delivers" : "does-not-deliver";
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 400) {
+        const rejection = rejectionSchema.safeParse(error.body);
+        if (rejection.success && rejection.data.error.code === "ORD006") {
+          return "postal-code-rejected";
+        }
+      }
+      throw error;
+    }
   };
 
   const facetValue = async (
@@ -144,16 +178,14 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
   };
 
   const findCandidates = async ({ postalCode, tipos, brands, sort, limit }: CandidateQuery) => {
-    const [regionId, ...slugs] = await Promise.all([
-      regionFor(postalCode),
-      ...tipos.map(slugForTipo),
-    ]);
+    const [found, ...slugs] = await Promise.all([regionFor(postalCode), ...tipos.map(slugForTipo)]);
+    if (!found) throw new Error(`Carrefour has no region for postal code ${postalCode}`);
     const tipoPath = slugs
       .filter((slug): slug is string => slug !== null)
       .map((slug) => `tipo-de-producto/${slug}`)
       .join("/");
     if (!tipoPath) return [];
-    const region: Record<string, string> = regionId ? { regionId } : {};
+    const region = { regionId: found.id };
     let facets = tipoPath;
     if (brands.length > 0) {
       const brandSlugs = await slugsForBrands(tipoPath, region, brands);
@@ -225,7 +257,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     return { lines, total };
   };
 
-  return { findCandidates, simulate };
+  return { checkDelivery, findCandidates, simulate };
 }
 
 export type SnapshotRecord = {
@@ -285,16 +317,24 @@ function measureOf(
   return { dimension: unit.dimension, amount: amount * unit.factor };
 }
 
-const fetchJson: HttpClient = async ({ method, url, body }) => {
+const fetchJson: HttpClient = async (request) => {
+  const { method, url, body } = request;
   const response = await fetch(url, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(
-      `Carrefour ${method} ${url} answered ${response.status}: ${await response.text()}`,
-    );
+    const text = await response.text();
+    throw new HttpError(request, response.status, parseOrText(text));
   }
   return response.json();
 };
+
+function parseOrText(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}

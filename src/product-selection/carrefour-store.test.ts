@@ -1,23 +1,34 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { createCarrefourStore, snapshotProducts, type HttpRequest } from "./carrefour-store.ts";
+import {
+  createCarrefourStore,
+  HttpError,
+  snapshotProducts,
+  type HttpRequest,
+} from "./carrefour-store.ts";
 
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
 
-const recorded = (routes: [RegExp, string][]) => {
+type Route = [RegExp, string] | [RegExp, string, number];
+
+const recorded = (routes: Route[]) => {
   const seen: HttpRequest[] = [];
   const http = (request: HttpRequest) => {
     seen.push(request);
     const route = routes.find(([pattern]) => pattern.test(request.url));
     if (!route) return Promise.reject(new Error(`no recorded response for ${request.url}`));
-    return Promise.resolve(fixture(route[1]));
+    const [, name, status] = route;
+    if (status !== undefined) {
+      return Promise.reject(new HttpError(request, status, fixture(name)));
+    }
+    return Promise.resolve(fixture(name));
   };
   return { store: createCarrefourStore(http), seen };
 };
 
-const searchRoutes: [RegExp, string][] = [
+const searchRoutes: Route[] = [
   [/\/checkout\/pub\/regions\?country=ARG&postalCode=1425$/, "regions"],
   [/\/facets\/trade-policy\/1\?/, "facets-query-gaseosa"],
   [/\/facets\/trade-policy\/1\/tipo-de-producto\/gaseosa\?/, "facets-tipo-gaseosa"],
@@ -33,7 +44,74 @@ const searchRoutes: [RegExp, string][] = [
 
 const cardTeaser = { name: "Tarjeta Carrefour 15%", minimumQuantity: 0 };
 
+const regionRoutes: Route[] = [
+  [/\/checkout\/pub\/regions\?country=ARG&postalCode=1425$/, "regions"],
+  [/\/checkout\/pub\/regions\?country=ARG&postalCode=C1425ABC$/, "regions-empty"],
+  [/\/checkout\/pub\/regions\?country=ARG&postalCode=abc$/, "regions-rejected", 400],
+];
+
 describe("createCarrefourStore", () => {
+  it("delivers to a postal code whose region has stores", async () => {
+    const { store, seen } = recorded(regionRoutes);
+    assert.equal(await store.checkDelivery("1425"), "delivers");
+    assert.equal(seen.length, 1);
+  });
+
+  it("does not deliver to a postal code whose region has no stores", async () => {
+    const { store } = recorded(regionRoutes);
+    assert.equal(await store.checkDelivery("C1425ABC"), "does-not-deliver");
+  });
+
+  it("does not deliver to a postal code with no region", async () => {
+    const store = createCarrefourStore(() => Promise.resolve([]));
+    assert.equal(await store.checkDelivery("1425"), "does-not-deliver");
+  });
+
+  it("tells a postal code Carrefour rejects", async () => {
+    const { store } = recorded(regionRoutes);
+    assert.equal(await store.checkDelivery("abc"), "postal-code-rejected");
+  });
+
+  it("fails the delivery check when Carrefour answers with another error", async () => {
+    const store = createCarrefourStore((request) =>
+      Promise.reject(new HttpError(request, 503, "Service Unavailable")),
+    );
+    await assert.rejects(store.checkDelivery("1425"), /answered 503/);
+  });
+
+  it("searches in the region it checked delivery for, asking for the region once", async () => {
+    const { store, seen } = recorded(searchRoutes);
+    await store.checkDelivery("1425");
+    await store.findCandidates({
+      postalCode: "1425",
+      tipos: ["Gaseosa"],
+      brands: ["Coca-Cola"],
+      sort: "discount:desc",
+      limit: 2,
+    });
+    assert.equal(seen.filter(({ url }) => url.includes("/checkout/pub/regions")).length, 1);
+  });
+
+  it("fails instead of searching without a region", async () => {
+    const seen: HttpRequest[] = [];
+    const store = createCarrefourStore((request) => {
+      seen.push(request);
+      if (request.url.includes("/checkout/pub/regions")) return Promise.resolve([]);
+      return Promise.resolve(fixture("facets-query-gaseosa"));
+    });
+    await assert.rejects(
+      store.findCandidates({
+        postalCode: "1425",
+        tipos: ["Gaseosa"],
+        brands: [],
+        sort: "discount:desc",
+        limit: 2,
+      }),
+      /no region for postal code 1425/,
+    );
+    assert.ok(seen.every(({ url }) => !url.includes("/product-search/")));
+  });
+
   it("lists available products of a Tipo and brand in the postal code's region", async () => {
     const { store, seen } = recorded(searchRoutes);
     const candidates = await store.findCandidates({

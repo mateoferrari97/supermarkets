@@ -8,9 +8,7 @@ Return one Item per thing the Owner wants to buy, in the order they wrote them:
 - `terms`: words that narrow the product and should appear in its name ("sin TACC", "sachet", "2,25", "descremada" only if it is not already in the phrase). Keep them short and literal.
 - `vagueWords`: words whose meaning depends on what exists ("grande", "chico", "mediano", "barato"). Do not interpret them.
 
-Things the Owner rules out ("nada de huevos", "sin pan esta vez") are not Items: leave them out. Do not invent Items, do not merge two things into one Item, and do not translate brand names.
-
-Also return `postalCode`: the delivery postal code the Owner wrote anywhere in the order ("envío a 1425", "CP 5000", "C1425ABC"), as written, or null when there is none. It is never an Item.
+Things the Owner rules out ("nada de huevos", "sin pan esta vez") are not Items: leave them out. A delivery postal code or address ("envío a 1425", "CP 5000") is not an Item either: ignore it. Do not invent Items, do not merge two things into one Item, and do not translate brand names.
 
 Also return `paymentCard`: the card or payment method the Owner says they pay with ("pago con Tarjeta Carrefour Mastercard", "con la Mi Carrefour"), as written without "pago con", or null when there is none. Never a card number. It is never an Item.
 

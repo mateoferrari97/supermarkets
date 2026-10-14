@@ -23,7 +23,6 @@ export type Question =
 export type OrderItem = Item & { productTypes: ProductTypeRef[]; question: Question | null };
 
 export type OrderDetails = {
-  postalCode: string | null;
   paymentCard: string | null;
   preference: string | null;
 };
@@ -193,24 +192,14 @@ export function createOrderResolver({
     answerText: string,
   ): Promise<OrderResolution> => {
     const questions = questionsOf(resolution.items);
-    const postalQuestion = resolution.postalCode === null ? questions.length + 1 : null;
-    if (questions.length === 0 && postalQuestion === null) return resolution;
+    if (questions.length === 0) return resolution;
     const { answers } = await llm.mapAnswer({
-      questions: [
-        ...questions.map(({ question, item }) => questionInput(question, item)),
-        ...(postalQuestion === null ? [] : [postalCodeInput(postalQuestion)]),
-      ],
+      questions: questions.map(({ question, item }) => questionInput(question, item)),
       answer: answerText,
     });
 
-    let postalCode = resolution.postalCode;
     const updates = new Map<OrderItem, Promise<OrderItem>>();
     for (const answer of answers) {
-      if (answer.question === postalQuestion) {
-        if (answer.kind === "rephrased" && answer.phrase)
-          postalCode ??= postalCodeFrom(answer.phrase);
-        continue;
-      }
       const item = questions.find(({ question }) => question === answer.question)?.item;
       if (!item || updates.has(item)) continue;
       const update = apply(item, answer);
@@ -219,29 +208,21 @@ export function createOrderResolver({
 
     return withMessage(
       await Promise.all(resolution.items.map((item) => updates.get(item) ?? Promise.resolve(item))),
-      { ...detailsOf(resolution), postalCode },
+      detailsOf(resolution),
     );
   };
 
   return {
     resolveOrder: async (orderText) => {
-      const { items, postalCode, paymentCard, preference } = await llm.splitOrder(orderText);
-      return withMessage(await Promise.all(items.map(resolveItem)), {
-        postalCode: postalCode === null ? null : postalCodeFrom(postalCode),
-        paymentCard,
-        preference,
-      });
+      const { items, paymentCard, preference } = await llm.splitOrder(orderText);
+      return withMessage(await Promise.all(items.map(resolveItem)), { paymentCard, preference });
     },
     answerQuestions,
   };
 }
 
-export function postalCodeFrom(text: string): string | null {
-  return /\d{4}/.exec(text)?.[0] ?? null;
-}
-
-function detailsOf({ postalCode, paymentCard, preference }: OrderDetails): OrderDetails {
-  return { postalCode, paymentCard, preference };
+function detailsOf({ paymentCard, preference }: OrderDetails): OrderDetails {
+  return { paymentCard, preference };
 }
 
 function itemFields(orderItem: OrderItem): Item {
@@ -273,10 +254,6 @@ function questionInput(number: number, item: Asked["item"]): QuestionInput {
   };
 }
 
-function postalCodeInput(number: number): QuestionInput {
-  return { question: number, phrase: "código postal", asks: "postalCode", term: null, options: [] };
-}
-
 function questionText(number: number, item: Asked["item"]): string {
   const { question, phrase } = item;
   const options = optionNames(question).map((name, index) => `   ${index + 1}) ${name}`);
@@ -300,9 +277,6 @@ function questionText(number: number, item: Asked["item"]): string {
 function withMessage(items: OrderItem[], details: OrderDetails): OrderResolution {
   const questions = questionsOf(items);
   const asked = questions.map(({ question, item }) => questionText(question, item));
-  if (details.postalCode === null) {
-    asked.push(`${questions.length + 1}. ¿A qué código postal es el envío?`);
-  }
   if (asked.length === 0) return { ...details, items, message: null };
   const intro = asked.length === 1 ? "Tengo una pregunta:" : "Tengo unas preguntas:";
   const outro = questions.some(({ item }) => optionNames(item.question).length > 0)
