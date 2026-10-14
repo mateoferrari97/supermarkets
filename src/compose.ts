@@ -7,6 +7,7 @@ import {
   type LlmCall,
 } from "./adapters/claude-code/claude-code-llm.ts";
 import { createDataFiles, type Checked } from "./adapters/files/data-files.ts";
+import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
 import type { Llm } from "./core/order-resolution/llm.ts";
 import {
   createOrderResolver as createResolver,
@@ -93,6 +94,26 @@ export function createOrderResolver({
   const { products, vocabulary, mapping } = data.value;
   const llm = createLlm({ vocabulary, model, onCall });
   return { ok: true, value: { ...createResolver({ products, vocabulary, mapping, llm }), model } };
+}
+
+export function createConversationDependencies(): Checked<
+  Omit<ConversationDependencies, "signal">
+> {
+  const data = loadOrderData();
+  if (!data.ok) return data;
+  const { products, snapshot, vocabulary, mapping, paymentCards } = data.value;
+  return {
+    ok: true,
+    value: {
+      products,
+      snapshot,
+      vocabulary,
+      mapping,
+      paymentCards,
+      llm: createLlm({ vocabulary }),
+      store: createOnlineStore(),
+    },
+  };
 }
 
 export async function downloadCatalog(

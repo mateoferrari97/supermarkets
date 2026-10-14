@@ -258,7 +258,7 @@ function questionsOf(items: OrderItem[]): Asked[] {
     .map((item, index) => ({ question: index + 1, item }));
 }
 
-function optionNames(question: Question): string[] {
+export function optionNames(question: Question): string[] {
   if (question.kind === "productType") return question.options.map(({ name }) => name);
   if (question.kind === "size") return question.options;
   return [];

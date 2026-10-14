@@ -7,7 +7,14 @@ export type CommentFinding = { path: string; line: number };
 type Language = "script" | "sql" | "shell";
 type RawComment = { index: number; body: string };
 
-const IGNORED_DIRECTORIES = [".scratch/", ".claude/", "node_modules/", ".data/"];
+const IGNORED_PATHS = [
+  ".scratch/",
+  ".claude/",
+  "node_modules/",
+  ".data/",
+  ".next/",
+  "next-env.d.ts",
+];
 const SCRIPT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 const DIRECTIVE = /^\s*(?:eslint-disable|eslint-enable|@ts-expect-error|@ts-ignore)(?=$|[\s-])/;
 const REFERENCE_DIRECTIVE = /^\/\s*<reference\s/;
@@ -240,7 +247,7 @@ function trackedFiles(): string[] {
   if (result.status !== 0) throw new Error(result.stderr);
   return result.stdout
     .split("\n")
-    .filter((path) => path !== "" && !IGNORED_DIRECTORIES.some((dir) => path.startsWith(dir)));
+    .filter((path) => path !== "" && !IGNORED_PATHS.some((ignored) => path.startsWith(ignored)));
 }
 
 function main(): void {

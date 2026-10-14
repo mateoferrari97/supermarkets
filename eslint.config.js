@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import nextPlugin from "@next/eslint-plugin-next";
 import tseslint from "typescript-eslint";
 
 const onlyImports = (allowed, message) => ({
@@ -23,7 +24,7 @@ const cliFilesMessage = "cli reads and writes files through compose, never fs (A
 const adapters = "(^|/)adapters(/|$)";
 
 export default tseslint.config(
-  { ignores: ["node_modules", ".claude", ".scratch", ".data"] },
+  { ignores: ["node_modules", ".claude", ".scratch", ".data", ".next", "next-env.d.ts"] },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
@@ -58,6 +59,10 @@ export default tseslint.config(
       ["\\./core/", "\\./adapters/"],
       "compose imports only core and adapters (ADR 0006).",
     ),
+  },
+  {
+    files: ["src/app/**"],
+    ...nextPlugin.configs["core-web-vitals"],
   },
   {
     files: ["src/app/**"],

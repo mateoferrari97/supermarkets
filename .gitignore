@@ -4,3 +4,5 @@ node_modules
 !.env.example
 .claude/worktrees/
 .data/
+.next/
+next-env.d.ts

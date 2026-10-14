@@ -7,3 +7,5 @@ docs
 GLOSSARY.md
 CLAUDE.md
 ARCHITECTURE.md
+.next
+next-env.d.ts
