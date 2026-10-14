@@ -1,5 +1,7 @@
 import { tipoMappingSchema, vocabularySchema } from "../src/product-types/schema.ts";
 import type { CatalogProduct, OrderResolution } from "../src/order-resolution/resolve-order.ts";
+import { snapshotProducts } from "../src/product-selection/carrefour-store.ts";
+import { paymentCardTableSchema } from "../src/product-selection/payment-cards.ts";
 import { GROCERY_DEPARTMENTS } from "../src/product-type-seed/split.ts";
 import {
   CARREFOUR_MAPPING_PATH,
@@ -11,21 +13,31 @@ import {
 export const PROMPTS_DIR = "prompts/order-resolution";
 export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
+export const PAYMENT_CARDS_PATH = "vocabulary/carrefour-payment-cards.json";
 
 export const readVocabulary = () => vocabularySchema.parse(readJson(VOCABULARY_PATH));
 
 export function readOrderData() {
   const grocery = new Set<string>(GROCERY_DEPARTMENTS);
-  const products: CatalogProduct[] = readCatalogProducts()
-    .filter((product) => grocery.has(product.department))
-    .map((product) => ({
-      name: product.name,
-      brand: product.brand ?? null,
-      tipo: product.tipo,
-      inStock: product.availableQuantity > 0,
-    }));
+  const catalog = readCatalogProducts().filter((product) => grocery.has(product.department));
+  const products: CatalogProduct[] = catalog.map((product) => ({
+    name: product.name,
+    brand: product.brand ?? null,
+    tipo: product.tipo,
+    inStock: product.availableQuantity > 0,
+  }));
   const mapping = tipoMappingSchema.parse(readJson(CARREFOUR_MAPPING_PATH));
-  return { products, vocabulary: readVocabulary(), mapping };
+  return {
+    products,
+    snapshot: snapshotProducts(
+      [...catalog].sort(
+        (a, b) => Number(b.availableQuantity > 0) - Number(a.availableQuantity > 0),
+      ),
+    ),
+    vocabulary: readVocabulary(),
+    mapping,
+    paymentCards: paymentCardTableSchema.parse(readJson(PAYMENT_CARDS_PATH)),
+  };
 }
 
 export function renderItem(item: OrderResolution["items"][number]): string {

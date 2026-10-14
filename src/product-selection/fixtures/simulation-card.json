@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "id": "3807",
+      "quantity": 2,
+      "availability": "available",
+      "unitMultiplier": 1.0,
+      "measurementUnit": "un",
+      "price": 600000,
+      "sellingPrice": 390000,
+      "priceTags": [
+        {
+          "name": "discount@price-69f69414-8e4b-4c1f-8c8e-d0cec61cf105#17b369e6-2352-4506-bcec-3dcf90df122e",
+          "value": -420000
+        }
+      ],
+      "priceDefinition": {
+        "total": 780000
+      }
+    }
+  ],
+  "ratesAndBenefitsData": {
+    "rateAndBenefitsIdentifiers": [
+      {
+        "id": "69f69414-8e4b-4c1f-8c8e-d0cec61cf105",
+        "name": "2do al 70% Tarjeta Carrefour o Cuenta digital Max 48 Combinable 9 al 15.10 COCA COLA"
+      }
+    ]
+  },
+  "messages": []
+}

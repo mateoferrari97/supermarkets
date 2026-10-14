@@ -8,6 +8,7 @@ import {
   mapAnswerOutputSchema,
   resolveItemOutputSchema,
   rewordItemOutputSchema,
+  selectionPolicySchema,
   splitOrderOutputSchema,
   type Llm,
   type ResolveItemInput,
@@ -114,6 +115,8 @@ export function createClaudeCodeLlm({
         input,
       ),
     mapAnswer: (input) => ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input),
+    translatePreference: (input) =>
+      ask("translate-preference", prompt("translate-preference"), selectionPolicySchema, input),
   };
 }
 

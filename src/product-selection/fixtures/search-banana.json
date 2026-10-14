@@ -1,0 +1,46 @@
+{
+  "recordsFiltered": 1,
+  "products": [
+    {
+      "productId": "719074",
+      "productName": "Banana selección x kg.",
+      "brand": "Genérico",
+      "properties": [
+        {
+          "name": "Tipo de producto",
+          "values": ["Banana"]
+        },
+        {
+          "name": "Gramaje de unidad de medida",
+          "values": ["GRM"]
+        },
+        {
+          "name": "Gramaje de unidad de consumo",
+          "values": ["1000.00"]
+        }
+      ],
+      "items": [
+        {
+          "itemId": "185818",
+          "measurementUnit": "kg",
+          "unitMultiplier": 0.5,
+          "sellers": [
+            {
+              "sellerId": "1",
+              "commertialOffer": {
+                "teasers": [
+                  {
+                    "name": "Tarjeta Carrefour 15%",
+                    "conditions": {
+                      "minimumQuantity": 0
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "cards": [
+    {
+      "names": [
+        "Tarjeta Carrefour Mastercard",
+        "Tarjeta Carrefour",
+        "Tarjeta Mi Carrefour",
+        "Tarjeta Mi Carrefour Crédito",
+        "Mi Carrefour Crédito"
+      ],
+      "paymentSystem": "502",
+      "bin": "507858"
+    },
+    {
+      "names": ["Prepaga BSF", "Tarjeta Mi Carrefour Prepaga", "Mi Carrefour Prepaga"],
+      "paymentSystem": "505",
+      "bin": null
+    }
+  ]
+}

@@ -4,8 +4,10 @@ import type {
   CandidateQuery,
   Measure,
   OnlineStore,
+  PaymentCard,
   Simulation,
-  SimulationItem,
+  SimulationRequest,
+  SnapshotProduct,
   StoreProduct,
 } from "./store.ts";
 
@@ -37,6 +39,23 @@ const searchSchema = z.object({
           itemId: z.string(),
           measurementUnit: z.string().nullish(),
           unitMultiplier: z.number().nullish(),
+          sellers: z
+            .array(
+              z.object({
+                sellerId: z.string(),
+                commertialOffer: z.object({
+                  teasers: z
+                    .array(
+                      z.object({
+                        name: z.string(),
+                        conditions: z.object({ minimumQuantity: z.number() }).nullish(),
+                      }),
+                    )
+                    .default([]),
+                }),
+              }),
+            )
+            .default([]),
         }),
       ),
     }),
@@ -111,7 +130,20 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     return slug;
   };
 
-  const findCandidates = async ({ postalCode, tipos, brand, sort, limit }: CandidateQuery) => {
+  const slugsForBrands = async (
+    tipoPath: string,
+    region: Record<string, string>,
+    brands: string[],
+  ) => {
+    const slugs = await Promise.all(
+      brands.map((brand) =>
+        facetValue(`facets/trade-policy/1/${tipoPath}`, region, "brand", brand),
+      ),
+    );
+    return slugs.filter((slug): slug is string => slug !== null);
+  };
+
+  const findCandidates = async ({ postalCode, tipos, brands, sort, limit }: CandidateQuery) => {
     const [regionId, ...slugs] = await Promise.all([
       regionFor(postalCode),
       ...tipos.map(slugForTipo),
@@ -123,15 +155,10 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     if (!tipoPath) return [];
     const region: Record<string, string> = regionId ? { regionId } : {};
     let facets = tipoPath;
-    if (brand) {
-      const brandSlug = await facetValue(
-        `facets/trade-policy/1/${tipoPath}`,
-        region,
-        "brand",
-        brand,
-      );
-      if (!brandSlug) return [];
-      facets = `${tipoPath}/brand/${brandSlug}`;
+    if (brands.length > 0) {
+      const brandSlugs = await slugsForBrands(tipoPath, region, brands);
+      if (brandSlugs.length === 0) return [];
+      facets = [tipoPath, ...brandSlugs.map((slug) => `brand/${slug}`)].join("/");
     }
     const url = search(`product-search/trade-policy/1/${facets}`, {
       ...region,
@@ -151,12 +178,19 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
           name: product.productName,
           brand: product.brand ?? null,
           measure: measureOf(product.properties, item),
+          weightStepKg: item.measurementUnit === "kg" ? (item.unitMultiplier ?? 1) : null,
+          teasers: (
+            item.sellers.find(({ sellerId }) => sellerId === "1")?.commertialOffer.teasers ?? []
+          ).map(({ name, conditions }) => ({
+            name,
+            minimumQuantity: conditions?.minimumQuantity ?? 0,
+          })),
         },
       ];
     });
   };
 
-  const simulate = async (postalCode: string, items: SimulationItem[]): Promise<Simulation> => {
+  const simulate = async ({ postalCode, card, items }: SimulationRequest): Promise<Simulation> => {
     const url = `${CARREFOUR_URL}/api/checkout/pub/orderForms/simulation?sc=1&RnbBehavior=0`;
     const body = simulationSchema.parse(
       await http({
@@ -166,6 +200,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
           items: items.map(({ itemId, quantity }) => ({ id: itemId, quantity, seller: "1" })),
           country: "ARG",
           postalCode,
+          ...(card ? { paymentData: { payments: [payment(card)] } } : {}),
         },
       }),
     );
@@ -191,6 +226,49 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
   };
 
   return { findCandidates, simulate };
+}
+
+export type SnapshotRecord = {
+  productId: string;
+  skuIds: string[];
+  name: string;
+  brand?: string | null;
+  tipo: string | null;
+  measureUnit: string | null;
+  consumptionQuantity: string | null;
+};
+
+export function snapshotProducts(records: SnapshotRecord[]): SnapshotProduct[] {
+  return records.flatMap((record): SnapshotProduct[] => {
+    const [itemId] = record.skuIds;
+    if (itemId === undefined || record.tipo === null) return [];
+    const properties = [
+      { name: "Gramaje de unidad de medida", values: [record.measureUnit ?? ""] },
+      { name: "Gramaje de unidad de consumo", values: [record.consumptionQuantity ?? ""] },
+    ];
+    return [
+      {
+        productId: record.productId,
+        itemId,
+        name: record.name,
+        brand: record.brand ?? null,
+        measure: measureOf(properties, {}),
+        weightStepKg: null,
+        teasers: [],
+        tipo: record.tipo,
+      },
+    ];
+  });
+}
+
+function payment({ paymentSystem, bin }: PaymentCard) {
+  return {
+    paymentSystem,
+    ...(bin ? { bin } : {}),
+    installments: 1,
+    value: 0,
+    referenceValue: 0,
+  };
 }
 
 function measureOf(

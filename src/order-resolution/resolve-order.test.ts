@@ -105,6 +105,8 @@ type Script = {
   rewordings?: Record<string, string>;
   replies?: Record<string, MapAnswerOutput>;
   postalCode?: string | null;
+  paymentCard?: string | null;
+  preference?: string | null;
 };
 
 type Seen = { resolved: ResolveItemInput[]; reworded: ResolveItemInput[]; asked: MapAnswerInput[] };
@@ -121,10 +123,12 @@ const fakeLlm = ({
   rewordings = {},
   replies = {},
   postalCode = "1425",
+  paymentCard = null,
+  preference = null,
 }: Script) => {
   const seen: Seen = { resolved: [], reworded: [], asked: [] };
   const llm: Llm = {
-    splitOrder: () => Promise.resolve({ items, postalCode }),
+    splitOrder: () => Promise.resolve({ items, postalCode, paymentCard, preference }),
     resolveItem: (input) => {
       seen.resolved.push(input);
       return scripted(answers, input.item.phrase, "answer");
@@ -137,6 +141,7 @@ const fakeLlm = ({
       seen.asked.push(input);
       return scripted(replies, input.answer, "reply");
     },
+    translatePreference: () => Promise.reject(new Error("order resolution never translates")),
   };
   return { llm, seen };
 };
@@ -187,6 +192,8 @@ describe("resolveOrder", () => {
         }),
       ],
       postalCode: "1425",
+      paymentCard: null,
+      preference: null,
       message: null,
     });
   });
@@ -486,6 +493,8 @@ describe("answerQuestions", () => {
     assert.deepEqual(resolution, {
       items: [resolved("yerba mate", "yerba", { quantity: 2 })],
       postalCode: "1425",
+      paymentCard: null,
+      preference: null,
       message: null,
     });
   });
@@ -536,6 +545,8 @@ describe("answerQuestions", () => {
     assert.deepEqual(resolution, {
       items: [resolved("yerba", "yerba"), resolved("leche", "leche-entera")],
       postalCode: "1425",
+      paymentCard: null,
+      preference: null,
       message: null,
     });
   });
@@ -548,5 +559,21 @@ describe("answerQuestions", () => {
     });
     assert.equal(resolution.postalCode, null);
     assert.equal(resolution.message, "Tengo una pregunta:\n\n1. ¿A qué código postal es el envío?");
+  });
+
+  it("keeps the order's Payment Card and preference through the questions round", async () => {
+    const { resolution } = await runAndAnswer(
+      {
+        items: [item("leche")],
+        answers: { leche },
+        paymentCard: "Tarjeta Carrefour Mastercard",
+        preference: "solo La Serenísima",
+        replies: { entera: reply({ options: [1] }) },
+      },
+      "entera",
+    );
+    assert.equal(resolution.message, null);
+    assert.equal(resolution.paymentCard, "Tarjeta Carrefour Mastercard");
+    assert.equal(resolution.preference, "solo La Serenísima");
   });
 });

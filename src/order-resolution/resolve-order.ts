@@ -22,11 +22,13 @@ export type Question =
 
 export type OrderItem = Item & { productTypes: ProductTypeRef[]; question: Question | null };
 
-export type OrderResolution = {
-  items: OrderItem[];
+export type OrderDetails = {
   postalCode: string | null;
-  message: string | null;
+  paymentCard: string | null;
+  preference: string | null;
 };
+
+export type OrderResolution = OrderDetails & { items: OrderItem[]; message: string | null };
 
 export type OrderDependencies = {
   products: CatalogProduct[];
@@ -217,17 +219,18 @@ export function createOrderResolver({
 
     return withMessage(
       await Promise.all(resolution.items.map((item) => updates.get(item) ?? Promise.resolve(item))),
-      postalCode,
+      { ...detailsOf(resolution), postalCode },
     );
   };
 
   return {
     resolveOrder: async (orderText) => {
-      const { items, postalCode } = await llm.splitOrder(orderText);
-      return withMessage(
-        await Promise.all(items.map(resolveItem)),
-        postalCode === null ? null : postalCodeFrom(postalCode),
-      );
+      const { items, postalCode, paymentCard, preference } = await llm.splitOrder(orderText);
+      return withMessage(await Promise.all(items.map(resolveItem)), {
+        postalCode: postalCode === null ? null : postalCodeFrom(postalCode),
+        paymentCard,
+        preference,
+      });
     },
     answerQuestions,
   };
@@ -235,6 +238,10 @@ export function createOrderResolver({
 
 export function postalCodeFrom(text: string): string | null {
   return /\d{4}/.exec(text)?.[0] ?? null;
+}
+
+function detailsOf({ postalCode, paymentCard, preference }: OrderDetails): OrderDetails {
+  return { postalCode, paymentCard, preference };
 }
 
 function itemFields(orderItem: OrderItem): Item {
@@ -290,19 +297,19 @@ function questionText(number: number, item: Asked["item"]): string {
   }
 }
 
-function withMessage(items: OrderItem[], postalCode: string | null): OrderResolution {
+function withMessage(items: OrderItem[], details: OrderDetails): OrderResolution {
   const questions = questionsOf(items);
   const asked = questions.map(({ question, item }) => questionText(question, item));
-  if (postalCode === null) {
+  if (details.postalCode === null) {
     asked.push(`${questions.length + 1}. ¿A qué código postal es el envío?`);
   }
-  if (asked.length === 0) return { items, postalCode, message: null };
+  if (asked.length === 0) return { ...details, items, message: null };
   const intro = asked.length === 1 ? "Tengo una pregunta:" : "Tengo unas preguntas:";
   const outro = questions.some(({ item }) => optionNames(item.question).length > 0)
     ? 'Respondé con el número o con palabras ("la 2", "entera"), o "cualquiera" si te da igual.'
     : null;
   const parts = [intro, ...asked, ...(outro ? [outro] : [])];
-  return { items, postalCode, message: parts.join("\n\n") };
+  return { ...details, items, message: parts.join("\n\n") };
 }
 
 export function resolveOrder(

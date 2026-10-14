@@ -23,7 +23,22 @@
         {
           "itemId": "11324",
           "measurementUnit": "un",
-          "unitMultiplier": 1
+          "unitMultiplier": 1.0,
+          "sellers": [
+            {
+              "sellerId": "1",
+              "commertialOffer": {
+                "teasers": [
+                  {
+                    "name": "Tarjeta Carrefour 15%",
+                    "conditions": {
+                      "minimumQuantity": 0
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -33,23 +48,44 @@
       "brand": "Coca Cola",
       "properties": [
         {
-          "name": "Tipo de producto",
-          "values": ["Gaseosa"]
-        },
-        {
           "name": "Gramaje de unidad de consumo",
           "values": ["2250.00"]
         },
         {
           "name": "Gramaje de unidad de medida",
           "values": ["CM3"]
+        },
+        {
+          "name": "Tipo de producto",
+          "values": ["Gaseosa"]
         }
       ],
       "items": [
         {
           "itemId": "3807",
           "measurementUnit": "un",
-          "unitMultiplier": 1
+          "unitMultiplier": 1.0,
+          "sellers": [
+            {
+              "sellerId": "1",
+              "commertialOffer": {
+                "teasers": [
+                  {
+                    "name": "Tarjeta Carrefour 15%",
+                    "conditions": {
+                      "minimumQuantity": 0
+                    }
+                  },
+                  {
+                    "name": "PROMO-2do al 50% Max 48 unidades Combinable COCA COLA-Reg-2-50-Aniv2 9 al 15.10",
+                    "conditions": {
+                      "minimumQuantity": 2
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       ]
     }

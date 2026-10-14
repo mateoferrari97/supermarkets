@@ -45,7 +45,7 @@ const score = (
 ) =>
   scoreCase(
     { id: "case", order: "pedido", ...evalCase },
-    { ...resolution, postalCode: "1425", message: null },
+    { ...resolution, postalCode: "1425", paymentCard: null, preference: null, message: null },
     vocabulary,
   );
 

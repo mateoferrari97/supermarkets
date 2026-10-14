@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "id": "185818",
+      "quantity": 2,
+      "availability": "available",
+      "unitMultiplier": 0.5,
+      "measurementUnit": "kg",
+      "price": 199900,
+      "sellingPrice": 99950,
+      "priceTags": [],
+      "priceDefinition": {
+        "total": 199900
+      }
+    }
+  ],
+  "ratesAndBenefitsData": {
+    "rateAndBenefitsIdentifiers": []
+  },
+  "messages": []
+}

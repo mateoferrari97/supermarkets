@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Pick one product per Item from live Carrefour search and checkout simulation
 

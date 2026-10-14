@@ -16,6 +16,8 @@ export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
 const catalogSchema = z.object({
   products: z.array(
     z.object({
+      productId: z.string(),
+      skuIds: z.array(z.string()),
       name: z.string(),
       brand: z.string().nullable().optional(),
       department: z.string(),
@@ -24,6 +26,7 @@ const catalogSchema = z.object({
       familia: z.string().nullable(),
       tipo: z.string().nullable(),
       measureUnit: z.string().nullable(),
+      consumptionQuantity: z.string().nullable(),
     }),
   ),
 });

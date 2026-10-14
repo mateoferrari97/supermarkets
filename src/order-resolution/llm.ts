@@ -11,6 +11,8 @@ export const splitOrderOutputSchema = z.strictObject({
     }),
   ),
   postalCode: z.string().min(1).nullable(),
+  paymentCard: z.string().min(1).nullable(),
+  preference: z.string().min(1).nullable(),
 });
 
 export const resolveItemOutputSchema = z.strictObject({
@@ -31,12 +33,29 @@ export const mapAnswerOutputSchema = z.strictObject({
 
 export const rewordItemOutputSchema = z.strictObject({ phrase: z.string().min(1) });
 
+export const selectionPolicySchema = z.strictObject({
+  ranking: z.enum(["savings-first", "cheapest-per-unit"]),
+  brandsOnly: z.array(z.string().min(1)),
+  brandsPreferred: z.array(z.string().min(1)),
+  brandsExcluded: z.array(z.string().min(1)),
+  unexpressed: z.array(z.string().min(1)),
+});
+
 export type SplitOrderOutput = z.infer<typeof splitOrderOutputSchema>;
 export type Item = SplitOrderOutput["items"][number];
 export type ResolveItemOutput = z.infer<typeof resolveItemOutputSchema>;
 
 export type MapAnswerOutput = z.infer<typeof mapAnswerOutputSchema>;
 export type RewordItemOutput = z.infer<typeof rewordItemOutputSchema>;
+export type SelectionPolicy = z.infer<typeof selectionPolicySchema>;
+
+export const DEFAULT_SELECTION_POLICY: SelectionPolicy = {
+  ranking: "savings-first",
+  brandsOnly: [],
+  brandsPreferred: [],
+  brandsExcluded: [],
+  unexpressed: [],
+};
 
 export type Evidence = { product: string; productTypeId: string; productTypeName: string };
 
@@ -52,9 +71,12 @@ export type QuestionInput = {
 
 export type MapAnswerInput = { questions: QuestionInput[]; answer: string };
 
+export type TranslatePreferenceInput = { preference: string };
+
 export type Llm = {
   splitOrder(orderText: string): Promise<SplitOrderOutput>;
   resolveItem(input: ResolveItemInput): Promise<ResolveItemOutput>;
   rewordItem(input: ResolveItemInput): Promise<RewordItemOutput>;
   mapAnswer(input: MapAnswerInput): Promise<MapAnswerOutput>;
+  translatePreference(input: TranslatePreferenceInput): Promise<SelectionPolicy>;
 };

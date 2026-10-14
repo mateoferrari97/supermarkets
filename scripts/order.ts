@@ -14,7 +14,7 @@ if (!orderText) {
   process.exit(1);
 }
 
-const { products, vocabulary, mapping } = readOrderData();
+const { products, snapshot, vocabulary, mapping, paymentCards } = readOrderData();
 
 const calls: LlmCall[] = [];
 const llm = createClaudeCodeLlm({
@@ -53,14 +53,26 @@ terminal.close();
 
 if (!resolution.message) {
   const picked = Date.now();
-  const selection = await pickProducts(resolution, { mapping, store: createCarrefourStore() });
+  const selection = await pickProducts(resolution, {
+    mapping,
+    store: createCarrefourStore(),
+    llm,
+    paymentCards,
+    snapshot,
+  });
   const money = (value: number) => `$${value.toFixed(2)}`;
-  console.log(`\nCarrito (código postal ${resolution.postalCode}):\n`);
+  const card = resolution.paymentCard ? `, pago con ${resolution.paymentCard}` : "";
+  console.log(`\nCarrito (código postal ${resolution.postalCode}${card}):\n`);
   for (const line of selection.lines) {
     const product = line.product
       ? `${line.product.name} (${line.product.itemId}) x${line.quantity}, ${money(line.unitPrice ?? 0)} c/u, ${money(line.total)}`
       : "sin producto";
     console.log(`- ${line.phrase}: ${product}. ${line.reason}`);
+    for (const notice of line.notices) console.log(`  ${notice}`);
+  }
+  for (const notice of selection.notices) console.log(`\n${notice}`);
+  if (selection.unexpressed.length > 0) {
+    console.log(`\nNo pude aplicar: ${selection.unexpressed.join("; ")}.`);
   }
   console.log(
     `\nTotal: ${money(selection.total)} (Carrefour, ${((Date.now() - picked) / 1000).toFixed(1)} s)`,
