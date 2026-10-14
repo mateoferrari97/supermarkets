@@ -16,9 +16,12 @@ The code is one package with the layers of ADR 0006 at the top and features insi
   - `src/core/product-type-seed/`: splitting Carrefour's Tipos into parts, checking classification proposals, consolidating them into the vocabulary, coverage and the remaining doubts.
 - `src/adapters/<technology>/`: implementations of the ports. They import `core`, `node:*` and zod.
   - `src/adapters/carrefour/`: `OnlineStore` over Carrefour's public API ([Carrefour API](docs/references/carrefour-api.md)) and the conversion of Catalog Snapshot records.
+  - `src/adapters/carrefour/`: also `downloadCatalog` (`catalog-download.ts`), which downloads the whole catalog and summarises its Tipos for `pnpm carrefour:catalog`.
   - `src/adapters/claude-code/`: `Llm` over local Claude Code sessions, and the zod schemas that parse their answers.
-- `src/compose.ts`: the composition root. It wires adapters into the ports (`createLlm`, `createOnlineStore`) and imports only `core` and `adapters`.
-- `scripts/`: the operator commands, which read and write files directly today, and the repo tooling (`format.mjs`, `no-comments.ts`, `check-docs.ts`). The operator commands move into a `cli` delivery layer and the files into an adapter in a later step of the migration; the chat (`app`) comes after that.
+  - `src/adapters/files/`: every read and write of the data folders (`data-files.ts`). It is the only place that knows their paths and layout, and each loader of `vocabulary/` and `evals/` data runs the full validation of `core` (schema plus cross-references) and returns the data or the errors.
+- `src/compose.ts`: the composition root. It wires adapters into the ports (`createLlm`, `createOnlineStore`, `createOrderResolver({ model? })`), exposes the named loaders and savers of `src/adapters/files/` (`loadOrderData`, `loadProductTypes`, `saveParts`, `saveEvalRun`, ...) and `downloadCatalog(outputDir?)`, and imports only `core` and `adapters`.
+- `src/cli/`: one file per operator command, run by `package.json` through `tsx`. A command reads its arguments from `process`, loads and saves only through `compose`, never imports `node:fs` or `adapters`, and reports through `src/cli/report.ts` (print the errors and exit 1, or print the success line).
+- `scripts/`: repo tooling outside the architecture (`format.mjs`, `no-comments.ts`, `check-docs.ts`), plus `order.ts` until the chat replaces `pnpm order`.
 
 ## Ports and the dependency rule
 
@@ -27,14 +30,14 @@ Only two things vary per adapter, so only they are ports (ADR 0006):
 - `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer, translate a preference.
 - `OnlineStore` (`src/core/product-selection/online-store.ts`): check delivery to a postal code, find candidates, simulate a cart, build the cart link.
 
-Static data (Catalog Snapshot, vocabulary, mapping, Payment Cards, eval set) has no port: it is loaded outside `core` and passed in as arguments. ESLint's `no-restricted-imports` in `eslint.config.js` enforces the rule in `pnpm lint`: `core` imports only `core` and zod; adapters import `core`, `node:*` and zod; `compose` imports `core` and adapters; `cli` and `app` never import adapters. Imports between features inside `core` are free.
+Static data (Catalog Snapshot, vocabulary, mapping, Payment Cards, eval set) has no port: it is loaded outside `core` and passed in as arguments. ESLint's `no-restricted-imports` in `eslint.config.js` enforces the rule in `pnpm lint`: `core` imports only `core` and zod; adapters import `core`, `node:*` and zod; `compose` imports `core` and adapters; `cli` and `app` never import adapters, and `cli` never imports `node:fs`. Imports between features inside `core` are free.
 
 ## An order end to end
 
 Today an order runs in the terminal with `pnpm order` (`scripts/order.ts`):
 
 1. **Postal code.** `postalCodeFrom` (`src/core/product-selection/postal-code.ts`) reads the code from the Owner's text; `OnlineStore.checkDelivery` asks Carrefour's regions endpoint (`src/adapters/carrefour/carrefour-store.ts`) whether it delivers there. A refusal asks again.
-2. **Data.** `readOrderData` (`scripts/order-files.ts`) loads the Catalog Snapshot's grocery products, the vocabulary, the Tipo mapping and the Payment Cards.
+2. **Data.** `loadOrderData` (`src/compose.ts`, reading through `src/adapters/files/data-files.ts`) loads the Catalog Snapshot's grocery products, the vocabulary, the Tipo mapping and the Payment Cards, and stops with every validation error before the order is read.
 3. **Resolver.** `createOrderResolver` (`src/core/order-resolution/resolve-order.ts`) builds a BM25 index (`src/core/order-resolution/bm25.ts`) over the names of the products whose Tipo is mapped to a Product Type.
 4. **Split.** `resolveOrder` calls `Llm.splitOrder`, which turns the text into Items (phrase, quantity, terms, vague words, brand), the Payment Card and the preference.
 5. **Resolve each Item.** The BM25 evidence and the Item go to `Llm.resolveItem`, which answers `match`, `ambiguous` or `none` with Product Type ids; code drops unknown ids. `none` is retried once with `Llm.rewordItem`. Code then checks the Item's terms against product names and builds size options for vague words from the Catalog Snapshot (`src/core/catalog/catalog.ts`).
@@ -46,7 +49,7 @@ Today an order runs in the terminal with `pnpm order` (`scripts/order.ts`):
 
 | Folder | What it holds | Who writes it | Who validates it | Committed |
 | --- | --- | --- | --- | --- |
-| `vocabulary/` | `product-types.json` (Product Type Groups and Product Types), `carrefour-tipos.json` (Carrefour Tipo to Product Type id, `null` for excluded), `carrefour-payment-cards.json` (Payment Card names to payment system and BIN) | `pnpm seed:consolidate` writes the first two from the seed proposals and decisions; the Payment Cards are edited by hand | `pnpm product-types` and `pnpm payment-cards`, in `pnpm check` | Yes |
-| `evals/` | `order-resolution.json`, the Owner's eval set: orders and what each must resolve to | By hand | `pnpm order:eval-set`, in `pnpm check` | Yes |
+| `vocabulary/` | `product-types.json` (Product Type Groups and Product Types), `carrefour-tipos.json` (Carrefour Tipo to Product Type id, `null` for excluded), `carrefour-payment-cards.json` (Payment Card names to payment system and BIN) | `pnpm seed:consolidate` writes the first two from the seed proposals and decisions; the Payment Cards are edited by hand | Every loader in `src/adapters/files/`; `pnpm product-types` and `pnpm payment-cards` run the same validation in `pnpm check` | Yes |
+| `evals/` | `order-resolution.json`, the Owner's eval set: orders and what each must resolve to | By hand | The eval set loader, also against the vocabulary; `pnpm order:eval-set` runs it in `pnpm check` | Yes |
 | `prompts/` | `order-resolution/<task>.md`, the system prompt of each `Llm` task | By hand ([LLM](docs/LLM.md#changing-a-prompt)) | Measured by `pnpm order:eval`; not checked by `pnpm docs:check` | Yes |
-| `.data/` | `carrefour/products.json` and `carrefour/tipos.json` (the Catalog Snapshot), `carrefour/seed/` (parts, proposals, decisions, doubts, summary), `order-resolution/eval-runs/` (one file per eval run) | `pnpm carrefour:catalog`, the `seed:*` commands and the seed skills, `pnpm order:eval` | No validator command; the commands parse the Catalog Snapshot and the seed decisions with zod when they read them | No (`.gitignore`) |
+| `.data/` | `carrefour/products.json` and `carrefour/tipos.json` (the Catalog Snapshot), `carrefour/seed/` (parts, proposals, decisions, doubts, summary), `order-resolution/eval-runs/` (one file per eval run) | `pnpm carrefour:catalog`, the `seed:*` commands and the seed skills, `pnpm order:eval` | No validator command; `src/adapters/files/` parses the Catalog Snapshot, the seed decisions and the eval runs with zod, and checks each proposal against its part, when it reads them | No (`.gitignore`) |

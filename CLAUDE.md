@@ -49,10 +49,11 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - `pnpm test`: Vitest over `src/` and `scripts/`.
 - `pnpm docs:check`: checks the knowledge base (ADR 0010) and prints file, line and rule for each finding.
 - `pnpm typecheck`, `pnpm lint`, `pnpm format` (`--check` to only check), `pnpm no-comments`.
+- The operator commands below, except `pnpm order` (`scripts/order.ts`), run one file each in `src/cli/` and read and write data only through the loaders and savers of `src/compose.ts`.
 - `pnpm order "<order text>"` (optionally `--postal-code <code>`): places an order in the terminal.
 - `pnpm order:eval [filter...]`: runs the order resolution eval set with real Claude Code sessions ([LLM](docs/LLM.md#changing-a-prompt)).
-- `pnpm order:eval-set`, `pnpm product-types`, `pnpm payment-cards`: validate the committed data in `evals/` and `vocabulary/`.
-- `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `.data/carrefour/` (`products.json`, `tipos.json`). `.data/` is not committed.
+- `pnpm order:eval-set`, `pnpm product-types`, `pnpm payment-cards`: validate the committed data in `evals/` and `vocabulary/` with the same loaders every command uses.
+- `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `.data/carrefour/` (`products.json`, `tipos.json`), or into the directory given as its argument. `.data/` is not committed.
 - `pnpm seed:split`, `pnpm seed:check-proposal <part-id>`, `pnpm seed:consolidate`, `pnpm seed:coverage`, `pnpm seed:doubts [size]`: the Product Type seed, run by the `seed-product-types` and `review-product-type-doubts` skills.
 
 ## Workflow

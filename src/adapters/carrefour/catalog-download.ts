@@ -1,5 +1,3 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { z } from "zod";
 
 const BASE_URL = "https://www.carrefour.com.ar";
@@ -10,7 +8,6 @@ const WINDOW = MAX_FROM + PAGE_SIZE;
 const CONCURRENCY = 8;
 const MAX_ATTEMPTS = 4;
 const EXAMPLES_PER_TIPO = 5;
-const OUTPUT_DIR = process.argv[2] ?? ".data/carrefour";
 
 type Category = { id: number; name: string; children: Category[] };
 
@@ -46,7 +43,7 @@ type RawProduct = z.infer<typeof productSchema>;
 
 type Node = { category: Category; path: string; department: string };
 
-type Product = {
+export type CatalogProduct = {
   productId: string;
   skuIds: string[];
   ean: string | null;
@@ -69,7 +66,7 @@ type Product = {
   unitPrice: string | null;
 };
 
-type TipoSummary = {
+export type TipoSummary = {
   tipo: string;
   products: number;
   availableProducts: number;
@@ -86,6 +83,33 @@ type CategoryResult = {
   total: number;
   products: RawProduct[];
   children: Node[];
+};
+
+export type CatalogMeta = {
+  fetchedAt: string;
+  source: string;
+  sellerId: string;
+  catalogTotal: number | null;
+  categoriesFetched: number;
+  productsListed: number;
+  uniqueProducts: number;
+  availableProducts: number;
+  productsWithoutTipo: number;
+  distinctTipos: number;
+  productsByDepartment: Record<string, number>;
+  incompleteCategories: { path: string; name: string; total: number; fetched: number }[];
+  productsOnlyInSplitCategories: {
+    path: string;
+    name: string;
+    total: number;
+    childrenTotal: number;
+  }[];
+};
+
+export type DownloadedCatalog = {
+  meta: CatalogMeta;
+  products: CatalogProduct[];
+  tipos: TipoSummary[];
 };
 
 let activeRequests = 0;
@@ -182,7 +206,7 @@ function specification(product: RawProduct, key: string): string | null {
   return typeof first === "string" && first.trim() !== "" ? first.trim() : null;
 }
 
-function toProduct(raw: RawProduct, department: string): Product {
+function toProduct(raw: RawProduct, department: string): CatalogProduct {
   const item = raw.items[0];
   const offer = item?.sellers.find((seller) => seller.sellerId === SELLER_ID)?.commertialOffer;
   return {
@@ -218,8 +242,8 @@ function sortedCounts(counts: Record<string, number>): Record<string, number> {
   return Object.fromEntries(Object.entries(counts).sort(([, a], [, b]) => b - a));
 }
 
-function summarizeTipos(products: Product[]): TipoSummary[] {
-  const byTipo = new Map<string, Product[]>();
+export function summarizeTipos(products: CatalogProduct[]): TipoSummary[] {
+  const byTipo = new Map<string, CatalogProduct[]>();
   for (const product of products) {
     if (product.tipo === null) continue;
     const group = byTipo.get(product.tipo) ?? [];
@@ -253,7 +277,9 @@ function summarizeTipos(products: Product[]): TipoSummary[] {
     .sort((a, b) => b.products - a.products || a.tipo.localeCompare(b.tipo, "es"));
 }
 
-async function main() {
+export async function downloadCatalog(
+  onCategory: (done: number) => void = () => undefined,
+): Promise<DownloadedCatalog> {
   const fetchedAt = new Date().toISOString();
   const tree = z
     .array(categorySchema)
@@ -267,12 +293,11 @@ async function main() {
 
   let done = 0;
   const onDone = () => {
-    process.stdout.write(`\r${String(++done)} categories`);
+    onCategory(++done);
   };
   const results = (await Promise.all(roots.map((root) => fetchCategory(root, onDone)))).flat();
-  process.stdout.write("\n");
 
-  const products = new Map<string, Product>();
+  const products = new Map<string, CatalogProduct>();
   let listed = 0;
   for (const result of results) {
     listed += result.products.length;
@@ -307,7 +332,7 @@ async function main() {
     .filter((category) => category.total > category.childrenTotal);
   const tipos = summarizeTipos(productList);
 
-  const meta = {
+  const meta: CatalogMeta = {
     fetchedAt,
     source: BASE_URL,
     sellerId: SELLER_ID,
@@ -328,13 +353,5 @@ async function main() {
     productsOnlyInSplitCategories,
   };
 
-  mkdirSync(OUTPUT_DIR, { recursive: true });
-  writeFileSync(
-    join(OUTPUT_DIR, "products.json"),
-    JSON.stringify({ ...meta, products: productList }, null, 2),
-  );
-  writeFileSync(join(OUTPUT_DIR, "tipos.json"), JSON.stringify({ ...meta, tipos }, null, 2));
-  process.stdout.write(`${JSON.stringify(meta, null, 2)}\nWritten to ${OUTPUT_DIR}\n`);
+  return { meta, products: productList, tipos };
 }
-
-await main();

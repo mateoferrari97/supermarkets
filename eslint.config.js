@@ -19,6 +19,8 @@ const coreFromAdapter = "\\.\\./\\.\\./core/";
 const coreMessage = "core imports only core and zod (ADR 0006).";
 const adaptersMessage = "adapters import only core, node:* and zod (ADR 0006).";
 const deliveryMessage = "cli and app import core and compose, never adapters (ADR 0006).";
+const cliFilesMessage = "cli reads and writes files through compose, never fs (ADR 0006).";
+const adapters = "(^|/)adapters(/|$)";
 
 export default tseslint.config(
   { ignores: ["node_modules", ".claude", ".scratch", ".data"] },
@@ -58,13 +60,23 @@ export default tseslint.config(
     ),
   },
   {
-    files: ["src/cli/**", "src/app/**"],
+    files: ["src/app/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ regex: adapters, caseSensitive: true, message: deliveryMessage }] },
+      ],
+    },
+  },
+  {
+    files: ["src/cli/**"],
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
-            { regex: "(^|/)adapters(/|$)", caseSensitive: true, message: deliveryMessage },
+            { regex: adapters, caseSensitive: true, message: deliveryMessage },
+            { regex: "^(node:)?fs(/|$)", caseSensitive: true, message: cliFilesMessage },
           ],
         },
       ],

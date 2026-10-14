@@ -1,6 +1,6 @@
 # Carrefour API
 
-Facts about the public endpoints of https://www.carrefour.com.ar that the code depends on. carrefour.com.ar runs on VTEX; every endpoint below answers anonymous requests without cookies. The facts were checked with live requests on 2026-10-13 and against the VTEX API reference (https://developers.vtex.com/docs/api-reference/intelligent-search-api-v1, https://developers.vtex.com/docs/api-reference/checkout-api). The adapter is `src/adapters/carrefour/carrefour-store.ts`; the full catalog download is `scripts/carrefour-catalog.ts`.
+Facts about the public endpoints of https://www.carrefour.com.ar that the code depends on. carrefour.com.ar runs on VTEX; every endpoint below answers anonymous requests without cookies. The facts were checked with live requests on 2026-10-13 and against the VTEX API reference (https://developers.vtex.com/docs/api-reference/intelligent-search-api-v1, https://developers.vtex.com/docs/api-reference/checkout-api). The adapter is `src/adapters/carrefour/carrefour-store.ts`; the full catalog download is `src/adapters/carrefour/catalog-download.ts`, run by `pnpm carrefour:catalog`.
 
 ## Regions
 
@@ -46,7 +46,7 @@ Facts about the public endpoints of https://www.carrefour.com.ar that the code d
 
 ## Catalog search (legacy)
 
-`GET /api/catalog_system/pub/products/search` is what `scripts/carrefour-catalog.ts` uses to download the Catalog Snapshot.
+`GET /api/catalog_system/pub/products/search` is what `src/adapters/carrefour/catalog-download.ts` uses to download the Catalog Snapshot.
 
 - `fq=C:/<category path>/` filters by category; `_from` and `_to` page by 50 at most, and `_from` stops at 2,500 (VTEX known issue: https://help.vtex.com/en/known-issues/catalog-search-api-limited-to-2500-results).
 - The `resources` header holds the filter's total (`resources: 0-49/1655`). A page can hold fewer products than asked while more remain, so paging stops on the total, not on a short page.
