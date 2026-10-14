@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Resolve an order's free text into Product Types
 
