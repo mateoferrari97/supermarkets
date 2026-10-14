@@ -6,7 +6,7 @@ Blocked by: 10
 
 ## Question
 
-In which order are the build slices migrated (Vitest, layers and dependency rule, `src/cli/`, docs and `pnpm docs`, the chat, removing `pnpm order`), and must `pnpm check` pass after every slice, with the old `pnpm order` and the new chat running side by side until the chat replaces it?
+In which order are the build slices migrated (Vitest, layers and dependency rule, `src/cli/`, docs and `pnpm docs:check`, the chat, removing `pnpm order`), and must `pnpm check` pass after every slice, with the old `pnpm order` and the new chat running side by side until the chat replaces it?
 
 ## Answer
 
@@ -26,7 +26,7 @@ Build tickets and blocking:
 | A | Vitest replaces `node:test` in `src/` and `scripts/`; `pnpm test` runs Vitest | none |
 | B | Move code into `src/core/<feature>/`, `src/adapters/<technology>/` and `src/compose.ts`, split the `Llm` and `OnlineStore` ports; behaviour unchanged, existing `scripts/` import the new paths | none |
 | C | Turn on the ESLint `no-restricted-imports` layer rule and fix what violates it | B |
-| D | Docs layout ([Docs layout](05-docs-layout.md)) and `pnpm docs` ([Mechanical docs checks](07-mechanical-docs-checks.md)) | A, C |
+| D | Docs layout ([Docs layout](05-docs-layout.md)) and `pnpm docs:check` ([Mechanical docs checks](07-mechanical-docs-checks.md)) | A, C |
 | E | `src/cli/` one file per command, `compose` loaders and savers in `adapters/files` with full validation | C |
 | F | `core/order-conversation` `takeTurn`, `AbortSignal` on both ports, remove `pnpm order` | A, E |
 | G | Next.js chat: NDJSON route handler, sessions, UI of [Chat flow](03-chat-flow.md); closes after one real order end to end | F |

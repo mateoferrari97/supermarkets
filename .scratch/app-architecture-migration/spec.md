@@ -10,7 +10,7 @@ Agents working in the repo have only `CLAUDE.md`, `GLOSSARY.md`, five ADRs and o
 
 ## Solution
 
-The code moves into the layers of ADR 0006: `src/core/<feature>/`, `src/adapters/<technology>/`, `src/compose.ts`, and two delivery adapters over the same use cases, `src/cli/` (every operator command except `order`) and `src/app/` (a Next.js chat, ADR 0007). ESLint enforces the dependency rule. The conversation of `scripts/order.ts` becomes `takeTurn` in `src/core/order-conversation/`, tested with fakes; `pnpm order` is removed and the Owner orders in the chat of ADR 0008, started with `pnpm dev`. Vitest replaces `node:test`. The knowledge base takes the layout of ADR 0009 and `pnpm docs` checks it as ADR 0010 says.
+The code moves into the layers of ADR 0006: `src/core/<feature>/`, `src/adapters/<technology>/`, `src/compose.ts`, and two delivery adapters over the same use cases, `src/cli/` (every operator command except `order`) and `src/app/` (a Next.js chat, ADR 0007). ESLint enforces the dependency rule. The conversation of `scripts/order.ts` becomes `takeTurn` in `src/core/order-conversation/`, tested with fakes; `pnpm order` is removed and the Owner orders in the chat of ADR 0008, started with `pnpm dev`. Vitest replaces `node:test`. The knowledge base takes the layout of ADR 0009 and `pnpm docs:check` checks it as ADR 0010 says.
 
 The migration is seven build tickets in `issues/`. `pnpm check` exits 0 at the end of every ticket; a slice that cannot end green is cut wrong. From the docs ticket on, each ticket updates the docs it touches.
 
@@ -37,7 +37,7 @@ The migration is seven build tickets in `issues/`. `pnpm check` exits 0 at the e
 19. As the developer, I want `pnpm lint` to fail when `core` imports an adapter or `cli` and `app` import `adapters`, so that the layers hold.
 20. As the developer, I want one test runner for `src/` and `scripts/`, so that `pnpm test` covers everything in `pnpm check`.
 21. As an agent, I want a ~100-line `CLAUDE.md` that maps into `ARCHITECTURE.md` and `docs/`, so that I find the knowledge I need without reading everything.
-22. As an agent, I want `pnpm docs` to fail on broken links, missing indexes, references into `.scratch/`, stale `src/` paths and wrong file names, so that the docs I read match the repo.
+22. As an agent, I want `pnpm docs:check` to fail on broken links, missing indexes, references into `.scratch/`, stale `src/` paths and wrong file names, so that the docs I read match the repo.
 
 ## Implementation Decisions
 
@@ -88,14 +88,14 @@ Toolchain (ADR 0007):
 
 Knowledge base (ADR 0009, ADR 0010):
 
-- `CLAUDE.md`: current rules plus a Map (pointers to `ARCHITECTURE.md`, `GLOSSARY.md`, `docs/adr/README.md`, `docs/product-specs/README.md`, `docs/references/README.md`, `docs/agents/README.md`, `docs/LLM.md`, `docs/TESTING.md`, `.scratch/`), Commands (`pnpm dev`, `pnpm check`, `pnpm test`, `pnpm docs`, every operator command) replacing "Catalog data", a short Workflow (wayfinder map, spec and tickets in `.scratch/`, ADRs and glossary) and File naming. At most 120 lines.
+- `CLAUDE.md`: current rules plus a Map (pointers to `ARCHITECTURE.md`, `GLOSSARY.md`, `docs/adr/README.md`, `docs/product-specs/README.md`, `docs/references/README.md`, `docs/agents/README.md`, `docs/LLM.md`, `docs/TESTING.md`, `.scratch/`), Commands (`pnpm dev`, `pnpm check`, `pnpm test`, `pnpm docs:check`, every operator command) replacing "Catalog data", a short Workflow (wayfinder map, spec and tickets in `.scratch/`, ADRs and glossary) and File naming. At most 120 lines.
 - `ARCHITECTURE.md`: the product in one paragraph, layers and ports, a codemap of an order end to end naming the module of each step, and a Data section on `vocabulary/`, `evals/`, `prompts/` and `.data/` (what each is, who writes it, who validates it, committed or not).
 - `docs/LLM.md`: the LLM translates and code decides (ADR 0002), where prompts live, how to change one and measure it with `order:eval`.
 - `docs/TESTING.md`: Vitest, recorded fixtures next to the adapter that uses them, no live calls in tests, the eval set apart from tests.
 - `docs/product-specs/product-type-seed-rules.md`: moved from `docs/`; the `seed-product-types` skill is updated to the new path.
 - `docs/references/carrefour-api.md`: Carrefour endpoints (search, facets, simulation, regions), quirks and fixtures, summarised from the Carrefour research notes in `.scratch/`. ADRs 0001, 0002 and 0005 stop citing `.scratch/`: Carrefour facts point at this reference, and the Thinking Machines result in ADR 0002 cites its original source.
 - `docs/adr/README.md`, `docs/product-specs/README.md`, `docs/references/README.md`, `docs/agents/README.md`: indexes.
-- `scripts/check-docs.ts` with Vitest tests, run as `pnpm docs` after `pnpm no-comments` in `pnpm check`, with the seven checks of ADR 0010.
+- `scripts/check-docs.ts` with Vitest tests, run as `pnpm docs:check` after `pnpm no-comments` in `pnpm check`, with the seven checks of ADR 0010.
 
 ## Testing Decisions
 

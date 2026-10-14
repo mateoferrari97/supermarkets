@@ -4,7 +4,7 @@ Status: accepted
 
 # Check the knowledge base mechanically in `pnpm check`
 
-`scripts/check-docs.ts`, run as `pnpm docs` right after `pnpm no-comments` in `pnpm check`, fails with the file, line and rule when the knowledge base of ADR 0009 drifts. It is a repo-specific script run with `tsx`, tested with Vitest, with no new dependency.
+`scripts/check-docs.ts`, run as `pnpm docs:check` right after `pnpm no-comments` in `pnpm check`, fails with the file, line and rule when the knowledge base of ADR 0009 drifts. It is a repo-specific script run with `tsx`, tested with Vitest, with no new dependency.
 
 It checks every tracked Markdown file outside `.scratch/` and `prompts/` (prompts are LLM input), including `.claude/skills/*/SKILL.md`, for:
 
@@ -13,7 +13,7 @@ It checks every tracked Markdown file outside `.scratch/` and `prompts/` (prompt
 3. Indexes: each subfolder of `docs/` has a `README.md` linking every sibling `.md`, and the Map of `CLAUDE.md` links every top-level document and every folder `README.md`.
 4. ADR `Status` front matter is `proposed`, `accepted`, `deprecated` or `superseded by ADR-NNNN`, and the superseding ADR exists.
 5. `CLAUDE.md` has at most 120 lines.
-6. Every `src/...` path cited in backticks exists, and `ARCHITECTURE.md` names every `src/core/<feature>/` and `src/adapters/<technology>/` directory. The layer rule itself stays with ESLint (ADR 0006).
+6. Every `src/...` path cited in backticks exists, except in ADRs, which are exempt because they record decisions that can name paths before they exist; and `ARCHITECTURE.md` names every `src/core/<feature>/` and `src/adapters/<technology>/` directory. The layer rule itself stays with ESLint (ADR 0006).
 7. Naming, at the root and in `docs/`: top-level documents UPPERCASE, subfolder documents lowercase kebab-case, folder indexes `README.md`, ADRs `NNNN-kebab-slug.md` with unique numbers and no gaps.
 
 ## Considered Options

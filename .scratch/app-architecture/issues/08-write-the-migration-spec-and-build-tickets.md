@@ -20,7 +20,7 @@ ADRs, one per lasting decision of this map, none citing `.scratch/`:
 - `docs/adr/0009-claude-md-is-a-short-map-into-a-content-first-docs-folder.md`: from [Docs layout](05-docs-layout.md), [ExecPlan format](06-execplan-format.md) and [Mechanical docs checks](07-mechanical-docs-checks.md).
 - `docs/adr/0010-check-the-knowledge-base-mechanically-in-pnpm-check.md`: from [Mechanical docs checks](07-mechanical-docs-checks.md).
 
-Spec: `.scratch/app-architecture-migration/spec.md`, with the seven build tickets of [Migration order](11-migration-order.md) as `issues/01` to `issues/07` (A to G in that order), all `ready-for-agent`: 01 Vitest and 02 the layer move start now; 03 the ESLint rule after 02; 04 docs and `pnpm docs` after 01 and 03; 05 `src/cli/` after 03; 06 `takeTurn` and removing `pnpm order` after 01 and 05; 07 the chat after 06.
+Spec: `.scratch/app-architecture-migration/spec.md`, with the seven build tickets of [Migration order](11-migration-order.md) as `issues/01` to `issues/07` (A to G in that order), all `ready-for-agent`: 01 Vitest and 02 the layer move start now; 03 the ESLint rule after 02; 04 docs and `pnpm docs:check` after 01 and 03; 05 `src/cli/` after 03; 06 `takeTurn` and removing `pnpm order` after 01 and 05; 07 the chat after 06.
 
 Two gaps settled with the Owner while writing:
 

@@ -27,18 +27,46 @@
 
 ## Before every push
 
-Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0. It runs, in order:
+Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test`, `pnpm product-types`, `pnpm payment-cards` and `pnpm order:eval-set`.
 
-1. `pnpm typecheck`
-2. `pnpm lint`
-3. `pnpm format --check`
-4. The no-comments check (see "No comments in code")
+If a step fails, fix it or tell the user; never push with a failing step, and never skip a step to make it pass. When a test, build or check is added, add it to `pnpm check`.
 
-If a step fails, fix it or tell the user; never push with a failing step, and never skip a step to make it pass. When tests or a build are added, add them to `pnpm check`.
+## Map
 
-## Catalog data
+- [ARCHITECTURE.md](ARCHITECTURE.md): the product, layers and ports, an order end to end, and the data folders.
+- [GLOSSARY.md](GLOSSARY.md): domain terms; use them in code, docs and tickets.
+- [docs/adr/](docs/adr/README.md): architecture decisions.
+- [docs/product-specs/](docs/product-specs/README.md): rules the product follows, such as the Product Type seed rules.
+- [docs/references/](docs/references/README.md): facts about external systems, such as the Carrefour API.
+- [docs/agents/](docs/agents/README.md): how the agent skills use this repo.
+- [docs/LLM.md](docs/LLM.md): what the LLM does, where prompts live, how to change and measure one.
+- [docs/TESTING.md](docs/TESTING.md): Vitest, fakes and fixtures, no live calls, the eval set.
+- `.scratch/`: work in flight (maps, specs, tickets, research). It can be deleted at any time, so nothing outside it links into it.
 
-- `pnpm carrefour:catalog` fetches the whole Carrefour catalog into `.data/carrefour/` (`products.json`, `tipos.json`). `.data/` is not committed.
+## Commands
+
+- `pnpm check`: every check, in the order above.
+- `pnpm test`: Vitest over `src/` and `scripts/`.
+- `pnpm docs:check`: checks the knowledge base (ADR 0010) and prints file, line and rule for each finding.
+- `pnpm typecheck`, `pnpm lint`, `pnpm format` (`--check` to only check), `pnpm no-comments`.
+- `pnpm order "<order text>"` (optionally `--postal-code <code>`): places an order in the terminal.
+- `pnpm order:eval [filter...]`: runs the order resolution eval set with real Claude Code sessions ([LLM](docs/LLM.md#changing-a-prompt)).
+- `pnpm order:eval-set`, `pnpm product-types`, `pnpm payment-cards`: validate the committed data in `evals/` and `vocabulary/`.
+- `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `.data/carrefour/` (`products.json`, `tipos.json`). `.data/` is not committed.
+- `pnpm seed:split`, `pnpm seed:check-proposal <part-id>`, `pnpm seed:consolidate`, `pnpm seed:coverage`, `pnpm seed:doubts [size]`: the Product Type seed, run by the `seed-product-types` and `review-product-type-doubts` skills.
+
+## Workflow
+
+- Open questions about a large effort live in a wayfinder map with one ticket per question, `.scratch/<effort>/map.md` and `.scratch/<effort>/issues/`.
+- A feature is built from a spec, `.scratch/<feature>/spec.md`, and one file per ticket in `.scratch/<feature>/issues/`. Notes go under `## Comments`; the `Status:` line follows [triage labels](docs/agents/triage-labels.md).
+- Record a hard-to-reverse decision as an ADR in `docs/adr/` and add it to its index; add or sharpen domain terms in `GLOSSARY.md`.
+- Each ticket updates the docs it touches: `ARCHITECTURE.md` when folders or the order flow change, the Commands above when a command changes, a reference when an external system's behaviour is learned.
+
+## File naming
+
+- Documents at the root and directly under `docs/` are UPPERCASE (`ARCHITECTURE.md`, `docs/LLM.md`); documents in subfolders are lowercase kebab-case; each folder under `docs/` has a `README.md` index linking every document in it.
+- ADRs are `docs/adr/NNNN-kebab-slug.md`, numbered without gaps.
+- Code files are lowercase kebab-case; a test sits next to the file it tests as `<file>.test.ts`.
 
 ## Agent skills
 
