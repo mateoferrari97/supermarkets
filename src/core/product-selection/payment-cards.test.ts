@@ -44,7 +44,7 @@ describe("payment cards", () => {
   it("parses the committed table", () => {
     const committed: unknown = JSON.parse(
       readFileSync(
-        new URL("../../vocabulary/carrefour-payment-cards.json", import.meta.url),
+        new URL("../../../vocabulary/carrefour-payment-cards.json", import.meta.url),
         "utf8",
       ),
     );

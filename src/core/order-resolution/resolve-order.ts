@@ -1,7 +1,8 @@
 import type { TipoMapping, Vocabulary } from "../product-types/schema.ts";
 import { buildBm25Index } from "./bm25.ts";
-import { distinctSizes, nameMatchesTerm, productMatchesBrand } from "./catalog.ts";
-import type { Evidence, Item, Llm, MapAnswerOutput, QuestionInput } from "./llm.ts";
+import { distinctSizes, nameMatchesTerm, productMatchesBrand } from "../catalog/catalog.ts";
+import type { Evidence, Item } from "./concepts.ts";
+import type { Llm, MapAnswerOutput, QuestionInput } from "./llm.ts";
 
 export const EVIDENCE_LIMIT = 10;
 

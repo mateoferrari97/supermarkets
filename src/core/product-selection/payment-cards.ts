@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { normalize } from "../order-resolution/text.ts";
-import type { PaymentCard } from "./store.ts";
+import { normalize } from "../catalog/text.ts";
+import type { PaymentCard } from "./concepts.ts";
 
 export const paymentCardTableSchema = z.strictObject({
   cards: z.array(

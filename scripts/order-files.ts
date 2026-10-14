@@ -1,8 +1,11 @@
-import { tipoMappingSchema, vocabularySchema } from "../src/product-types/schema.ts";
-import type { CatalogProduct, OrderResolution } from "../src/order-resolution/resolve-order.ts";
-import { snapshotProducts } from "../src/product-selection/carrefour-store.ts";
-import { paymentCardTableSchema } from "../src/product-selection/payment-cards.ts";
-import { GROCERY_DEPARTMENTS } from "../src/product-type-seed/split.ts";
+import { tipoMappingSchema, vocabularySchema } from "../src/core/product-types/schema.ts";
+import type {
+  CatalogProduct,
+  OrderResolution,
+} from "../src/core/order-resolution/resolve-order.ts";
+import { snapshotProducts } from "../src/adapters/carrefour/carrefour-store.ts";
+import { paymentCardTableSchema } from "../src/core/product-selection/payment-cards.ts";
+import { GROCERY_DEPARTMENTS } from "../src/core/product-type-seed/split.ts";
 import {
   CARREFOUR_MAPPING_PATH,
   VOCABULARY_PATH,

@@ -1,4 +1,4 @@
-export type Measure = { dimension: "volume" | "weight"; amount: number };
+import type { Measure, PaymentCard } from "./concepts.ts";
 
 export type SearchSort = "discount:desc" | "price:asc";
 
@@ -23,8 +23,6 @@ export type CandidateQuery = {
   sort: SearchSort;
   limit: number;
 };
-
-export type PaymentCard = { paymentSystem: string; bin: string | null };
 
 export type SimulationItem = { itemId: string; quantity: number };
 

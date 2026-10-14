@@ -1,4 +1,4 @@
-import { validateEvalSet } from "../src/order-resolution/eval-set.ts";
+import { validateEvalSet } from "../src/core/order-resolution/eval-set.ts";
 import { readJson } from "./seed-files.ts";
 import { ORDER_EVAL_SET_PATH, readVocabulary } from "./order-files.ts";
 

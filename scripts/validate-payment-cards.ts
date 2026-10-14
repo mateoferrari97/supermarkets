@@ -1,4 +1,4 @@
-import { validatePaymentCards } from "../src/product-selection/payment-cards.ts";
+import { validatePaymentCards } from "../src/core/product-selection/payment-cards.ts";
 import { PAYMENT_CARDS_PATH } from "./order-files.ts";
 import { readJson } from "./seed-files.ts";
 

@@ -1,4 +1,4 @@
-import { validateProductTypes } from "../src/product-types/validate.ts";
+import { validateProductTypes } from "../src/core/product-types/validate.ts";
 import { CARREFOUR_MAPPING_PATH, VOCABULARY_PATH, readJson } from "./seed-files.ts";
 
 const errors = validateProductTypes(readJson(VOCABULARY_PATH), readJson(CARREFOUR_MAPPING_PATH));

@@ -3,9 +3,9 @@ import {
   consolidate,
   decisionsSchema,
   renderSummary,
-} from "../src/product-type-seed/consolidate.ts";
-import { proposalSchema, validateProposal } from "../src/product-type-seed/proposal.ts";
-import { validateProductTypes } from "../src/product-types/validate.ts";
+} from "../src/core/product-type-seed/consolidate.ts";
+import { proposalSchema, validateProposal } from "../src/core/product-type-seed/proposal.ts";
+import { validateProductTypes } from "../src/core/product-types/validate.ts";
 import {
   CARREFOUR_MAPPING_PATH,
   DECISIONS_PATH,

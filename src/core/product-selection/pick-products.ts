@@ -1,10 +1,7 @@
 import type { TipoMapping } from "../product-types/schema.ts";
-import { nameMatchesTerm, productMatchesBrand, sizesIn } from "../order-resolution/catalog.ts";
-import {
-  DEFAULT_SELECTION_POLICY,
-  type Llm,
-  type SelectionPolicy,
-} from "../order-resolution/llm.ts";
+import { nameMatchesTerm, productMatchesBrand, sizesIn } from "../catalog/catalog.ts";
+import { DEFAULT_SELECTION_POLICY, type SelectionPolicy } from "../order-resolution/concepts.ts";
+import type { Llm } from "../order-resolution/llm.ts";
 import type { OrderItem, OrderResolution } from "../order-resolution/resolve-order.ts";
 import { findPaymentCard, type PaymentCardTable } from "./payment-cards.ts";
 import { postalCodeFrom } from "./postal-code.ts";
@@ -14,7 +11,7 @@ import type {
   SimulationItem,
   SnapshotProduct,
   StoreProduct,
-} from "./store.ts";
+} from "./online-store.ts";
 
 export const CANDIDATES_PER_ITEM = 2;
 export const SEARCH_LIMIT = 50;

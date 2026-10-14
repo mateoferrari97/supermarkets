@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { Item, SelectionPolicy } from "../order-resolution/llm.ts";
+import type { Item, SelectionPolicy } from "../order-resolution/concepts.ts";
 import type { OrderItem, OrderResolution } from "../order-resolution/resolve-order.ts";
 import { pickProducts, type PickDependencies } from "./pick-products.ts";
 import type {
@@ -10,7 +10,7 @@ import type {
   SimulationRequest,
   SnapshotProduct,
   StoreProduct,
-} from "./store.ts";
+} from "./online-store.ts";
 
 const mapping = {
   Gaseosa: "gaseosa",

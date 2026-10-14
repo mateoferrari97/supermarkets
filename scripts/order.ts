@@ -1,13 +1,12 @@
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
-import { createClaudeCodeLlm, type LlmCall } from "../src/order-resolution/claude-code-llm.ts";
 import {
   createOrderResolver,
   type OrderResolution,
-} from "../src/order-resolution/resolve-order.ts";
-import { createCarrefourStore } from "../src/product-selection/carrefour-store.ts";
-import { pickProducts } from "../src/product-selection/pick-products.ts";
-import { postalCodeFrom } from "../src/product-selection/postal-code.ts";
+} from "../src/core/order-resolution/resolve-order.ts";
+import { createLlm, createOnlineStore, type LlmCall } from "../src/compose.ts";
+import { pickProducts } from "../src/core/product-selection/pick-products.ts";
+import { postalCodeFrom } from "../src/core/product-selection/postal-code.ts";
 import { PROMPTS_DIR, readOrderData, renderItem } from "./order-files.ts";
 
 const { values, positionals } = parseArgs({
@@ -20,7 +19,7 @@ if (!orderText) {
   process.exit(1);
 }
 
-const store = createCarrefourStore();
+const store = createOnlineStore();
 const terminal = createInterface({ input: process.stdin });
 const lines = terminal[Symbol.asyncIterator]();
 const ask = async (question: string) => {
@@ -57,7 +56,7 @@ if (postalCode === null) {
 const { products, snapshot, vocabulary, mapping, paymentCards } = readOrderData();
 
 const calls: LlmCall[] = [];
-const llm = createClaudeCodeLlm({
+const llm = createLlm({
   vocabulary,
   promptsDir: PROMPTS_DIR,
   onCall: (call) => calls.push(call),

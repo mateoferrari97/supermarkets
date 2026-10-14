@@ -3,16 +3,15 @@ import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Vocabulary } from "../product-types/schema.ts";
+import type { Vocabulary } from "../../core/product-types/schema.ts";
 import {
   mapAnswerOutputSchema,
   resolveItemOutputSchema,
   rewordItemOutputSchema,
   selectionPolicySchema,
   splitOrderOutputSchema,
-  type Llm,
-  type ResolveItemInput,
-} from "./llm.ts";
+} from "./llm-output-schemas.ts";
+import type { Llm, ResolveItemInput } from "../../core/order-resolution/llm.ts";
 
 export const DEFAULT_MODEL = "claude-haiku-5-5";
 export const DEFAULT_BUDGET_USD = 0.25;

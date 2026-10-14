@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import type { RemainingDoubt } from "../src/product-type-seed/consolidate.ts";
-import { doubtBatch, renderDoubtBatch } from "../src/product-type-seed/doubts.ts";
+import type { RemainingDoubt } from "../src/core/product-type-seed/consolidate.ts";
+import { doubtBatch, renderDoubtBatch } from "../src/core/product-type-seed/doubts.ts";
 import { DOUBTS_PATH, readJson } from "./seed-files.ts";
 
 const DEFAULT_BATCH_SIZE = 10;

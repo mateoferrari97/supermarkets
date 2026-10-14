@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Part } from "../src/product-type-seed/split.ts";
+import type { Part } from "../src/core/product-type-seed/split.ts";
 
 export const CATALOG_PATH = ".data/carrefour/products.json";
 export const SEED_DIR = ".data/carrefour/seed";

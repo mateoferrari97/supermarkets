@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { splitIntoParts } from "../src/product-type-seed/split.ts";
+import { splitIntoParts } from "../src/core/product-type-seed/split.ts";
 import { PARTS_DIR, readCatalogProducts } from "./seed-files.ts";
 
 const parts = splitIntoParts(readCatalogProducts());

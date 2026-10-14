@@ -5,12 +5,16 @@ import {
   DEFAULT_MODEL,
   createClaudeCodeLlm,
   type LlmCall,
-} from "../src/order-resolution/claude-code-llm.ts";
-import { evalSetSchema, scoreCase, validateEvalSet } from "../src/order-resolution/eval-set.ts";
+} from "../src/adapters/claude-code/claude-code-llm.ts";
+import {
+  evalSetSchema,
+  scoreCase,
+  validateEvalSet,
+} from "../src/core/order-resolution/eval-set.ts";
 import {
   createOrderResolver,
   type OrderResolution,
-} from "../src/order-resolution/resolve-order.ts";
+} from "../src/core/order-resolution/resolve-order.ts";
 import { readJson, writeJsonText } from "./seed-files.ts";
 import {
   ORDER_EVAL_RUNS_DIR,

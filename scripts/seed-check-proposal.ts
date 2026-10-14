@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { validateProposal } from "../src/product-type-seed/proposal.ts";
-import type { Part } from "../src/product-type-seed/split.ts";
+import { validateProposal } from "../src/core/product-type-seed/proposal.ts";
+import type { Part } from "../src/core/product-type-seed/split.ts";
 import { PARTS_DIR, PROPOSALS_DIR, readJson } from "./seed-files.ts";
 
 const partId = process.argv[2];

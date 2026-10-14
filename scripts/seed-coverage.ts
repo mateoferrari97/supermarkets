@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { tipoMappingSchema } from "../src/product-types/schema.ts";
-import { coverage, renderCoverage } from "../src/product-type-seed/coverage.ts";
-import { splitIntoParts } from "../src/product-type-seed/split.ts";
+import { tipoMappingSchema } from "../src/core/product-types/schema.ts";
+import { coverage, renderCoverage } from "../src/core/product-type-seed/coverage.ts";
+import { splitIntoParts } from "../src/core/product-type-seed/split.ts";
 import {
   CARREFOUR_MAPPING_PATH,
   DOUBTS_PATH,

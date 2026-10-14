@@ -1,18 +1,17 @@
 import { z } from "zod";
-import { sameBrand, sizesIn } from "../order-resolution/catalog.ts";
-import { normalize } from "../order-resolution/text.ts";
+import { sameBrand, sizesIn } from "../../core/catalog/catalog.ts";
+import { normalize } from "../../core/catalog/text.ts";
+import type { Measure, PaymentCard } from "../../core/product-selection/concepts.ts";
 import type {
   CandidateQuery,
   Delivery,
-  Measure,
   OnlineStore,
-  PaymentCard,
   Simulation,
   SimulationItem,
   SimulationRequest,
   SnapshotProduct,
   StoreProduct,
-} from "./store.ts";
+} from "../../core/product-selection/online-store.ts";
 
 export const CARREFOUR_URL = "https://www.carrefour.com.ar";
 
