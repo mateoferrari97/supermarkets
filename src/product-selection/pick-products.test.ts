@@ -58,6 +58,7 @@ const fakeStore = (
   const simulations: SimulationRequest[] = [];
   const store: OnlineStore = {
     checkDelivery: () => Promise.reject(new Error("product picking never checks delivery")),
+    cartLink: (items) => items.map(({ itemId, quantity }) => `${itemId}x${quantity}`).join(","),
     findCandidates: (query) => {
       queries.push(query);
       return Promise.resolve(candidates(query));
@@ -211,9 +212,23 @@ describe("pickProducts", () => {
         },
       ],
       total: 9000,
+      cartLink: "3807x2",
       notices: [],
       unexpressed: [],
     });
+  });
+
+  it("links a cart with the products picked and leaves out Items with none", async () => {
+    const { store } = fakeStore((query) => (query.tipos.includes("Gaseosa") ? [coca] : []), {
+      "3807": { unit: 4500 },
+    });
+    const filled = await pick(
+      order(orderItem("coca", ["gaseosa"], { quantity: 3 }), orderItem("yerba", ["yerba"])),
+      depending(store),
+    );
+    assert.equal(filled.cartLink, "3807x3");
+    const empty = await pick(order(orderItem("yerba", ["yerba"])), depending(store));
+    assert.equal(empty.cartLink, null);
   });
 
   it("without savings picks the lowest price per unit of measure, not per package", async () => {
@@ -505,6 +520,15 @@ describe("pickProducts", () => {
         notices: [],
       });
       assert.equal(selection.total, 12000);
+    });
+
+    it("names the brand and terms when no product with them is available", async () => {
+      const { store } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
+      const { lines } = await pick(
+        order(orderItem("coca", ["gaseosa"], { brand: "Coca-Cola", terms: ["light"] })),
+        depending(store),
+      );
+      assert.equal(lines[0]?.reason, "No encontré ningún producto Coca-Cola light disponible.");
     });
 
     it("buys a product sold by weight in its steps, from a weight term or the quantity in kg", async () => {

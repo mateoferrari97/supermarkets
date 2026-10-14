@@ -187,6 +187,19 @@ describe("createCarrefourStore", () => {
     assert.equal(new URL(seen.at(-1)!.url).searchParams.get("sort"), "price:asc");
   });
 
+  it("finds a brand written with one letter wrong", async () => {
+    const { store, seen } = recorded(searchRoutes);
+    const candidates = await store.findCandidates({
+      postalCode: "1425",
+      tipos: ["Gaseosa"],
+      brands: ["Coca Kola"],
+      sort: "discount:desc",
+      limit: 2,
+    });
+    assert.equal(candidates.length, 2);
+    assert.match(seen.at(-1)!.url, /\/brand\/coca-cola\?/);
+  });
+
   it("reads the weight step of a product sold by weight", async () => {
     const { store } = recorded([
       [/\/checkout\/pub\/regions\?/, "regions"],
@@ -278,6 +291,34 @@ describe("createCarrefourStore", () => {
     });
     assert.equal(simulation.lines[0]?.available, false);
     assert.equal(simulation.total, 0);
+  });
+
+  it("links a Carrefour cart with every item at its quantity from seller 1", () => {
+    const store = createCarrefourStore(() => Promise.reject(new Error("a link needs no request")));
+    assert.equal(
+      store.cartLink([
+        { itemId: "217502", quantity: 2 },
+        { itemId: "9008", quantity: 1 },
+      ]),
+      "https://www.carrefour.com.ar/checkout/cart/add?sku=217502&qty=2&seller=1&sku=9008&qty=1&seller=1&sc=1",
+    );
+  });
+
+  it("takes the measure's dimension from the name when the name gives one size of the other dimension", () => {
+    const record = {
+      productId: "1",
+      skuIds: ["9008"],
+      name: "Mostaza Natura 500 g.",
+      tipo: "Mostaza",
+      measureUnit: "CM3",
+      consumptionQuantity: "500.00",
+    };
+    const [mostaza, lata] = snapshotProducts([
+      record,
+      { ...record, skuIds: ["1000"], name: "Gaseosa Coca Cola 354 ml", consumptionQuantity: "354" },
+    ]);
+    assert.deepEqual(mostaza?.measure, { dimension: "weight", amount: 500 });
+    assert.deepEqual(lata?.measure, { dimension: "volume", amount: 354 });
   });
 
   it("turns Catalog Snapshot products into products to simulate, skipping those with no Tipo", () => {

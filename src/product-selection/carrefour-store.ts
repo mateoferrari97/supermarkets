@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sameBrand, sizesIn } from "../order-resolution/catalog.ts";
 import { normalize } from "../order-resolution/text.ts";
 import type {
   CandidateQuery,
@@ -7,6 +8,7 @@ import type {
   OnlineStore,
   PaymentCard,
   Simulation,
+  SimulationItem,
   SimulationRequest,
   SnapshotProduct,
   StoreProduct,
@@ -152,8 +154,11 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
   ) => {
     const body = facetsSchema.parse(await http({ method: "GET", url: search(path, params) }));
     const wanted = normalize(name);
-    const facet = body.facets.find((candidate) => candidate.key === key);
-    return facet?.values.find((value) => normalize(value.name ?? "") === wanted)?.value ?? null;
+    const values = body.facets.find((candidate) => candidate.key === key)?.values ?? [];
+    const exact = values.find((value) => normalize(value.name ?? "") === wanted);
+    const close =
+      key === "brand" ? values.find((value) => sameBrand(name, value.name ?? "")) : undefined;
+    return (exact ?? close)?.value ?? null;
   };
 
   const slugForTipo = (tipo: string) => {
@@ -209,7 +214,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
           itemId: item.itemId,
           name: product.productName,
           brand: product.brand ?? null,
-          measure: measureOf(product.properties, item),
+          measure: measureOf(product.productName, product.properties, item),
           weightStepKg: item.measurementUnit === "kg" ? (item.unitMultiplier ?? 1) : null,
           teasers: (
             item.sellers.find(({ sellerId }) => sellerId === "1")?.commertialOffer.teasers ?? []
@@ -257,7 +262,18 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     return { lines, total };
   };
 
-  return { checkDelivery, findCandidates, simulate };
+  return { checkDelivery, findCandidates, simulate, cartLink };
+}
+
+function cartLink(items: SimulationItem[]): string {
+  const params = new URLSearchParams();
+  for (const { itemId, quantity } of items) {
+    params.append("sku", itemId);
+    params.append("qty", String(quantity));
+    params.append("seller", "1");
+  }
+  params.append("sc", "1");
+  return `${CARREFOUR_URL}/checkout/cart/add?${params}`;
 }
 
 export type SnapshotRecord = {
@@ -284,7 +300,7 @@ export function snapshotProducts(records: SnapshotRecord[]): SnapshotProduct[] {
         itemId,
         name: record.name,
         brand: record.brand ?? null,
-        measure: measureOf(properties, {}),
+        measure: measureOf(record.name, properties, {}),
         weightStepKg: null,
         teasers: [],
         tipo: record.tipo,
@@ -304,6 +320,7 @@ function payment({ paymentSystem, bin }: PaymentCard) {
 }
 
 function measureOf(
+  productName: string,
   properties: { name: string; values: string[] }[],
   item: { measurementUnit?: string | null; unitMultiplier?: number | null },
 ): Measure | null {
@@ -314,6 +331,10 @@ function measureOf(
   const unit = UNITS[value("Gramaje de unidad de medida") ?? ""];
   const amount = Number(value("Gramaje de unidad de consumo"));
   if (!unit || !Number.isFinite(amount) || amount <= 0) return null;
+  const [named, ...others] = sizesIn(productName);
+  if (named && others.length === 0 && named.dimension !== unit.dimension) {
+    return { dimension: named.dimension, amount: named.amount };
+  }
   return { dimension: unit.dimension, amount: amount * unit.factor };
 }
 

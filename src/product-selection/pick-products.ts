@@ -34,6 +34,7 @@ export type ProductSelection = {
   postalCode: string;
   lines: PickedLine[];
   total: number;
+  cartLink: string | null;
   notices: string[];
   unexpressed: string[];
 };
@@ -196,13 +197,16 @@ export async function pickProducts(
       const { item, ranked, chosen, notices } = itemPick;
       const best = ranked[chosen];
       if (!best) {
+        const wanted = [item.brand ?? "", ...item.terms].filter(Boolean).join(" ");
         return {
           phrase: item.phrase,
           product: null,
           quantity: Math.ceil(item.quantity ?? 1),
           unitPrice: null,
           total: 0,
-          reason: "No encontré ningún producto disponible.",
+          reason: wanted
+            ? `No encontré ningún producto ${wanted} disponible.`
+            : "No encontré ningún producto disponible.",
           notices,
         };
       }
@@ -227,10 +231,14 @@ export async function pickProducts(
     }),
   );
 
+  const bought = lines.flatMap(({ product, quantity }) =>
+    product ? [{ itemId: product.itemId, quantity }] : [],
+  );
   return {
     postalCode,
     lines,
     total: cart.total,
+    cartLink: bought.length > 0 ? store.cartLink(bought) : null,
     notices: orderNotices,
     unexpressed: policy.unexpressed,
   };

@@ -21,6 +21,23 @@
       "items": [{ "productType": "yerba" }, { "noItem": "huevo" }]
     },
     {
+      "id": "marca-de-una-lista",
+      "order": "mayonesa ketchup y mostaza natura",
+      "items": [
+        { "productType": "mayonesa", "brand": "Natura" },
+        { "productType": "ketchup", "brand": "Natura" },
+        { "productType": "mostaza", "brand": "Natura" }
+      ]
+    },
+    {
+      "id": "marca-con-tambien",
+      "order": "chorizo parrillero la diviza, morcilla tambien la divisa",
+      "items": [
+        { "productType": "chorizo-parrillero", "brand": "La Divisa" },
+        { "productType": "morcilla", "brand": "La Divisa" }
+      ]
+    },
+    {
       "id": "envio-a-codigo-postal",
       "order": "yerba, envío a 1425",
       "items": [{ "productType": "yerba" }, { "noItem": "1425" }, { "noItem": "envío" }]

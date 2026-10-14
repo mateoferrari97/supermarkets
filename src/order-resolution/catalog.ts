@@ -49,15 +49,36 @@ export function nameMatchesTerm(name: string, term: string): boolean {
   return ` ${normalize(name)} `.includes(` ${normalize(term)} `);
 }
 
+export const BRAND_TYPO_MIN_LENGTH = 5;
+
+export function sameBrand(written: string, brand: string): boolean {
+  const [a, b] = [normalize(written), normalize(brand)];
+  if (a === b) return true;
+  return Math.min(a.length, b.length) >= BRAND_TYPO_MIN_LENGTH && editDistance(a, b) <= 1;
+}
+
 export function productMatchesBrand(
   product: { name: string; brand: string | null },
   brand: string,
 ) {
-  const wanted = normalize(brand);
   return (
-    normalize(product.brand ?? "") === wanted ||
-    ` ${normalize(product.name)} `.includes(` ${wanted} `)
+    sameBrand(brand, product.brand ?? "") ||
+    ` ${normalize(product.name)} `.includes(` ${normalize(brand)} `)
   );
+}
+
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (const [i, charA] of [...a].entries()) {
+    const current = [i + 1];
+    for (const [j, charB] of [...b].entries()) {
+      current.push(
+        Math.min(previous[j + 1]! + 1, current[j]! + 1, previous[j]! + (charA === charB ? 0 : 1)),
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length]!;
 }
 
 export function distinctSizes(names: string[]): Size[] {

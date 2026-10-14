@@ -109,6 +109,7 @@ if (!resolution.message) {
   if (selection.unexpressed.length > 0) {
     console.log(`\nNo pude aplicar: ${selection.unexpressed.join("; ")}.`);
   }
+  if (selection.cartLink) console.log(`\nLink del carrito: ${selection.cartLink}`);
   console.log(
     `\nTotal: ${money(selection.total)} (Carrefour, ${((Date.now() - picked) / 1000).toFixed(1)} s)`,
   );

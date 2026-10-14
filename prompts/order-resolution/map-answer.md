@@ -16,4 +16,6 @@ Return one entry in `answers` per question the answer refers to, with its `quest
 - `rephrased` with the Owner's new words as a short phrase in Spanish, only for `phrase` questions (the thing they meant: "pan rallado") and `term` questions (the word to look for instead: "sin gluten").
 - `unclear` with no options when the answer refers to the question but matches none of its options.
 
+Match each part of the answer to a question by the thing it names: "sal gruesa sola" answers the question about "sal gruesa", and a part that names a thing no question is about ("chorizo parrillero" when only "sal gruesa" is asked) answers nothing and is left out. For a `term` question, keeping the thing without the word ("sola", "común", "sin eso", "la normal") is `any`.
+
 When there is a single question, a bare number or name refers to it. When there are several, a number alone refers to an option only if it is unambiguous ("1: la 2, 2: cualquiera" picks option 2 of question 1), and a reply that leaves everything open ("cualquiera" alone) is `any` for every question. Leave out questions the answer does not mention. Use only question and option numbers that were offered; never invent an option.

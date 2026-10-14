@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Vocabulary } from "../product-types/schema.ts";
+import { sameBrand } from "./catalog.ts";
 import type { OrderResolution } from "./resolve-order.ts";
 import { normalize } from "./text.ts";
 
@@ -149,9 +150,7 @@ function satisfies(
     if (!wanted.every((id) => offered.has(id))) return false;
   }
   if (expected.quantity !== undefined && actual.quantity !== expected.quantity) return false;
-  if (expected.brand !== undefined && normalize(actual.brand ?? "") !== normalize(expected.brand)) {
-    return false;
-  }
+  if (expected.brand !== undefined && !sameBrand(actual.brand ?? "", expected.brand)) return false;
   const terms = new Set(actual.terms.map(normalize));
   return (expected.terms ?? []).every((term) => terms.has(normalize(term)));
 }

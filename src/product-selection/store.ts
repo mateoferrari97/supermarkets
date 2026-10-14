@@ -51,4 +51,5 @@ export type OnlineStore = {
   checkDelivery: (postalCode: string) => Promise<Delivery>;
   findCandidates: (query: CandidateQuery) => Promise<StoreProduct[]>;
   simulate: (request: SimulationRequest) => Promise<Simulation>;
+  cartLink: (items: SimulationItem[]) => string;
 };
