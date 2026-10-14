@@ -22,7 +22,11 @@ export type Question =
 
 export type OrderItem = Item & { productTypes: ProductTypeRef[]; question: Question | null };
 
-export type OrderResolution = { items: OrderItem[]; message: string | null };
+export type OrderResolution = {
+  items: OrderItem[];
+  postalCode: string | null;
+  message: string | null;
+};
 
 export type OrderDependencies = {
   products: CatalogProduct[];
@@ -187,14 +191,24 @@ export function createOrderResolver({
     answerText: string,
   ): Promise<OrderResolution> => {
     const questions = questionsOf(resolution.items);
-    if (questions.length === 0) return resolution;
+    const postalQuestion = resolution.postalCode === null ? questions.length + 1 : null;
+    if (questions.length === 0 && postalQuestion === null) return resolution;
     const { answers } = await llm.mapAnswer({
-      questions: questions.map(({ question, item }) => questionInput(question, item)),
+      questions: [
+        ...questions.map(({ question, item }) => questionInput(question, item)),
+        ...(postalQuestion === null ? [] : [postalCodeInput(postalQuestion)]),
+      ],
       answer: answerText,
     });
 
+    let postalCode = resolution.postalCode;
     const updates = new Map<OrderItem, Promise<OrderItem>>();
     for (const answer of answers) {
+      if (answer.question === postalQuestion) {
+        if (answer.kind === "rephrased" && answer.phrase)
+          postalCode ??= postalCodeFrom(answer.phrase);
+        continue;
+      }
       const item = questions.find(({ question }) => question === answer.question)?.item;
       if (!item || updates.has(item)) continue;
       const update = apply(item, answer);
@@ -203,16 +217,24 @@ export function createOrderResolver({
 
     return withMessage(
       await Promise.all(resolution.items.map((item) => updates.get(item) ?? Promise.resolve(item))),
+      postalCode,
     );
   };
 
   return {
     resolveOrder: async (orderText) => {
-      const { items } = await llm.splitOrder(orderText);
-      return withMessage(await Promise.all(items.map(resolveItem)));
+      const { items, postalCode } = await llm.splitOrder(orderText);
+      return withMessage(
+        await Promise.all(items.map(resolveItem)),
+        postalCode === null ? null : postalCodeFrom(postalCode),
+      );
     },
     answerQuestions,
   };
+}
+
+export function postalCodeFrom(text: string): string | null {
+  return /\d{4}/.exec(text)?.[0] ?? null;
 }
 
 function itemFields(orderItem: OrderItem): Item {
@@ -244,6 +266,10 @@ function questionInput(number: number, item: Asked["item"]): QuestionInput {
   };
 }
 
+function postalCodeInput(number: number): QuestionInput {
+  return { question: number, phrase: "código postal", asks: "postalCode", term: null, options: [] };
+}
+
 function questionText(number: number, item: Asked["item"]): string {
   const { question, phrase } = item;
   const options = optionNames(question).map((name, index) => `   ${index + 1}) ${name}`);
@@ -264,16 +290,19 @@ function questionText(number: number, item: Asked["item"]): string {
   }
 }
 
-function withMessage(items: OrderItem[]): OrderResolution {
+function withMessage(items: OrderItem[], postalCode: string | null): OrderResolution {
   const questions = questionsOf(items);
-  if (questions.length === 0) return { items, message: null };
   const asked = questions.map(({ question, item }) => questionText(question, item));
-  const intro = questions.length === 1 ? "Tengo una pregunta:" : "Tengo unas preguntas:";
+  if (postalCode === null) {
+    asked.push(`${questions.length + 1}. ¿A qué código postal es el envío?`);
+  }
+  if (asked.length === 0) return { items, postalCode, message: null };
+  const intro = asked.length === 1 ? "Tengo una pregunta:" : "Tengo unas preguntas:";
   const outro = questions.some(({ item }) => optionNames(item.question).length > 0)
     ? 'Respondé con el número o con palabras ("la 2", "entera"), o "cualquiera" si te da igual.'
     : null;
   const parts = [intro, ...asked, ...(outro ? [outro] : [])];
-  return { items, message: parts.join("\n\n") };
+  return { items, postalCode, message: parts.join("\n\n") };
 }
 
 export function resolveOrder(

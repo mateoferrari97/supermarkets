@@ -1,0 +1,57 @@
+{
+  "recordsFiltered": 13,
+  "products": [
+    {
+      "productId": "393964",
+      "productName": "Gaseosa cola Coca Cola Zero 2,25 lts",
+      "brand": "Coca Cola",
+      "properties": [
+        {
+          "name": "Gramaje de unidad de consumo",
+          "values": ["2250.00"]
+        },
+        {
+          "name": "Tipo de producto",
+          "values": ["Gaseosa"]
+        },
+        {
+          "name": "Gramaje de unidad de medida",
+          "values": ["CM3"]
+        }
+      ],
+      "items": [
+        {
+          "itemId": "11324",
+          "measurementUnit": "un",
+          "unitMultiplier": 1
+        }
+      ]
+    },
+    {
+      "productId": "30138",
+      "productName": "Gaseosa cola Coca Cola sabor original 2,25 lts",
+      "brand": "Coca Cola",
+      "properties": [
+        {
+          "name": "Tipo de producto",
+          "values": ["Gaseosa"]
+        },
+        {
+          "name": "Gramaje de unidad de consumo",
+          "values": ["2250.00"]
+        },
+        {
+          "name": "Gramaje de unidad de medida",
+          "values": ["CM3"]
+        }
+      ],
+      "items": [
+        {
+          "itemId": "3807",
+          "measurementUnit": "un",
+          "unitMultiplier": 1
+        }
+      ]
+    }
+  ]
+}

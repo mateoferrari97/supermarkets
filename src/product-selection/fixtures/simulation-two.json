@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "id": "11324",
+      "quantity": 2,
+      "availability": "available",
+      "price": 600000,
+      "sellingPrice": 600000,
+      "priceTags": [],
+      "priceDefinition": {
+        "total": 1200000
+      }
+    }
+  ],
+  "ratesAndBenefitsData": {
+    "rateAndBenefitsIdentifiers": []
+  },
+  "messages": []
+}

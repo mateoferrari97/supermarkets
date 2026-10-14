@@ -104,6 +104,7 @@ type Script = {
   answers: Record<string, ResolveItemOutput>;
   rewordings?: Record<string, string>;
   replies?: Record<string, MapAnswerOutput>;
+  postalCode?: string | null;
 };
 
 type Seen = { resolved: ResolveItemInput[]; reworded: ResolveItemInput[]; asked: MapAnswerInput[] };
@@ -114,10 +115,16 @@ const scripted = <T>(table: Record<string, T>, key: string, task: string): Promi
   return Promise.resolve(value);
 };
 
-const fakeLlm = ({ items, answers, rewordings = {}, replies = {} }: Script) => {
+const fakeLlm = ({
+  items,
+  answers,
+  rewordings = {},
+  replies = {},
+  postalCode = "1425",
+}: Script) => {
   const seen: Seen = { resolved: [], reworded: [], asked: [] };
   const llm: Llm = {
-    splitOrder: () => Promise.resolve({ items }),
+    splitOrder: () => Promise.resolve({ items, postalCode }),
     resolveItem: (input) => {
       seen.resolved.push(input);
       return scripted(answers, input.item.phrase, "answer");
@@ -179,6 +186,7 @@ describe("resolveOrder", () => {
           terms: ["1 l"],
         }),
       ],
+      postalCode: "1425",
       message: null,
     });
   });
@@ -477,6 +485,7 @@ describe("answerQuestions", () => {
     ]);
     assert.deepEqual(resolution, {
       items: [resolved("yerba mate", "yerba", { quantity: 2 })],
+      postalCode: "1425",
       message: null,
     });
   });
@@ -500,5 +509,44 @@ describe("answerQuestions", () => {
       'Tengo una pregunta:\n\n1. No encontré "bombilla". ¿A qué te referís?',
     );
     assert.equal(seen.reworded.length, 2);
+  });
+
+  it("asks for the postal code last when the order has none, and keeps the one answered", async () => {
+    const { resolution, seen } = await runAndAnswer(
+      {
+        items: [item("yerba"), item("leche")],
+        answers: { yerba, leche },
+        postalCode: null,
+        replies: {
+          "entera, a la 1425": reply(
+            { options: [1] },
+            { question: 2, kind: "rephrased", phrase: "C1425ABC" },
+          ),
+        },
+      },
+      "entera, a la 1425",
+    );
+    assert.deepEqual(seen.asked[0]?.questions.at(-1), {
+      question: 2,
+      phrase: "código postal",
+      asks: "postalCode",
+      term: null,
+      options: [],
+    });
+    assert.deepEqual(resolution, {
+      items: [resolved("yerba", "yerba"), resolved("leche", "leche-entera")],
+      postalCode: "1425",
+      message: null,
+    });
+  });
+
+  it("keeps asking for the postal code until one is given", async () => {
+    const { resolution } = await run({
+      items: [item("yerba")],
+      answers: { yerba },
+      postalCode: "por casa",
+    });
+    assert.equal(resolution.postalCode, null);
+    assert.equal(resolution.message, "Tengo una pregunta:\n\n1. ¿A qué código postal es el envío?");
   });
 });

@@ -41,11 +41,11 @@ const pending = (phrase: string, ids: string[], overrides: Partial<Item> = {}): 
 
 const score = (
   evalCase: Omit<EvalCase, "id" | "order">,
-  resolution: Omit<OrderResolution, "message">,
+  resolution: Pick<OrderResolution, "items">,
 ) =>
   scoreCase(
     { id: "case", order: "pedido", ...evalCase },
-    { ...resolution, message: null },
+    { ...resolution, postalCode: "1425", message: null },
     vocabulary,
   );
 

@@ -9,3 +9,5 @@ Return one Item per thing the Owner wants to buy, in the order they wrote them:
 - `vagueWords`: words whose meaning depends on what exists ("grande", "chico", "mediano", "barato"). Do not interpret them.
 
 Things the Owner rules out ("nada de huevos", "sin pan esta vez") are not Items: leave them out. Do not invent Items, do not merge two things into one Item, and do not translate brand names.
+
+Also return `postalCode`: the delivery postal code the Owner wrote anywhere in the order ("envío a 1425", "CP 5000", "C1425ABC"), as written, or null when there is none. It is never an Item.

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "11187",
+      "quantity": 1,
+      "availability": "cannotBeDelivered",
+      "price": 609000,
+      "sellingPrice": 609000,
+      "priceTags": [],
+      "priceDefinition": {
+        "total": 609000
+      }
+    }
+  ],
+  "ratesAndBenefitsData": null,
+  "messages": [
+    {
+      "code": "cannotBeDelivered",
+      "text": "El ítem Gaseosa Coca-Cola sabor original 2,5 lts no pudo ser enviado para las coordenadas seleccionadas"
+    }
+  ]
+}

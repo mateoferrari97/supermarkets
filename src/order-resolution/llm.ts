@@ -10,6 +10,7 @@ export const splitOrderOutputSchema = z.strictObject({
       vagueWords: z.array(z.string().min(1)),
     }),
   ),
+  postalCode: z.string().min(1).nullable(),
 });
 
 export const resolveItemOutputSchema = z.strictObject({
@@ -44,7 +45,7 @@ export type ResolveItemInput = { item: Item; evidence: Evidence[] };
 export type QuestionInput = {
   question: number;
   phrase: string;
-  asks: "productType" | "phrase" | "term" | "size";
+  asks: "productType" | "phrase" | "term" | "size" | "postalCode";
   term: string | null;
   options: { option: number; name: string }[];
 };

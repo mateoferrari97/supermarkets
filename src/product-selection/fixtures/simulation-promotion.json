@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "id": "3807",
+      "quantity": 2,
+      "availability": "available",
+      "price": 600000,
+      "sellingPrice": 450000,
+      "priceTags": [
+        {
+          "name": "discount@price-3eacc48d-f8aa-485c-99e9-b9443a200931#6401d4ce-77ce-488a-940f-1f1f406d1d9e",
+          "value": -300000
+        }
+      ],
+      "priceDefinition": {
+        "total": 900000
+      }
+    }
+  ],
+  "ratesAndBenefitsData": {
+    "rateAndBenefitsIdentifiers": [
+      {
+        "id": "3eacc48d-f8aa-485c-99e9-b9443a200931",
+        "name": "PROMO-2do al 50% Max 48 unidades Combinable COCA COLA-Reg-2-50-Aniv2 9 al 15.10"
+      }
+    ]
+  },
+  "messages": []
+}

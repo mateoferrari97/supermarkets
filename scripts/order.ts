@@ -4,6 +4,8 @@ import {
   createOrderResolver,
   type OrderResolution,
 } from "../src/order-resolution/resolve-order.ts";
+import { createCarrefourStore } from "../src/product-selection/carrefour-store.ts";
+import { pickProducts } from "../src/product-selection/pick-products.ts";
 import { PROMPTS_DIR, readOrderData, renderItem } from "./order-files.ts";
 
 const orderText = process.argv.slice(2).join(" ").trim();
@@ -48,6 +50,22 @@ while (resolution.message) {
   show(resolution);
 }
 terminal.close();
+
+if (!resolution.message) {
+  const picked = Date.now();
+  const selection = await pickProducts(resolution, { mapping, store: createCarrefourStore() });
+  const money = (value: number) => `$${value.toFixed(2)}`;
+  console.log(`\nCarrito (código postal ${resolution.postalCode}):\n`);
+  for (const line of selection.lines) {
+    const product = line.product
+      ? `${line.product.name} (${line.product.itemId}) x${line.quantity}, ${money(line.unitPrice ?? 0)} c/u, ${money(line.total)}`
+      : "sin producto";
+    console.log(`- ${line.phrase}: ${product}. ${line.reason}`);
+  }
+  console.log(
+    `\nTotal: ${money(selection.total)} (Carrefour, ${((Date.now() - picked) / 1000).toFixed(1)} s)`,
+  );
+}
 
 const cost = calls.reduce((total, call) => total + call.costUsd, 0);
 console.log(

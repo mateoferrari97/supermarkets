@@ -1,0 +1,371 @@
+{
+  "facets": [
+    {
+      "key": "tipo-de-producto",
+      "name": "Tipo de producto",
+      "values": [
+        {
+          "name": "Agua saborizada",
+          "value": "agua-saborizada",
+          "quantity": 22
+        },
+        {
+          "name": "Agua tónica",
+          "value": "agua-tonica",
+          "quantity": 7
+        },
+        {
+          "name": "Aperitivo con alcohol",
+          "value": "aperitivo-con-alcohol",
+          "quantity": 3
+        },
+        {
+          "name": "Aperitivo sin alcohol",
+          "value": "aperitivo-sin-alcohol",
+          "quantity": 1
+        },
+        {
+          "name": "Bebida láctea",
+          "value": "bebida-lactea",
+          "quantity": 1
+        },
+        {
+          "name": "Coctel",
+          "value": "coctel",
+          "quantity": 1
+        },
+        {
+          "name": "Envase",
+          "value": "envase",
+          "quantity": 1
+        },
+        {
+          "name": "Fernet",
+          "value": "fernet",
+          "quantity": 1
+        },
+        {
+          "name": "Gaseosa",
+          "value": "gaseosa",
+          "quantity": 415
+        },
+        {
+          "name": "Jugo en polvo",
+          "value": "jugo-en-polvo",
+          "quantity": 2
+        },
+        {
+          "name": "Jugo listo",
+          "value": "jugo-listo",
+          "quantity": 10
+        },
+        {
+          "name": "Pack de gaseosa",
+          "value": "pack-de-gaseosa",
+          "quantity": 7
+        },
+        {
+          "name": "Set de vasos",
+          "value": "set-de-vasos",
+          "quantity": 1
+        },
+        {
+          "name": "Soda",
+          "value": "soda",
+          "quantity": 4
+        },
+        {
+          "name": "Tapón",
+          "value": "tapon",
+          "quantity": 1
+        },
+        {
+          "name": "Vaso",
+          "value": "vaso",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "key": "brand",
+      "name": "Marca",
+      "values": [
+        {
+          "name": "1882",
+          "value": "1882",
+          "quantity": 1
+        },
+        {
+          "name": "Coca Cola",
+          "value": "coca-cola",
+          "quantity": 68
+        },
+        {
+          "name": "Cunnington",
+          "value": "cunnington",
+          "quantity": 45
+        },
+        {
+          "name": "Fanta",
+          "value": "fanta",
+          "quantity": 35
+        },
+        {
+          "name": "Pepsi",
+          "value": "pepsi",
+          "quantity": 27
+        },
+        {
+          "name": "Carrefour",
+          "value": "carrefour",
+          "quantity": 26
+        },
+        {
+          "name": "Sprite",
+          "value": "sprite",
+          "quantity": 26
+        },
+        {
+          "name": "Manaos",
+          "value": "manaos",
+          "quantity": 23
+        },
+        {
+          "name": "7 Up",
+          "value": "7-up",
+          "quantity": 21
+        },
+        {
+          "name": "Torasso",
+          "value": "torasso",
+          "quantity": 20
+        },
+        {
+          "name": "Secco",
+          "value": "secco",
+          "quantity": 19
+        },
+        {
+          "name": "Schweppes",
+          "value": "schweppes",
+          "quantity": 16
+        },
+        {
+          "name": "Paso De Los Toros",
+          "value": "paso-de-los-toros",
+          "quantity": 15
+        },
+        {
+          "name": "Aquarius",
+          "value": "aquarius",
+          "quantity": 13
+        },
+        {
+          "name": "Mirinda",
+          "value": "mirinda",
+          "quantity": 13
+        },
+        {
+          "name": "Talca",
+          "value": "talca",
+          "quantity": 13
+        },
+        {
+          "name": "Goliat",
+          "value": "goliat",
+          "quantity": 8
+        },
+        {
+          "name": "Pritty",
+          "value": "pritty",
+          "quantity": 8
+        },
+        {
+          "name": "Rumipal",
+          "value": "rumipal",
+          "quantity": 8
+        },
+        {
+          "name": "Crush",
+          "value": "crush",
+          "quantity": 7
+        },
+        {
+          "name": "Doble Cola",
+          "value": "doble-cola",
+          "quantity": 7
+        },
+        {
+          "name": "Córdoba",
+          "value": "cordoba",
+          "quantity": 5
+        },
+        {
+          "name": "Pindapoy",
+          "value": "pindapoy",
+          "quantity": 5
+        },
+        {
+          "name": "Placer",
+          "value": "placer",
+          "quantity": 5
+        },
+        {
+          "name": "Frutafiel",
+          "value": "frutafiel",
+          "quantity": 4
+        },
+        {
+          "name": "Genérico",
+          "value": "generico",
+          "quantity": 4
+        },
+        {
+          "name": "Sierra De Los Padres",
+          "value": "sierra-de-los-padres",
+          "quantity": 4
+        },
+        {
+          "name": "Britvic",
+          "value": "britvic",
+          "quantity": 3
+        },
+        {
+          "name": "Coloreada",
+          "value": "coloreada",
+          "quantity": 3
+        },
+        {
+          "name": "La Bichy",
+          "value": "la-bichy",
+          "quantity": 3
+        },
+        {
+          "name": "Levité",
+          "value": "levite",
+          "quantity": 3
+        },
+        {
+          "name": "Guaraná Antarctica",
+          "value": "guarana-antarctica",
+          "quantity": 2
+        },
+        {
+          "name": "Las Brisas",
+          "value": "las-brisas",
+          "quantity": 2
+        },
+        {
+          "name": "Silva",
+          "value": "silva",
+          "quantity": 2
+        },
+        {
+          "name": "Awafrut",
+          "value": "awafrut",
+          "quantity": 1
+        },
+        {
+          "name": "Bacardi",
+          "value": "bacardi",
+          "quantity": 1
+        },
+        {
+          "name": "Baggio",
+          "value": "baggio",
+          "quantity": 1
+        },
+        {
+          "name": "Bunji",
+          "value": "bunji",
+          "quantity": 1
+        },
+        {
+          "name": "Campari",
+          "value": "campari",
+          "quantity": 1
+        },
+        {
+          "name": "Cimes",
+          "value": "cimes",
+          "quantity": 1
+        },
+        {
+          "name": "Del Valle",
+          "value": "del-valle",
+          "quantity": 1
+        },
+        {
+          "name": "Fever Tree",
+          "value": "fever-tree",
+          "quantity": 1
+        },
+        {
+          "name": "Gancia",
+          "value": "gancia",
+          "quantity": 1
+        },
+        {
+          "name": "Guaraná",
+          "value": "guarana",
+          "quantity": 1
+        },
+        {
+          "name": "Jumex",
+          "value": "jumex",
+          "quantity": 1
+        },
+        {
+          "name": "La Serenísima",
+          "value": "la-serenisima",
+          "quantity": 1
+        },
+        {
+          "name": "Limon & Nada",
+          "value": "limon---nada",
+          "quantity": 1
+        },
+        {
+          "name": "Loekemeyer",
+          "value": "loekemeyer",
+          "quantity": 1
+        },
+        {
+          "name": "Magna",
+          "value": "magna",
+          "quantity": 1
+        },
+        {
+          "name": "Nadir",
+          "value": "nadir",
+          "quantity": 1
+        },
+        {
+          "name": "Pasabahce",
+          "value": "pasabahce",
+          "quantity": 1
+        },
+        {
+          "name": "Pura Frutta",
+          "value": "pura-frutta",
+          "quantity": 1
+        },
+        {
+          "name": "Tacconi",
+          "value": "tacconi",
+          "quantity": 1
+        },
+        {
+          "name": "Tutti",
+          "value": "tutti",
+          "quantity": 1
+        },
+        {
+          "name": "Verao",
+          "value": "verao",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}
