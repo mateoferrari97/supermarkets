@@ -13,7 +13,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm format --check && pnpm no-comments && pnpm test && pnpm product-types && pnpm payment-cards && pnpm order:eval-set",
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "carrefour:catalog": "tsx scripts/carrefour-catalog.ts",
-    "test": "tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
+    "test": "vitest run",
     "product-types": "tsx scripts/validate-product-types.ts",
     "payment-cards": "tsx scripts/validate-payment-cards.ts",
     "seed:split": "tsx scripts/seed-split.ts",
@@ -33,7 +33,8 @@
     "tsx": "^4.23.15",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "^8.71.2",
-    "typescript7": "npm:typescript@7.0.2"
+    "typescript7": "npm:typescript@7.0.2",
+    "vitest": "^5.0.4"
   },
   "dependencies": {
     "zod": "^4.6.7"

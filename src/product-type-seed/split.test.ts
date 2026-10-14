@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { type CatalogProduct, MAX_TIPOS_PER_PART, splitIntoParts } from "./split.ts";
 
 const product = (overrides: Partial<CatalogProduct>): CatalogProduct => ({

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { Item } from "./llm.ts";
 import { scoreCase, validateEvalSet, type EvalCase } from "./eval-set.ts";
 import type { OrderItem, OrderResolution } from "./resolve-order.ts";

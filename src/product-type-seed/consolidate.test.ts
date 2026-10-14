@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { validateProductTypes } from "../product-types/validate.ts";
 import { consolidate, renderSummary, type Consolidation, type Decision } from "./consolidate.ts";
 import type { Proposal } from "./proposal.ts";

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { RemainingDoubt } from "./consolidate.ts";
 import { doubtBatch, renderDoubtBatch } from "./doubts.ts";
 

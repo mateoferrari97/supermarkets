@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { Item, SelectionPolicy } from "../order-resolution/llm.ts";
 import type { OrderItem, OrderResolution } from "../order-resolution/resolve-order.ts";
 import { pickProducts, type PickDependencies } from "./pick-products.ts";
