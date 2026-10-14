@@ -15,46 +15,20 @@
       "name": "Aceite",
       "productTypes": [
         {
-          "id": "aceite-de-canola",
-          "name": "Aceite de canola"
-        },
-        {
           "id": "aceite-de-coco",
           "name": "Aceite de coco"
-        },
-        {
-          "id": "aceite-de-girasol",
-          "name": "Aceite de girasol"
-        },
-        {
-          "id": "aceite-de-maiz",
-          "name": "Aceite de maíz"
         },
         {
           "id": "aceite-de-oliva",
           "name": "Aceite de oliva"
         },
         {
-          "id": "aceite-de-soja",
-          "name": "Aceite de soja"
-        },
-        {
           "id": "aceite-en-aerosol",
           "name": "Aceite en aerosol"
         },
         {
-          "id": "aceite-mezcla",
-          "name": "Aceite mezcla"
-        }
-      ]
-    },
-    {
-      "id": "grupo-aceite-para-masajes",
-      "name": "Aceite para masajes",
-      "productTypes": [
-        {
-          "id": "aceite-para-masajes",
-          "name": "Aceite para masajes"
+          "id": "aceite-de-girasol",
+          "name": "Aceite vegetal"
         }
       ]
     },
@@ -83,10 +57,6 @@
         {
           "id": "acelga",
           "name": "Acelga"
-        },
-        {
-          "id": "acelga-congelada",
-          "name": "Acelga congelada"
         }
       ]
     },
@@ -183,10 +153,6 @@
           "name": "Salsa golf"
         },
         {
-          "id": "salsa-mostaza-y-miel",
-          "name": "Salsa mostaza y miel"
-        },
-        {
           "id": "salsa-ranch",
           "name": "Salsa ranch"
         },
@@ -223,10 +189,6 @@
           "name": "Brocha de afeitar"
         },
         {
-          "id": "crema-de-afeitar",
-          "name": "Crema de afeitar"
-        },
-        {
           "id": "espuma-de-afeitar",
           "name": "Espuma de afeitar"
         },
@@ -246,7 +208,7 @@
       "productTypes": [
         {
           "id": "agua-con-gas",
-          "name": "Agua con gas"
+          "name": "Agua con gas o soda"
         },
         {
           "id": "agua-saborizada",
@@ -293,10 +255,6 @@
       "name": "Ají",
       "productTypes": [
         {
-          "id": "aji-jalapeno",
-          "name": "Ají jalapeño"
-        },
-        {
           "id": "aji-molido",
           "name": "Ají molido"
         },
@@ -310,15 +268,7 @@
         },
         {
           "id": "ajies-en-vinagre",
-          "name": "Ajíes en vinagre"
-        },
-        {
-          "id": "chiles-en-conserva",
-          "name": "Chiles en conserva"
-        },
-        {
-          "id": "jalapenos",
-          "name": "Jalapeños"
+          "name": "Ajíes en conserva"
         }
       ]
     },
@@ -333,10 +283,6 @@
         {
           "id": "ajo-deshidratado",
           "name": "Ajo deshidratado"
-        },
-        {
-          "id": "ajo-en-polvo",
-          "name": "Ajo en polvo"
         }
       ]
     },
@@ -413,16 +359,12 @@
       "name": "Alcohol",
       "productTypes": [
         {
-          "id": "alcohol-en-aerosol",
-          "name": "Alcohol en aerosol"
+          "id": "alcohol-etilico",
+          "name": "Alcohol"
         },
         {
           "id": "alcohol-en-gel",
           "name": "Alcohol en gel"
-        },
-        {
-          "id": "alcohol-etilico",
-          "name": "Alcohol etílico"
         }
       ]
     },
@@ -453,10 +395,6 @@
         {
           "id": "algodon",
           "name": "Algodón"
-        },
-        {
-          "id": "discos-desmaquillantes",
-          "name": "Discos desmaquillantes"
         }
       ]
     },
@@ -477,14 +415,6 @@
         {
           "id": "anchoas",
           "name": "Anchoas"
-        },
-        {
-          "id": "anchoas-en-aceite",
-          "name": "Anchoas en aceite"
-        },
-        {
-          "id": "anchoas-en-vinagre",
-          "name": "Anchoas en vinagre"
         }
       ]
     },
@@ -505,16 +435,6 @@
         {
           "id": "antihumedad",
           "name": "Antihumedad"
-        }
-      ]
-    },
-    {
-      "id": "grupo-antipolillas",
-      "name": "Antipolillas",
-      "productTypes": [
-        {
-          "id": "antipolillas",
-          "name": "Antipolillas"
         }
       ]
     },
@@ -569,10 +489,6 @@
         {
           "id": "arandanos",
           "name": "Arándanos"
-        },
-        {
-          "id": "arandanos-congelados",
-          "name": "Arándanos congelados"
         }
       ]
     },
@@ -661,20 +577,12 @@
           "name": "Arroz basmati"
         },
         {
-          "id": "arroz-blanco",
+          "id": "arroz-largo-fino",
           "name": "Arroz blanco"
-        },
-        {
-          "id": "arroz-doble-carolina",
-          "name": "Arroz doble carolina"
         },
         {
           "id": "arroz-integral",
           "name": "Arroz integral"
-        },
-        {
-          "id": "arroz-largo-fino",
-          "name": "Arroz largo fino"
         },
         {
           "id": "arroz-para-paella",
@@ -691,10 +599,6 @@
         {
           "id": "arroz-parboil",
           "name": "Arroz parboil"
-        },
-        {
-          "id": "arroz-yamani",
-          "name": "Arroz yamaní"
         }
       ]
     },
@@ -703,24 +607,12 @@
       "name": "Arvejas",
       "productTypes": [
         {
-          "id": "arvejas-congeladas",
-          "name": "Arvejas congeladas"
-        },
-        {
           "id": "arvejas-enlatadas",
-          "name": "Arvejas enlatadas"
-        },
-        {
-          "id": "arvejas-frescas",
-          "name": "Arvejas frescas"
+          "name": "Arvejas"
         },
         {
           "id": "arvejas-partidas",
           "name": "Arvejas partidas"
-        },
-        {
-          "id": "arvejas-secas",
-          "name": "Arvejas secas"
         }
       ]
     },
@@ -745,6 +637,10 @@
         {
           "id": "atun-en-aceite",
           "name": "Atún en aceite"
+        },
+        {
+          "id": "atun-fresco",
+          "name": "Atún fresco"
         },
         {
           "id": "lomitos-de-atun",
@@ -786,11 +682,7 @@
         },
         {
           "id": "azucar-mascabo",
-          "name": "Azúcar mascabo"
-        },
-        {
-          "id": "azucar-negra",
-          "name": "Azúcar negra"
+          "name": "Azúcar mascabo o negra"
         }
       ]
     },
@@ -801,6 +693,16 @@
         {
           "id": "azufre",
           "name": "Azufre"
+        }
+      ]
+    },
+    {
+      "id": "grupo-bagel",
+      "name": "Bagel",
+      "productTypes": [
+        {
+          "id": "bagel",
+          "name": "Bagel"
         }
       ]
     },
@@ -838,10 +740,6 @@
       "id": "grupo-barrita",
       "name": "Barrita",
       "productTypes": [
-        {
-          "id": "barra-de-arroz",
-          "name": "Barra de arroz"
-        },
         {
           "id": "barra-de-cereal",
           "name": "Barra de cereal"
@@ -955,16 +853,6 @@
       ]
     },
     {
-      "id": "grupo-bocaditos-de-vegetales",
-      "name": "Bocaditos de vegetales",
-      "productTypes": [
-        {
-          "id": "bocaditos-de-vegetales",
-          "name": "Bocaditos de vegetales"
-        }
-      ]
-    },
-    {
       "id": "grupo-bolsa-de-residuos",
       "name": "Bolsa de residuos",
       "productTypes": [
@@ -1005,10 +893,6 @@
         {
           "id": "brandy",
           "name": "Brandy"
-        },
-        {
-          "id": "conac",
-          "name": "Coñac"
         }
       ]
     },
@@ -1029,10 +913,6 @@
         {
           "id": "brocoli",
           "name": "Brócoli"
-        },
-        {
-          "id": "brocoli-congelado",
-          "name": "Brócoli congelado"
         }
       ]
     },
@@ -1113,10 +993,6 @@
       "name": "Cacao",
       "productTypes": [
         {
-          "id": "cacao-amargo",
-          "name": "Cacao amargo"
-        },
-        {
           "id": "cacao-en-polvo",
           "name": "Cacao en polvo"
         }
@@ -1177,12 +1053,8 @@
       "name": "Canela",
       "productTypes": [
         {
-          "id": "canela-en-rama",
-          "name": "Canela en rama"
-        },
-        {
           "id": "canela-molida",
-          "name": "Canela molida"
+          "name": "Canela"
         }
       ]
     },
@@ -1210,10 +1082,6 @@
       "id": "grupo-carbon",
       "name": "Carbón",
       "productTypes": [
-        {
-          "id": "briquetas-de-carbon",
-          "name": "Briquetas de carbón"
-        },
         {
           "id": "carbon",
           "name": "Carbón"
@@ -1253,14 +1121,6 @@
         {
           "id": "bife-americano",
           "name": "Bife americano"
-        },
-        {
-          "id": "bife-ancho",
-          "name": "Bife ancho"
-        },
-        {
-          "id": "bife-angosto",
-          "name": "Bife angosto"
         },
         {
           "id": "bife-de-chorizo",
@@ -1387,16 +1247,8 @@
           "name": "Cebolla"
         },
         {
-          "id": "cebolla-congelada",
-          "name": "Cebolla congelada"
-        },
-        {
           "id": "cebolla-deshidratada",
           "name": "Cebolla deshidratada"
-        },
-        {
-          "id": "cebolla-en-polvo",
-          "name": "Cebolla en polvo"
         },
         {
           "id": "cebolla-frita",
@@ -1491,16 +1343,8 @@
       "name": "Cera para pisos",
       "productTypes": [
         {
-          "id": "autobrillo-para-pisos",
-          "name": "Autobrillo para pisos"
-        },
-        {
           "id": "cera-para-pisos",
           "name": "Cera para pisos"
-        },
-        {
-          "id": "restaurador-de-pisos",
-          "name": "Restaurador de pisos"
         }
       ]
     },
@@ -1509,8 +1353,8 @@
       "name": "Cerdo",
       "productTypes": [
         {
-          "id": "bondiola-de-cerdo",
-          "name": "Bondiola de cerdo"
+          "id": "bondiola",
+          "name": "Bondiola"
         },
         {
           "id": "carre-de-cerdo",
@@ -1529,10 +1373,6 @@
           "name": "Codillo de cerdo"
         },
         {
-          "id": "costilla-de-cerdo",
-          "name": "Costilla de cerdo"
-        },
-        {
           "id": "cuerito-de-cerdo",
           "name": "Cuerito de cerdo"
         },
@@ -1543,6 +1383,10 @@
         {
           "id": "matambre-de-cerdo",
           "name": "Matambre de cerdo"
+        },
+        {
+          "id": "patitas-de-cerdo",
+          "name": "Patitas de cerdo"
         },
         {
           "id": "pechito-de-cerdo",
@@ -1579,44 +1423,16 @@
       "name": "Cereal",
       "productTypes": [
         {
-          "id": "almohaditas",
-          "name": "Almohaditas"
-        },
-        {
-          "id": "aros-de-cereal",
-          "name": "Aros de cereal"
-        },
-        {
-          "id": "arroz-inflado",
-          "name": "Arroz inflado"
-        },
-        {
-          "id": "bolitas-de-cereal",
-          "name": "Bolitas de cereal"
-        },
-        {
           "id": "cereal",
           "name": "Cereal"
         },
         {
-          "id": "cereal-de-chocolate",
-          "name": "Cereal de chocolate"
-        },
-        {
-          "id": "copos-de-maiz",
-          "name": "Copos de maíz"
+          "id": "maiz-inflado",
+          "name": "Cereal inflado"
         },
         {
           "id": "granola",
           "name": "Granola"
-        },
-        {
-          "id": "maiz-inflado",
-          "name": "Maíz inflado"
-        },
-        {
-          "id": "trigo-inflado",
-          "name": "Trigo inflado"
         }
       ]
     },
@@ -1627,10 +1443,6 @@
         {
           "id": "cereza",
           "name": "Cereza"
-        },
-        {
-          "id": "cerezas-congeladas",
-          "name": "Cerezas congeladas"
         }
       ]
     },
@@ -1663,10 +1475,6 @@
           "name": "Cerveza roja"
         },
         {
-          "id": "cerveza-rubia",
-          "name": "Cerveza rubia"
-        },
-        {
           "id": "cerveza-sin-alcohol",
           "name": "Cerveza sin alcohol"
         }
@@ -1689,14 +1497,6 @@
         {
           "id": "chaucha",
           "name": "Chaucha"
-        },
-        {
-          "id": "chauchas-congeladas",
-          "name": "Chauchas congeladas"
-        },
-        {
-          "id": "chauchas-enlatadas",
-          "name": "Chauchas enlatadas"
         }
       ]
     },
@@ -1707,10 +1507,6 @@
         {
           "id": "chimichurri",
           "name": "Chimichurri"
-        },
-        {
-          "id": "chimichurri-deshidratado",
-          "name": "Chimichurri deshidratado"
         }
       ]
     },
@@ -1721,10 +1517,6 @@
         {
           "id": "chipa",
           "name": "Chipa"
-        },
-        {
-          "id": "chipa-congelado",
-          "name": "Chipá congelado"
         }
       ]
     },
@@ -1743,16 +1535,8 @@
       "name": "Choclo",
       "productTypes": [
         {
-          "id": "choclo-congelado",
-          "name": "Choclo congelado"
-        },
-        {
-          "id": "choclo-en-granos",
-          "name": "Choclo en granos"
-        },
-        {
           "id": "choclo-enlatado",
-          "name": "Choclo enlatado"
+          "name": "Choclo"
         }
       ]
     },
@@ -1771,10 +1555,6 @@
         {
           "id": "chocolate-para-taza",
           "name": "Chocolate para taza"
-        },
-        {
-          "id": "frutos-secos-con-chocolate",
-          "name": "Frutos secos con chocolate"
         }
       ]
     },
@@ -1784,11 +1564,7 @@
       "productTypes": [
         {
           "id": "bano-de-reposteria",
-          "name": "Baño de repostería"
-        },
-        {
-          "id": "chips-de-chocolate",
-          "name": "Chips de chocolate"
+          "name": "Chocolate de repostería"
         }
       ]
     },
@@ -1803,10 +1579,6 @@
         {
           "id": "chorizo-parrillero",
           "name": "Chorizo parrillero"
-        },
-        {
-          "id": "chorizo-seco",
-          "name": "Chorizo seco"
         },
         {
           "id": "chorizo-vegano",
@@ -1897,22 +1669,6 @@
       "name": "Comida preparada",
       "productTypes": [
         {
-          "id": "arancini",
-          "name": "Arancini"
-        },
-        {
-          "id": "arroz-con-calamares",
-          "name": "Arroz con calamares"
-        },
-        {
-          "id": "arroz-listo",
-          "name": "Arroz listo"
-        },
-        {
-          "id": "choripan",
-          "name": "Choripán"
-        },
-        {
           "id": "comida-arabe",
           "name": "Comida árabe"
         },
@@ -1921,32 +1677,8 @@
           "name": "Comida lista"
         },
         {
-          "id": "guiso-de-lentejas",
-          "name": "Guiso de lentejas"
-        },
-        {
-          "id": "parmigiana",
-          "name": "Parmigiana"
-        },
-        {
-          "id": "pasta-lista",
-          "name": "Pasta lista"
-        },
-        {
-          "id": "pechuga-de-pollo-al-verdeo",
-          "name": "Pechuga de pollo al verdeo"
-        },
-        {
-          "id": "roll-relleno",
-          "name": "Roll relleno"
-        },
-        {
           "id": "sushi",
           "name": "Sushi"
-        },
-        {
-          "id": "wok",
-          "name": "Wok"
         }
       ]
     },
@@ -1979,24 +1711,12 @@
           "name": "Adobo"
         },
         {
-          "id": "complemento-para-carne-picada",
-          "name": "Complemento para carne picada"
-        },
-        {
-          "id": "condimento-ahumado",
-          "name": "Condimento ahumado"
-        },
-        {
           "id": "condimento-barbacoa",
           "name": "Condimento barbacoa"
         },
         {
           "id": "condimento-para-arroz",
           "name": "Condimento para arroz"
-        },
-        {
-          "id": "condimento-para-ave",
-          "name": "Condimento para ave"
         },
         {
           "id": "condimento-para-carnes",
@@ -2065,16 +1785,8 @@
       "name": "Cordero",
       "productTypes": [
         {
-          "id": "bife-de-cordero",
-          "name": "Bife de cordero"
-        },
-        {
           "id": "cordero",
           "name": "Cordero"
-        },
-        {
-          "id": "rack-de-cordero",
-          "name": "Rack de cordero"
         }
       ]
     },
@@ -2105,18 +1817,6 @@
         {
           "id": "crema-corporal",
           "name": "Crema corporal"
-        },
-        {
-          "id": "crema-de-ordene",
-          "name": "Crema de ordeñe"
-        },
-        {
-          "id": "crema-para-piernas",
-          "name": "Crema para piernas"
-        },
-        {
-          "id": "crema-sapolan",
-          "name": "Crema sapolán"
         }
       ]
     },
@@ -2180,11 +1880,7 @@
         },
         {
           "id": "crema-de-avellanas",
-          "name": "Crema de avellanas"
-        },
-        {
-          "id": "crema-de-pistacho",
-          "name": "Crema de pistacho"
+          "name": "Crema de avellanas o pistacho"
         }
       ]
     },
@@ -2199,34 +1895,12 @@
       ]
     },
     {
-      "id": "grupo-criollitos",
-      "name": "Criollitos",
-      "productTypes": [
-        {
-          "id": "criollitos",
-          "name": "Criollitos"
-        }
-      ]
-    },
-    {
       "id": "grupo-croquetas",
       "name": "Croquetas",
       "productTypes": [
         {
-          "id": "bocaditos-de-verdura",
-          "name": "Bocaditos de verdura"
-        },
-        {
-          "id": "croquetas",
-          "name": "Croquetas"
-        },
-        {
-          "id": "croquetas-de-papa",
-          "name": "Croquetas de papa"
-        },
-        {
           "id": "croquetas-de-verdura",
-          "name": "Croquetas de verdura"
+          "name": "Croquetas"
         }
       ]
     },
@@ -2283,10 +1957,6 @@
         {
           "id": "renovador-de-gamuza",
           "name": "Renovador de gamuza"
-        },
-        {
-          "id": "tinta-para-cuero",
-          "name": "Tinta para cuero"
         }
       ]
     },
@@ -2339,10 +2009,6 @@
       "name": "Depilatorio",
       "productTypes": [
         {
-          "id": "banda-depilatoria",
-          "name": "Banda depilatoria"
-        },
-        {
           "id": "cera-depilatoria",
           "name": "Cera depilatoria"
         },
@@ -2376,10 +2042,6 @@
       "productTypes": [
         {
           "id": "agua-micelar",
-          "name": "Agua micelar"
-        },
-        {
-          "id": "desmaquillante",
           "name": "Desmaquillante"
         }
       ]
@@ -2397,15 +2059,7 @@
           "name": "Desodorante en barra"
         },
         {
-          "id": "desodorante-en-gel",
-          "name": "Desodorante en gel"
-        },
-        {
-          "id": "desodorante-en-polvo",
-          "name": "Desodorante en polvo"
-        },
-        {
-          "id": "desodorante-para-pies",
+          "id": "talco-pedico",
           "name": "Desodorante para pies"
         },
         {
@@ -2461,10 +2115,6 @@
         {
           "id": "dulce-de-batata",
           "name": "Dulce de batata"
-        },
-        {
-          "id": "dulce-de-batata-con-chocolate",
-          "name": "Dulce de batata con chocolate"
         }
       ]
     },
@@ -2521,16 +2171,8 @@
       "name": "Edulcorante",
       "productTypes": [
         {
-          "id": "edulcorante-en-pastillas",
-          "name": "Edulcorante en pastillas"
-        },
-        {
           "id": "edulcorante-en-sobres",
-          "name": "Edulcorante en sobres"
-        },
-        {
-          "id": "edulcorante-liquido",
-          "name": "Edulcorante líquido"
+          "name": "Edulcorante"
         }
       ]
     },
@@ -2541,10 +2183,6 @@
         {
           "id": "empanadas",
           "name": "Empanadas"
-        },
-        {
-          "id": "empanadas-congeladas",
-          "name": "Empanadas congeladas"
         }
       ]
     },
@@ -2607,12 +2245,8 @@
       "name": "Escoba",
       "productTypes": [
         {
-          "id": "escoba",
-          "name": "Escoba"
-        },
-        {
           "id": "escobillon",
-          "name": "Escobillón"
+          "name": "Escoba"
         }
       ]
     },
@@ -2673,10 +2307,6 @@
           "name": "Espinaca"
         },
         {
-          "id": "espinaca-congelada",
-          "name": "Espinaca congelada"
-        },
-        {
           "id": "espinaca-deshidratada",
           "name": "Espinaca deshidratada"
         }
@@ -2692,11 +2322,7 @@
         },
         {
           "id": "esponja-de-acero",
-          "name": "Esponja de acero"
-        },
-        {
-          "id": "esponja-de-bronce",
-          "name": "Esponja de bronce"
+          "name": "Esponja metálica"
         }
       ]
     },
@@ -2763,24 +2389,12 @@
       "name": "Facturas",
       "productTypes": [
         {
-          "id": "berlinesa",
-          "name": "Berlinesa"
-        },
-        {
-          "id": "canoncitos",
-          "name": "Cañoncitos"
-        },
-        {
           "id": "facturas",
           "name": "Facturas"
         },
         {
           "id": "medialunas",
           "name": "Medialunas"
-        },
-        {
-          "id": "medialunas-congeladas",
-          "name": "Medialunas congeladas"
         },
         {
           "id": "pastelitos",
@@ -2831,16 +2445,8 @@
       "name": "Fiambre",
       "productTypes": [
         {
-          "id": "bondiola",
-          "name": "Bondiola"
-        },
-        {
           "id": "fiambre-de-cerdo",
           "name": "Fiambre de cerdo"
-        },
-        {
-          "id": "leberwurst",
-          "name": "Leberwurst"
         },
         {
           "id": "lomo-de-cerdo",
@@ -2877,44 +2483,12 @@
       "name": "Fideos",
       "productTypes": [
         {
-          "id": "fideos",
-          "name": "Fideos"
-        },
-        {
           "id": "fideos-al-huevo",
           "name": "Fideos al huevo"
         },
         {
-          "id": "fideos-ave-maria",
-          "name": "Fideos ave maría"
-        },
-        {
-          "id": "fideos-bucatini",
-          "name": "Fideos bucatini"
-        },
-        {
           "id": "fideos-cabello-de-angel",
           "name": "Fideos cabello de ángel"
-        },
-        {
-          "id": "fideos-canestri",
-          "name": "Fideos canestri"
-        },
-        {
-          "id": "fideos-caracoles",
-          "name": "Fideos caracoles"
-        },
-        {
-          "id": "fideos-caserecce",
-          "name": "Fideos caserecce"
-        },
-        {
-          "id": "fideos-cellentani",
-          "name": "Fideos cellentani"
-        },
-        {
-          "id": "fideos-coditos",
-          "name": "Fideos coditos"
         },
         {
           "id": "fideos-de-arroz",
@@ -2925,80 +2499,20 @@
           "name": "Fideos de legumbres"
         },
         {
-          "id": "fideos-dedales",
-          "name": "Fideos dedales"
-        },
-        {
-          "id": "fideos-dedalitos",
-          "name": "Fideos dedalitos"
+          "id": "fideos-tirabuzon",
+          "name": "Fideos guiseros"
         },
         {
           "id": "fideos-integrales",
           "name": "Fideos integrales"
         },
         {
-          "id": "fideos-letras",
-          "name": "Fideos letras"
-        },
-        {
-          "id": "fideos-linguine",
-          "name": "Fideos linguine"
-        },
-        {
-          "id": "fideos-macarrones",
-          "name": "Fideos macarrones"
-        },
-        {
-          "id": "fideos-monos",
-          "name": "Fideos moños"
-        },
-        {
-          "id": "fideos-mostachol",
-          "name": "Fideos mostachol"
-        },
-        {
-          "id": "fideos-municiones",
-          "name": "Fideos municiones"
-        },
-        {
-          "id": "fideos-noquis",
-          "name": "Fideos ñoquis"
-        },
-        {
-          "id": "fideos-orecchiette",
-          "name": "Fideos orecchiette"
-        },
-        {
-          "id": "fideos-pamperitos",
-          "name": "Fideos pamperitos"
-        },
-        {
-          "id": "fideos-rigatoni",
-          "name": "Fideos rigatoni"
-        },
-        {
-          "id": "fideos-rigatti",
-          "name": "Fideos rigatti"
-        },
-        {
-          "id": "fideos-ruote",
-          "name": "Fideos ruote"
+          "id": "fideos-tallarines",
+          "name": "Fideos largos"
         },
         {
           "id": "fideos-soperos",
           "name": "Fideos soperos"
-        },
-        {
-          "id": "fideos-spaghetti",
-          "name": "Fideos spaghetti"
-        },
-        {
-          "id": "fideos-tallarines",
-          "name": "Fideos tallarines"
-        },
-        {
-          "id": "fideos-tirabuzon",
-          "name": "Fideos tirabuzón"
         }
       ]
     },
@@ -3019,16 +2533,6 @@
         {
           "id": "filtro-de-cafe",
           "name": "Filtro de café"
-        }
-      ]
-    },
-    {
-      "id": "grupo-fizz",
-      "name": "Fizz",
-      "productTypes": [
-        {
-          "id": "fizz",
-          "name": "Fizz"
         }
       ]
     },
@@ -3087,8 +2591,16 @@
           "name": "Duraznos en almíbar"
         },
         {
+          "id": "frutas-en-conserva",
+          "name": "Frutas en conserva"
+        },
+        {
           "id": "frutillas-en-lata",
           "name": "Frutillas en lata"
+        },
+        {
+          "id": "higos-en-almibar",
+          "name": "Higos en almíbar"
         },
         {
           "id": "peras-en-lata",
@@ -3106,7 +2618,7 @@
       "productTypes": [
         {
           "id": "frutas-con-chocolate",
-          "name": "Frutas con chocolate"
+          "name": "Frutas congeladas con chocolate"
         }
       ]
     },
@@ -3115,16 +2627,8 @@
       "name": "Frutas congeladas",
       "productTypes": [
         {
-          "id": "frambuesas-congeladas",
-          "name": "Frambuesas congeladas"
-        },
-        {
           "id": "mix-de-frutos-rojos-congelados",
-          "name": "Mix de frutos rojos congelados"
-        },
-        {
-          "id": "moras-congeladas",
-          "name": "Moras congeladas"
+          "name": "Frutas congeladas"
         }
       ]
     },
@@ -3135,10 +2639,6 @@
         {
           "id": "frutilla",
           "name": "Frutilla"
-        },
-        {
-          "id": "frutillas-congeladas",
-          "name": "Frutillas congeladas"
         }
       ]
     },
@@ -3163,12 +2663,8 @@
           "name": "Mix de frutos secos"
         },
         {
-          "id": "nueces-con-cascara",
-          "name": "Nueces con cáscara"
-        },
-        {
           "id": "nueces-peladas",
-          "name": "Nueces peladas"
+          "name": "Nueces"
         },
         {
           "id": "pistachos",
@@ -3191,20 +2687,12 @@
       "name": "Galletitas",
       "productTypes": [
         {
-          "id": "crackers",
-          "name": "Crackers"
-        },
-        {
-          "id": "galletas-marineras",
-          "name": "Galletas marineras"
-        },
-        {
           "id": "galletitas-con-semillas",
           "name": "Galletitas con semillas"
         },
         {
-          "id": "galletitas-de-agua",
-          "name": "Galletitas de agua"
+          "id": "crackers",
+          "name": "Galletitas de agua o saladas"
         },
         {
           "id": "galletitas-de-hojaldre",
@@ -3219,10 +2707,6 @@
           "name": "Galletitas dulces"
         },
         {
-          "id": "galletitas-saladas",
-          "name": "Galletitas saladas"
-        },
-        {
           "id": "pepas",
           "name": "Pepas"
         }
@@ -3233,12 +2717,8 @@
       "name": "Garbanzos",
       "productTypes": [
         {
-          "id": "garbanzos-en-lata",
-          "name": "Garbanzos en lata"
-        },
-        {
           "id": "garbanzos-secos",
-          "name": "Garbanzos secos"
+          "name": "Garbanzos"
         }
       ]
     },
@@ -3272,7 +2752,7 @@
       "productTypes": [
         {
           "id": "gel-para-masajes",
-          "name": "Gel para masajes"
+          "name": "Gel o aceite para masajes"
         }
       ]
     },
@@ -3319,10 +2799,6 @@
           "name": "Caramelos"
         },
         {
-          "id": "caramelos-masticables",
-          "name": "Caramelos masticables"
-        },
-        {
           "id": "chicle",
           "name": "Chicle"
         },
@@ -3335,6 +2811,10 @@
           "name": "Confites"
         },
         {
+          "id": "mani-con-chocolate",
+          "name": "Frutos secos con chocolate"
+        },
+        {
           "id": "garrapinada",
           "name": "Garrapiñada"
         },
@@ -3343,20 +2823,8 @@
           "name": "Gomitas"
         },
         {
-          "id": "grageas",
-          "name": "Grageas"
-        },
-        {
           "id": "malvaviscos",
           "name": "Malvaviscos"
-        },
-        {
-          "id": "mani-con-chocolate",
-          "name": "Maní con chocolate"
-        },
-        {
-          "id": "pasas-de-uva-con-chocolate",
-          "name": "Pasas de uva con chocolate"
         },
         {
           "id": "pastillas",
@@ -3493,10 +2961,6 @@
           "name": "Hamburguesa de pollo"
         },
         {
-          "id": "hamburguesa-vegana",
-          "name": "Hamburguesa vegana"
-        },
-        {
           "id": "medallon-vegetal",
           "name": "Medallón vegetal"
         }
@@ -3595,10 +3059,6 @@
           "name": "Harina leudante"
         },
         {
-          "id": "harina-para-pizza",
-          "name": "Harina para pizza"
-        },
-        {
           "id": "harina-proteica",
           "name": "Harina proteica"
         }
@@ -3619,10 +3079,6 @@
         {
           "id": "postre-helado",
           "name": "Postre helado"
-        },
-        {
-          "id": "yogur-helado",
-          "name": "Yogur helado"
         }
       ]
     },
@@ -3714,23 +3170,11 @@
       "productTypes": [
         {
           "id": "champignones",
-          "name": "Champignones"
-        },
-        {
-          "id": "champignones-enlatados",
-          "name": "Champignones enlatados"
-        },
-        {
-          "id": "girgolas",
-          "name": "Gírgolas"
+          "name": "Hongos"
         },
         {
           "id": "hongos-secos",
           "name": "Hongos secos"
-        },
-        {
-          "id": "portobello",
-          "name": "Portobello"
         }
       ]
     },
@@ -3748,11 +3192,7 @@
         },
         {
           "id": "huevos-blancos",
-          "name": "Huevos blancos"
-        },
-        {
-          "id": "huevos-color",
-          "name": "Huevos color"
+          "name": "Huevos"
         },
         {
           "id": "huevos-de-codorniz",
@@ -3776,11 +3216,7 @@
       "productTypes": [
         {
           "id": "humo-liquido",
-          "name": "Humo líquido"
-        },
-        {
-          "id": "humo-solido",
-          "name": "Humo sólido"
+          "name": "Humo"
         }
       ]
     },
@@ -3809,6 +3245,10 @@
       "name": "Insecticida",
       "productTypes": [
         {
+          "id": "insecticida-para-polillas",
+          "name": "Antipolillas"
+        },
+        {
           "id": "cebo-insecticida",
           "name": "Cebo insecticida"
         },
@@ -3829,10 +3269,6 @@
           "name": "Insecticida para moscas y mosquitos"
         },
         {
-          "id": "insecticida-para-polillas",
-          "name": "Insecticida para polillas"
-        },
-        {
           "id": "insecticida-para-pulgas",
           "name": "Insecticida para pulgas"
         }
@@ -3845,10 +3281,6 @@
         {
           "id": "jabon-en-barra",
           "name": "Jabón en barra"
-        },
-        {
-          "id": "jabon-en-espuma",
-          "name": "Jabón en espuma"
         },
         {
           "id": "jabon-liquido",
@@ -3922,7 +3354,17 @@
       "productTypes": [
         {
           "id": "jardinera",
-          "name": "Jardinera"
+          "name": "Jardinera o mix de verduras"
+        }
+      ]
+    },
+    {
+      "id": "grupo-jengibre",
+      "name": "Jengibre",
+      "productTypes": [
+        {
+          "id": "jengibre-fresco",
+          "name": "Jengibre fresco"
         }
       ]
     },
@@ -3941,16 +3383,12 @@
       "name": "Jugo",
       "productTypes": [
         {
+          "id": "jugo-listo",
+          "name": "Jugo"
+        },
+        {
           "id": "jugo-en-polvo",
           "name": "Jugo en polvo"
-        },
-        {
-          "id": "jugo-listo",
-          "name": "Jugo listo"
-        },
-        {
-          "id": "jugo-natural",
-          "name": "Jugo natural"
         }
       ]
     },
@@ -4033,8 +3471,8 @@
       "name": "Lasagna",
       "productTypes": [
         {
-          "id": "lasagna-congelada",
-          "name": "Lasagna congelada"
+          "id": "lasagna",
+          "name": "Lasagna lista"
         },
         {
           "id": "tapas-para-lasagna",
@@ -4059,10 +3497,6 @@
         {
           "id": "lavandina",
           "name": "Lavandina"
-        },
-        {
-          "id": "lavandina-en-gel",
-          "name": "Lavandina en gel"
         }
       ]
     },
@@ -4070,6 +3504,10 @@
       "id": "grupo-leche",
       "name": "Leche",
       "productTypes": [
+        {
+          "id": "bebida-lactea",
+          "name": "Bebida láctea"
+        },
         {
           "id": "leche-chocolatada",
           "name": "Leche chocolatada"
@@ -4149,28 +3587,8 @@
           "name": "Lechuga"
         },
         {
-          "id": "lechuga-capuchina",
-          "name": "Lechuga capuchina"
-        },
-        {
-          "id": "lechuga-criolla",
-          "name": "Lechuga criolla"
-        },
-        {
           "id": "lechuga-escarola",
           "name": "Lechuga escarola"
-        },
-        {
-          "id": "lechuga-francesa",
-          "name": "Lechuga francesa"
-        },
-        {
-          "id": "lechuga-mantecosa",
-          "name": "Lechuga mantecosa"
-        },
-        {
-          "id": "lechuga-morada",
-          "name": "Lechuga morada"
         }
       ]
     },
@@ -4179,16 +3597,8 @@
       "name": "Lentejas",
       "productTypes": [
         {
-          "id": "lentejas-en-lata",
-          "name": "Lentejas en lata"
-        },
-        {
           "id": "lentejas-secas",
-          "name": "Lentejas secas"
-        },
-        {
-          "id": "lentejones",
-          "name": "Lentejones"
+          "name": "Lentejas"
         }
       ]
     },
@@ -4208,11 +3618,7 @@
       "productTypes": [
         {
           "id": "levadura-fresca",
-          "name": "Levadura fresca"
-        },
-        {
-          "id": "levadura-seca",
-          "name": "Levadura seca"
+          "name": "Levadura"
         }
       ]
     },
@@ -4247,22 +3653,12 @@
       ]
     },
     {
-      "id": "grupo-limonada",
-      "name": "Limonada",
-      "productTypes": [
-        {
-          "id": "limonada",
-          "name": "Limonada"
-        }
-      ]
-    },
-    {
       "id": "grupo-limpiador",
       "name": "Limpiador",
       "productTypes": [
         {
           "id": "limpiador-cremoso",
-          "name": "Limpiador cremoso"
+          "name": "Limpiador cremoso o en polvo"
         },
         {
           "id": "limpiador-de-alfombras",
@@ -4271,14 +3667,6 @@
         {
           "id": "limpiador-de-pisos",
           "name": "Limpiador de pisos"
-        },
-        {
-          "id": "limpiador-en-gel",
-          "name": "Limpiador en gel"
-        },
-        {
-          "id": "limpiador-en-polvo",
-          "name": "Limpiador en polvo"
         },
         {
           "id": "limpiador-multiuso",
@@ -4303,10 +3691,6 @@
         {
           "id": "limpiador-para-vidrios",
           "name": "Limpiador para vidrios"
-        },
-        {
-          "id": "quitasarro",
-          "name": "Quitasarro"
         }
       ]
     },
@@ -4314,10 +3698,6 @@
       "id": "grupo-limpiador-de-inodoro",
       "name": "Limpiador de inodoro",
       "productTypes": [
-        {
-          "id": "adhesivo-para-inodoro",
-          "name": "Adhesivo para inodoro"
-        },
         {
           "id": "gel-para-inodoro",
           "name": "Gel para inodoro"
@@ -4417,10 +3797,6 @@
           "name": "Maíz blanco pisado"
         },
         {
-          "id": "maiz-pisado",
-          "name": "Maíz colorado pisado"
-        },
-        {
           "id": "maiz-pisingallo",
           "name": "Maíz pisingallo"
         }
@@ -4517,10 +3893,6 @@
           "name": "Accesorios de maquillaje"
         },
         {
-          "id": "brillo-labial",
-          "name": "Brillo labial"
-        },
-        {
           "id": "corrector-de-ojeras",
           "name": "Corrector de ojeras"
         },
@@ -4529,7 +3901,7 @@
           "name": "Delineador de ojos"
         },
         {
-          "id": "labial",
+          "id": "brillo-labial",
           "name": "Labial"
         },
         {
@@ -4571,24 +3943,12 @@
           "name": "Almejas"
         },
         {
-          "id": "anillas-de-calamar",
-          "name": "Anillas de calamar"
-        },
-        {
           "id": "berberechos",
           "name": "Berberechos"
         },
         {
           "id": "calamar",
           "name": "Calamar"
-        },
-        {
-          "id": "camarones",
-          "name": "Camarones"
-        },
-        {
-          "id": "cazuela-de-mariscos",
-          "name": "Cazuela de mariscos"
         },
         {
           "id": "gambas-al-ajillo",
@@ -4601,10 +3961,6 @@
         {
           "id": "mejillones",
           "name": "Mejillones"
-        },
-        {
-          "id": "mejillones-en-escabeche",
-          "name": "Mejillones en escabeche"
         },
         {
           "id": "mejillones-en-lata",
@@ -4687,20 +4043,8 @@
       "name": "Melón",
       "productTypes": [
         {
-          "id": "melon-amarillo",
-          "name": "Melón amarillo"
-        },
-        {
           "id": "melon-blanco",
-          "name": "Melón blanco"
-        },
-        {
-          "id": "melon-negro",
-          "name": "Melón negro"
-        },
-        {
-          "id": "melon-scripto",
-          "name": "Melón scripto"
+          "name": "Melón"
         }
       ]
     },
@@ -4753,10 +4097,6 @@
       "name": "Mermelada",
       "productTypes": [
         {
-          "id": "jalea",
-          "name": "Jalea"
-        },
-        {
           "id": "mermelada",
           "name": "Mermelada"
         }
@@ -4777,10 +4117,6 @@
       "name": "Milanesa",
       "productTypes": [
         {
-          "id": "milanesa-de-bola-de-lomo",
-          "name": "Milanesa de bola de lomo"
-        },
-        {
           "id": "milanesa-de-carne",
           "name": "Milanesa de carne"
         },
@@ -4789,27 +4125,11 @@
           "name": "Milanesa de cerdo"
         },
         {
-          "id": "milanesa-de-cuadrada",
-          "name": "Milanesa de cuadrada"
-        },
-        {
-          "id": "milanesa-de-merluza",
-          "name": "Milanesa de merluza"
-        },
-        {
-          "id": "milanesa-de-nalga",
-          "name": "Milanesa de nalga"
-        },
-        {
           "id": "milanesa-de-pollo",
           "name": "Milanesa de pollo"
         },
         {
           "id": "milanesa-de-soja",
-          "name": "Milanesa de soja"
-        },
-        {
-          "id": "milanesa-vegetal",
           "name": "Milanesa vegetal"
         }
       ]
@@ -4889,10 +4209,6 @@
         {
           "id": "mostaza",
           "name": "Mostaza"
-        },
-        {
-          "id": "mostaza-dijon",
-          "name": "Mostaza dijón"
         }
       ]
     },
@@ -4903,16 +4219,6 @@
         {
           "id": "mousse-para-el-pelo",
           "name": "Mousse para el pelo"
-        }
-      ]
-    },
-    {
-      "id": "grupo-muffin",
-      "name": "Muffin",
-      "productTypes": [
-        {
-          "id": "muffin",
-          "name": "Muffin"
         }
       ]
     },
@@ -4931,12 +4237,8 @@
       "name": "Naranja",
       "productTypes": [
         {
-          "id": "naranja-de-jugo",
-          "name": "Naranja de jugo"
-        },
-        {
           "id": "naranja-de-ombligo",
-          "name": "Naranja de ombligo"
+          "name": "Naranja"
         }
       ]
     },
@@ -4945,12 +4247,8 @@
       "name": "Nuez moscada",
       "productTypes": [
         {
-          "id": "nuez-moscada-entera",
-          "name": "Nuez moscada entera"
-        },
-        {
           "id": "nuez-moscada-molida",
-          "name": "Nuez moscada molida"
+          "name": "Nuez moscada"
         }
       ]
     },
@@ -4964,7 +4262,7 @@
         },
         {
           "id": "nuggets-de-pollo",
-          "name": "Nuggets de pollo"
+          "name": "Nuggets o medallones de pollo"
         }
       ]
     },
@@ -4975,16 +4273,6 @@
         {
           "id": "oregano",
           "name": "Orégano"
-        }
-      ]
-    },
-    {
-      "id": "grupo-paella",
-      "name": "Paella",
-      "productTypes": [
-        {
-          "id": "paella",
-          "name": "Paella"
         }
       ]
     },
@@ -5057,20 +4345,12 @@
       "name": "Pan",
       "productTypes": [
         {
-          "id": "baguette",
-          "name": "Baguette"
-        },
-        {
           "id": "bollitos",
           "name": "Bollitos"
         },
         {
           "id": "pan-ciabatta",
           "name": "Pan ciabatta"
-        },
-        {
-          "id": "pan-congelado",
-          "name": "Pan congelado"
         },
         {
           "id": "pan-de-ajo",
@@ -5091,10 +4371,6 @@
         {
           "id": "pan-lactal-integral",
           "name": "Pan lactal integral"
-        },
-        {
-          "id": "pan-lactal-multicereal",
-          "name": "Pan lactal multicereal"
         }
       ]
     },
@@ -5195,10 +4471,6 @@
         {
           "id": "panceta",
           "name": "Panceta"
-        },
-        {
-          "id": "panceta-salada",
-          "name": "Panceta salada"
         }
       ]
     },
@@ -5219,10 +4491,6 @@
         {
           "id": "panal-para-adulto",
           "name": "Pañal para adulto"
-        },
-        {
-          "id": "ropa-interior-para-incontinencia",
-          "name": "Ropa interior para incontinencia"
         },
         {
           "id": "toalla-para-incontinencia",
@@ -5269,14 +4537,6 @@
         {
           "id": "papa",
           "name": "Papa"
-        },
-        {
-          "id": "papa-negra",
-          "name": "Papa negra"
-        },
-        {
-          "id": "papines-andinos",
-          "name": "Papines andinos"
         }
       ]
     },
@@ -5286,11 +4546,7 @@
       "productTypes": [
         {
           "id": "papas-fritas-congeladas",
-          "name": "Papas fritas congeladas"
-        },
-        {
-          "id": "papas-noisette",
-          "name": "Papas noisette"
+          "name": "Papas congeladas"
         }
       ]
     },
@@ -5315,10 +4571,16 @@
         {
           "id": "papel-higienico-simple",
           "name": "Papel higiénico simple"
-        },
+        }
+      ]
+    },
+    {
+      "id": "grupo-papel-para-armar",
+      "name": "Papel para armar",
+      "productTypes": [
         {
-          "id": "papel-higienico-triple",
-          "name": "Papel higiénico triple"
+          "id": "papel-para-armar",
+          "name": "Papel para armar"
         }
       ]
     },
@@ -5382,11 +4644,7 @@
       "productTypes": [
         {
           "id": "pasta-de-aceitunas",
-          "name": "Pasta de aceitunas"
-        },
-        {
-          "id": "pasta-de-vegetales",
-          "name": "Pasta de vegetales"
+          "name": "Pasta para untar"
         }
       ]
     },
@@ -5401,20 +4659,6 @@
       ]
     },
     {
-      "id": "grupo-pastas-congeladas",
-      "name": "Pastas congeladas",
-      "productTypes": [
-        {
-          "id": "canelones-congelados",
-          "name": "Canelones congelados"
-        },
-        {
-          "id": "fideos-orientales",
-          "name": "Fideos orientales"
-        }
-      ]
-    },
-    {
       "id": "grupo-pasta-fresca",
       "name": "Pastas frescas",
       "productTypes": [
@@ -5423,20 +4667,12 @@
           "name": "Capeletis"
         },
         {
-          "id": "fagotinos",
-          "name": "Fagotinos"
-        },
-        {
           "id": "fideos-frescos",
           "name": "Fideos frescos"
         },
         {
           "id": "noquis",
           "name": "Ñoquis"
-        },
-        {
-          "id": "panzottis",
-          "name": "Panzottis"
         },
         {
           "id": "ravioles",
@@ -5449,10 +4685,6 @@
         {
           "id": "sorrentinos",
           "name": "Sorrentinos"
-        },
-        {
-          "id": "tortelettis",
-          "name": "Tortelettis"
         }
       ]
     },
@@ -5466,7 +4698,7 @@
         },
         {
           "id": "pate-de-foie",
-          "name": "Paté de foie"
+          "name": "Paté o leberwurst"
         }
       ]
     },
@@ -5526,7 +4758,7 @@
       "productTypes": [
         {
           "id": "perejil-deshidratado",
-          "name": "Perejil deshidratado"
+          "name": "Perejil"
         }
       ]
     },
@@ -5537,10 +4769,6 @@
         {
           "id": "body-splash",
           "name": "Body splash"
-        },
-        {
-          "id": "colonia",
-          "name": "Colonia"
         },
         {
           "id": "perfume",
@@ -5601,10 +4829,6 @@
           "name": "Lisa"
         },
         {
-          "id": "medallon-de-pescado",
-          "name": "Medallón de pescado"
-        },
-        {
           "id": "mero",
           "name": "Mero"
         },
@@ -5655,20 +4879,12 @@
       "name": "Pescado rebozado",
       "productTypes": [
         {
-          "id": "bastones-de-merluza",
-          "name": "Bastones de merluza"
-        },
-        {
-          "id": "filet-de-merluza-rebozado",
-          "name": "Filet de merluza rebozado"
+          "id": "medallon-de-salmon",
+          "name": "Medallón de salmón"
         },
         {
           "id": "medallon-de-merluza",
-          "name": "Medallón de merluza"
-        },
-        {
-          "id": "medallon-de-salmon",
-          "name": "Medallón de salmón"
+          "name": "Merluza rebozada"
         }
       ]
     },
@@ -5677,12 +4893,8 @@
       "name": "Pesto",
       "productTypes": [
         {
-          "id": "pesto-deshidratado",
-          "name": "Pesto deshidratado"
-        },
-        {
           "id": "salsa-pesto",
-          "name": "Salsa pesto"
+          "name": "Pesto"
         }
       ]
     },
@@ -5705,14 +4917,6 @@
           "name": "Pepinillos en vinagre"
         },
         {
-          "id": "pepinos-agridulces",
-          "name": "Pepinos agridulces"
-        },
-        {
-          "id": "pepinos-condimentados",
-          "name": "Pepinos condimentados"
-        },
-        {
           "id": "pickles",
           "name": "Pickles"
         }
@@ -5733,12 +4937,8 @@
       "name": "Pimienta",
       "productTypes": [
         {
-          "id": "pimienta-blanca",
-          "name": "Pimienta blanca"
-        },
-        {
           "id": "pimienta-negra",
-          "name": "Pimienta negra"
+          "name": "Pimienta"
         },
         {
           "id": "pimienta-saborizada",
@@ -5795,16 +4995,8 @@
       "name": "Pizza",
       "productTypes": [
         {
-          "id": "palita",
-          "name": "Palita"
-        },
-        {
-          "id": "pizza",
-          "name": "Pizza"
-        },
-        {
           "id": "pizza-congelada",
-          "name": "Pizza congelada"
+          "name": "Pizza"
         },
         {
           "id": "prepizza",
@@ -5865,16 +5057,8 @@
           "name": "Arrolladito de pollo"
         },
         {
-          "id": "cuarto-trasero-de-pollo",
-          "name": "Cuarto trasero de pollo"
-        },
-        {
-          "id": "muslo-de-pollo",
-          "name": "Muslo de pollo"
-        },
-        {
           "id": "pata-de-pollo",
-          "name": "Pata de pollo"
+          "name": "Pata y muslo de pollo"
         },
         {
           "id": "pechuga-de-pollo",
@@ -5891,10 +5075,6 @@
         {
           "id": "presas-de-pollo-surtidas",
           "name": "Presas de pollo surtidas"
-        },
-        {
-          "id": "suprema-de-pollo",
-          "name": "Suprema de pollo"
         }
       ]
     },
@@ -6033,6 +5213,10 @@
         {
           "id": "mousse-en-polvo",
           "name": "Mousse en polvo"
+        },
+        {
+          "id": "postre-en-polvo",
+          "name": "Postre en polvo"
         }
       ]
     },
@@ -6043,10 +5227,6 @@
         {
           "id": "premezcla-dulce",
           "name": "Premezcla dulce"
-        },
-        {
-          "id": "premezcla-para-albondigas",
-          "name": "Premezcla para albóndigas"
         },
         {
           "id": "premezcla-para-bizcochuelo",
@@ -6142,15 +5322,11 @@
         },
         {
           "id": "polvo-para-lavavajillas",
-          "name": "Polvo para lavavajillas"
+          "name": "Detergente para máquina lavavajillas"
         },
         {
           "id": "sal-para-lavavajillas",
           "name": "Sal para lavavajillas"
-        },
-        {
-          "id": "tabletas-para-lavavajillas",
-          "name": "Tabletas para lavavajillas"
         }
       ]
     },
@@ -6249,14 +5425,6 @@
       "name": "Queso",
       "productTypes": [
         {
-          "id": "alimento-a-base-de-queso-rallado",
-          "name": "Alimento a base de queso rallado"
-        },
-        {
-          "id": "bocconcino",
-          "name": "Bocconcino"
-        },
-        {
           "id": "burrata",
           "name": "Burrata"
         },
@@ -6282,39 +5450,23 @@
         },
         {
           "id": "queso-brie",
-          "name": "Queso brie"
-        },
-        {
-          "id": "queso-camembert",
-          "name": "Queso camembert"
+          "name": "Queso brie o camembert"
         },
         {
           "id": "queso-cheddar",
           "name": "Queso cheddar"
         },
         {
-          "id": "queso-con-hierbas",
-          "name": "Queso con hierbas"
-        },
-        {
-          "id": "queso-crema",
-          "name": "Queso crema"
-        },
-        {
           "id": "queso-cremoso",
           "name": "Queso cremoso"
         },
         {
-          "id": "queso-cuartirolo",
-          "name": "Queso cuartirolo"
-        },
-        {
-          "id": "queso-danbo",
-          "name": "Queso danbo"
-        },
-        {
           "id": "queso-de-cabra",
           "name": "Queso de cabra"
+        },
+        {
+          "id": "queso-tybo",
+          "name": "Queso de máquina"
         },
         {
           "id": "queso-duro",
@@ -6323,10 +5475,6 @@
         {
           "id": "queso-emmental",
           "name": "Queso emmental"
-        },
-        {
-          "id": "queso-en-fetas",
-          "name": "Queso en fetas"
         },
         {
           "id": "queso-en-hebras",
@@ -6339,10 +5487,6 @@
         {
           "id": "queso-fontina",
           "name": "Queso fontina"
-        },
-        {
-          "id": "queso-fynbo",
-          "name": "Queso fynbo"
         },
         {
           "id": "queso-gouda",
@@ -6365,10 +5509,6 @@
           "name": "Queso mascarpone"
         },
         {
-          "id": "queso-parmesano",
-          "name": "Queso parmesano"
-        },
-        {
           "id": "queso-pategras",
           "name": "Queso pategrás"
         },
@@ -6381,10 +5521,6 @@
           "name": "Queso pimentino"
         },
         {
-          "id": "queso-port-salut",
-          "name": "Queso port salut"
-        },
-        {
           "id": "queso-provolone",
           "name": "Queso provolone"
         },
@@ -6394,7 +5530,7 @@
         },
         {
           "id": "queso-reggianito",
-          "name": "Queso reggianito"
+          "name": "Queso reggianito o parmesano"
         },
         {
           "id": "queso-sardo",
@@ -6407,10 +5543,6 @@
         {
           "id": "queso-tandil",
           "name": "Queso tandil"
-        },
-        {
-          "id": "queso-tybo",
-          "name": "Queso tybo"
         },
         {
           "id": "queso-untable",
@@ -6657,16 +5789,6 @@
       ]
     },
     {
-      "id": "grupo-rosca-polaca",
-      "name": "Rosca polaca",
-      "productTypes": [
-        {
-          "id": "rosca-polaca",
-          "name": "Rosca polaca"
-        }
-      ]
-    },
-    {
       "id": "grupo-rucula",
       "name": "Rúcula",
       "productTypes": [
@@ -6683,10 +5805,6 @@
         {
           "id": "saborizador",
           "name": "Saborizador"
-        },
-        {
-          "id": "saborizador-en-cubo",
-          "name": "Saborizador en cubo"
         }
       ]
     },
@@ -6695,16 +5813,8 @@
       "name": "Sal",
       "productTypes": [
         {
-          "id": "sal-del-himalaya",
-          "name": "Sal del himalaya"
-        },
-        {
           "id": "sal-dietetica",
           "name": "Sal dietética"
-        },
-        {
-          "id": "sal-entrefina",
-          "name": "Sal entrefina"
         },
         {
           "id": "sal-fina",
@@ -6731,10 +5841,6 @@
         {
           "id": "salame",
           "name": "Salame"
-        },
-        {
-          "id": "salamin",
-          "name": "Salamín"
         }
       ]
     },
@@ -6743,12 +5849,12 @@
       "name": "Salchicha",
       "productTypes": [
         {
-          "id": "salchicha",
-          "name": "Salchicha"
+          "id": "rosca-polaca",
+          "name": "Rosca polaca"
         },
         {
-          "id": "salchicha-alemana",
-          "name": "Salchicha alemana"
+          "id": "salchicha",
+          "name": "Salchicha"
         },
         {
           "id": "salchicha-parrillera",
@@ -6757,6 +5863,16 @@
         {
           "id": "salchicha-vegana",
           "name": "Salchicha vegana"
+        }
+      ]
+    },
+    {
+      "id": "grupo-salmon",
+      "name": "Salmón",
+      "productTypes": [
+        {
+          "id": "salmon-ahumado",
+          "name": "Salmón ahumado"
         }
       ]
     },
@@ -6778,7 +5894,7 @@
         },
         {
           "id": "salsa-cheddar",
-          "name": "Salsa cheddar"
+          "name": "Salsa cheddar o de queso"
         },
         {
           "id": "salsa-curry",
@@ -6799,10 +5915,6 @@
         {
           "id": "salsa-de-pistacho",
           "name": "Salsa de pistacho"
-        },
-        {
-          "id": "salsa-de-queso",
-          "name": "Salsa de queso"
         },
         {
           "id": "salsa-malbec",
@@ -6837,16 +5949,8 @@
           "name": "Salsa bolognesa"
         },
         {
-          "id": "salsa-de-tomate-en-polvo",
-          "name": "Salsa de tomate en polvo"
-        },
-        {
           "id": "salsa-de-tomate-lista",
           "name": "Salsa de tomate lista"
-        },
-        {
-          "id": "salsa-para-pizza",
-          "name": "Salsa para pizza"
         },
         {
           "id": "tuco-de-mariscos",
@@ -6891,10 +5995,6 @@
         {
           "id": "salsa-inglesa",
           "name": "Salsa inglesa"
-        },
-        {
-          "id": "salsa-provenzal",
-          "name": "Salsa provenzal"
         }
       ]
     },
@@ -6915,10 +6015,6 @@
         {
           "id": "salsa-picante",
           "name": "Salsa picante"
-        },
-        {
-          "id": "salsa-sweet-chili",
-          "name": "Salsa sweet chili"
         }
       ]
     },
@@ -6929,14 +6025,6 @@
         {
           "id": "salvado",
           "name": "Salvado"
-        },
-        {
-          "id": "salvado-de-avena",
-          "name": "Salvado de avena"
-        },
-        {
-          "id": "salvado-de-trigo",
-          "name": "Salvado de trigo"
         }
       ]
     },
@@ -7005,6 +6093,10 @@
         {
           "id": "secador-de-piso",
           "name": "Secador de piso"
+        },
+        {
+          "id": "secador-de-vidrios",
+          "name": "Secador de vidrios"
         }
       ]
     },
@@ -7167,10 +6259,6 @@
         {
           "id": "oblea",
           "name": "Oblea"
-        },
-        {
-          "id": "trufas",
-          "name": "Trufas"
         }
       ]
     },
@@ -7179,20 +6267,12 @@
       "name": "Snack salado",
       "productTypes": [
         {
-          "id": "chalitas",
-          "name": "Chalitas"
-        },
-        {
           "id": "chips-de-batata",
           "name": "Chips de batata"
         },
         {
           "id": "chips-de-mandioca",
           "name": "Chips de mandioca"
-        },
-        {
-          "id": "conitos-de-maiz",
-          "name": "Conitos de maíz"
         },
         {
           "id": "maiz-frito",
@@ -7207,10 +6287,6 @@
           "name": "Nachos"
         },
         {
-          "id": "palitos-de-maiz",
-          "name": "Palitos de maíz"
-        },
-        {
           "id": "palitos-salados",
           "name": "Palitos salados"
         },
@@ -7219,16 +6295,8 @@
           "name": "Papas fritas"
         },
         {
-          "id": "papas-pay",
-          "name": "Papas pay"
-        },
-        {
           "id": "pochoclo",
           "name": "Pochoclo"
-        },
-        {
-          "id": "pretzels",
-          "name": "Pretzels"
         },
         {
           "id": "snack-de-arroz",
@@ -7241,16 +6309,6 @@
         {
           "id": "snacks",
           "name": "Snacks"
-        }
-      ]
-    },
-    {
-      "id": "grupo-soda",
-      "name": "Soda",
-      "productTypes": [
-        {
-          "id": "soda",
-          "name": "Soda"
         }
       ]
     },
@@ -7325,10 +6383,6 @@
         {
           "id": "talco-corporal",
           "name": "Talco corporal"
-        },
-        {
-          "id": "talco-pedico",
-          "name": "Talco pédico"
         }
       ]
     },
@@ -7355,10 +6409,6 @@
           "name": "Masa para arrolladitos"
         },
         {
-          "id": "tapas-para-copetin",
-          "name": "Tapas para copetín"
-        },
-        {
           "id": "tapas-para-empanadas",
           "name": "Tapas para empanadas"
         },
@@ -7369,16 +6419,6 @@
         {
           "id": "tapas-para-pastelitos",
           "name": "Tapas para pastelitos"
-        }
-      ]
-    },
-    {
-      "id": "grupo-tapas-de-merengue",
-      "name": "Tapas de merengue",
-      "productTypes": [
-        {
-          "id": "tapas-de-merengue",
-          "name": "Tapas de merengue"
         }
       ]
     },
@@ -7397,20 +6437,12 @@
       "name": "Tarta",
       "productTypes": [
         {
-          "id": "lemon-pie",
-          "name": "Lemon pie"
+          "id": "tarta-dulce",
+          "name": "Tarta dulce"
         },
         {
-          "id": "tarta-congelada",
-          "name": "Tarta congelada"
-        },
-        {
-          "id": "tarta-de-manzana",
-          "name": "Tarta de manzana"
-        },
-        {
-          "id": "tarta-de-ricota",
-          "name": "Tarta de ricota"
+          "id": "tarta-salada",
+          "name": "Tarta salada"
         }
       ]
     },
@@ -7545,10 +6577,6 @@
       "name": "Toallitas húmedas",
       "productTypes": [
         {
-          "id": "toallitas-antibacteriales",
-          "name": "Toallitas antibacteriales"
-        },
-        {
           "id": "toallitas-desmaquillantes",
           "name": "Toallitas desmaquillantes"
         },
@@ -7585,16 +6613,8 @@
           "name": "Extracto de tomate"
         },
         {
-          "id": "pulpa-de-tomate",
-          "name": "Pulpa de tomate"
-        },
-        {
           "id": "pure-de-tomate",
-          "name": "Puré de tomate"
-        },
-        {
-          "id": "tomate-perita",
-          "name": "Tomate perita"
+          "name": "Tomate triturado"
         },
         {
           "id": "tomates-secos",
@@ -7665,16 +6685,8 @@
       "name": "Tratamiento capilar",
       "productTypes": [
         {
-          "id": "aceite-para-el-pelo",
-          "name": "Aceite para el pelo"
-        },
-        {
           "id": "ampolla-capilar",
           "name": "Ampolla capilar"
-        },
-        {
-          "id": "bano-de-crema",
-          "name": "Baño de crema"
         },
         {
           "id": "locion-capilar",
@@ -7737,12 +6749,8 @@
       "name": "Uva",
       "productTypes": [
         {
-          "id": "uva-blanca",
-          "name": "Uva blanca"
-        },
-        {
           "id": "uva-roja",
-          "name": "Uva roja"
+          "name": "Uva"
         }
       ]
     },
@@ -7763,10 +6771,6 @@
         {
           "id": "vegetales-cortados",
           "name": "Vegetales cortados"
-        },
-        {
-          "id": "verdura-para-sopa",
-          "name": "Verdura para sopa"
         }
       ]
     },
@@ -7787,16 +6791,6 @@
         {
           "id": "velas",
           "name": "Velas"
-        }
-      ]
-    },
-    {
-      "id": "grupo-verduras-congeladas",
-      "name": "Verduras congeladas",
-      "productTypes": [
-        {
-          "id": "mix-de-verduras-congeladas",
-          "name": "Mix de verduras congeladas"
         }
       ]
     },
@@ -7844,22 +6838,6 @@
       "id": "grupo-vino",
       "name": "Vino",
       "productTypes": [
-        {
-          "id": "jerez",
-          "name": "Jerez"
-        },
-        {
-          "id": "marsala",
-          "name": "Marsala"
-        },
-        {
-          "id": "moscato",
-          "name": "Moscato"
-        },
-        {
-          "id": "oporto",
-          "name": "Oporto"
-        },
         {
           "id": "vino-blanco",
           "name": "Vino blanco"
@@ -7977,12 +6955,8 @@
       "name": "Zapallito",
       "productTypes": [
         {
-          "id": "zapallito-largo",
-          "name": "Zapallito largo"
-        },
-        {
           "id": "zapallito-redondo",
-          "name": "Zapallito redondo"
+          "name": "Zapallito"
         }
       ]
     },
@@ -7993,10 +6967,6 @@
         {
           "id": "zapallo",
           "name": "Zapallo"
-        },
-        {
-          "id": "zapallo-anco",
-          "name": "Zapallo anco"
         }
       ]
     }

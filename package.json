@@ -18,7 +18,8 @@
     "seed:split": "tsx scripts/seed-split.ts",
     "seed:check-proposal": "tsx scripts/seed-check-proposal.ts",
     "seed:consolidate": "tsx scripts/seed-consolidate.ts",
-    "seed:coverage": "tsx scripts/seed-coverage.ts"
+    "seed:coverage": "tsx scripts/seed-coverage.ts",
+    "seed:doubts": "tsx scripts/seed-doubts.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
