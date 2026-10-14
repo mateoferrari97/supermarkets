@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The Online Store answers whether it delivers to a postal code: delivers, does not deliver, or postal code rejected; other errors propagate.
 - [x] The Carrefour adapter answers it from the regions endpoint, reusing the cached region for search; tested with recorded regions responses for a region with stores (1425), an empty region `SW#` ("C1425ABC") and a rejected postal code (400 `ORD006`, "abc").

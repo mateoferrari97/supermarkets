@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `split-order` returns no postal code, and an order text with "envío a 1425" gives no Item for it.
 - [x] The order's questions message never asks for the postal code, even when the order has none; the postal code question kind is removed from `map-answer`.

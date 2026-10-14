@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Know the Owner's postal code before any order
 
