@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Seed the Product Type tree and the Carrefour Tipo mapping
 

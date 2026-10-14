@@ -4,8 +4,12 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] All grocery Tipos are mapped or excluded per the coverage report.
+- [x] All grocery Tipos are mapped or excluded per the coverage report.
 - [ ] The Owner has skimmed the tree summary and applied any corrections.
-- [ ] `pnpm check` exits 0 and the vocabulary and mapping are committed.
+- [x] `pnpm check` exits 0 and the vocabulary and mapping are committed.
+
+## Comments
+
+Closed by the Owner without skimming the tree summary: the tree had already been through five reviewer passes and the Owner's answers to every doubt (see ticket 05). Coverage on the 2026-10-13 snapshot: 2,139 Tipos mapped, 64 excluded, none in doubt or unreviewed; vocabulary and mapping committed in 6030622. Corrections found later in real orders are applied as consolidation decisions.
