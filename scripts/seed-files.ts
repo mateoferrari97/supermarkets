@@ -17,6 +17,7 @@ const catalogSchema = z.object({
   products: z.array(
     z.object({
       name: z.string(),
+      brand: z.string().nullable().optional(),
       department: z.string(),
       availableQuantity: z.number(),
       seccion: z.string().nullable(),
