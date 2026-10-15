@@ -57,6 +57,9 @@ A cart link never sums quantities, and what happens to the cart already there de
 - The `resources` header holds the filter's total (`resources: 0-49/1655`). A page can hold fewer products than asked while more remain, so paging stops on the total, not on a short page.
 - The category tree comes from `GET /api/catalog_system/pub/category/tree/4`. Only one leaf exceeded the 2,550-product window on 2026-10-13; it was covered by sorting by name both ways.
 - Each product carries Carrefour's merchandise hierarchy (`EC_Sector`, `EC_Sección`, `EC_Grupo`, `EC_Familia`, `EC_Subfamilia`) and `Tipo de producto`.
+- Each item carries the Sale Step: `measurementUnit` is `kg` for a product sold by weight and `un` otherwise, and `unitMultiplier` is the step in kg ("Banana selección x kg.": `kg`, `0.5`; packaged products: `un`, `1`). Checked on 2026-10-15.
+- Each seller's `commertialOffer` carries `PromotionTeasers`, each with a `Name` and `Conditions.MinimumQuantity` ("Gaseosa cola Coca Cola sabor original 2,25 lts": "PROMO-2do al 50% Max 48 unidades Combinable COCA COLA-Reg-2-50-Aniv2 9 al 15.10", minimum quantity 2). `Teasers` holds the same teasers with keys such as `<Name>k__BackingField`. Checked on 2026-10-15.
+- `Gramaje de unidad de medida` and `Gramaje de unidad de consumo` give a packaged product's size (`CM3` `1500` is 1.5 l). A product sold by weight also has them (banana: `GRM` `1000.00`), so they are not its size. On 2026-10-13, 39,498 of 105,336 products had no `Gramaje de unidad de medida`; the units seen were `UNI`, `GRM`, `CM3`, `GRS`, `KGM`, `M21`, `LTR`, `ML`, `PAN`, `MTR`, `LM1`, `UN1`, `MIL`, `GR1` and `ML1`.
 - The full pass on 2026-10-13 gave 105,336 unique products, 15,180 with stock for seller 1, 5,486 Tipo values and 1,648 products without a Tipo.
 
 ## The grocery departments and Tipo
@@ -79,6 +82,7 @@ Recorded answers live in `src/adapters/carrefour/fixtures/` and are read by `src
 | `facets-query-gaseosa.json`, `facets-query-banana.json` | The Tipo slug found by a text query |
 | `facets-tipo-gaseosa.json` | The brand slugs inside a Tipo |
 | `search-gaseosa-coca-cola.json`, `search-gaseosa-coca-cola-pepsi.json` | A search by Tipo and one or two brands |
+| `catalog-search-coca-cola-banana.json` | Three products of the catalog search, trimmed to the fields the download reads: a packaged product with a teaser, a product sold by weight and a packaged product without teasers |
 | `search-banana.json` | A product sold by weight, with `unitMultiplier` |
 | `simulation-promotion.json` | A quantity promotion ("2do al 50%") at quantity 2 |
 | `simulation-unavailable.json` | An item with availability `cannotBeDelivered` |

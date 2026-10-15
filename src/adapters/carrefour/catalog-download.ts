@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Teaser } from "../../core/order-matching/catalog-product.ts";
 
 const BASE_URL = "https://www.carrefour.com.ar";
 const SELLER_ID = "1";
@@ -18,10 +19,16 @@ const categorySchema: z.ZodType<Category> = z.object({
   },
 });
 
+const teaserSchema = z.object({
+  Name: z.string(),
+  Conditions: z.object({ MinimumQuantity: z.number().nullish() }),
+});
+
 const offerSchema = z.object({
   Price: z.number(),
   ListPrice: z.number(),
   AvailableQuantity: z.number(),
+  PromotionTeasers: z.array(teaserSchema).nullish(),
 });
 
 const productSchema = z.looseObject({
@@ -33,6 +40,8 @@ const productSchema = z.looseObject({
     z.object({
       itemId: z.string(),
       ean: z.string().nullish(),
+      measurementUnit: z.string().nullish(),
+      unitMultiplier: z.number().nullish(),
       sellers: z.array(z.object({ sellerId: z.string(), commertialOffer: offerSchema })),
     }),
   ),
@@ -63,6 +72,9 @@ export type CatalogProduct = {
   consumptionQuantity: string | null;
   conversionFactor: string | null;
   unitPrice: string | null;
+  measurementUnit: string | null;
+  unitMultiplier: number | null;
+  teasers: Teaser[];
 };
 
 type Page = { products: RawProduct[]; total: number };
@@ -84,6 +96,8 @@ export type CatalogMeta = {
   uniqueProducts: number;
   availableProducts: number;
   productsWithoutTipo: number;
+  productsSoldByWeight: number;
+  productsWithTeasers: number;
   distinctTipos: number;
   productsByDepartment: Record<string, number>;
   incompleteCategories: { path: string; name: string; total: number; fetched: number }[];
@@ -218,7 +232,21 @@ function toProduct(raw: RawProduct, department: string): CatalogProduct {
     consumptionQuantity: specification(raw, "Gramaje de unidad de consumo"),
     conversionFactor: specification(raw, "Gramaje factor de conversión"),
     unitPrice: specification(raw, "Precio x unidad"),
+    measurementUnit: item?.measurementUnit ?? null,
+    unitMultiplier: item?.unitMultiplier ?? null,
+    teasers: (offer?.PromotionTeasers ?? []).flatMap((teaser) =>
+      typeof teaser.Conditions.MinimumQuantity === "number"
+        ? [{ name: teaser.Name, minimumQuantity: teaser.Conditions.MinimumQuantity }]
+        : [],
+    ),
   };
+}
+
+export function catalogProductsFrom(page: unknown, department: string): CatalogProduct[] {
+  return z
+    .array(productSchema)
+    .parse(page)
+    .map((raw) => toProduct(raw, department));
 }
 
 function increment(counts: Record<string, number>, key: string | null) {
@@ -294,6 +322,8 @@ export async function downloadCatalog(
     uniqueProducts: productList.length,
     availableProducts: productList.filter((product) => product.availableQuantity > 0).length,
     productsWithoutTipo: productList.filter((product) => product.tipo === null).length,
+    productsSoldByWeight: productList.filter((product) => product.measurementUnit === "kg").length,
+    productsWithTeasers: productList.filter((product) => product.teasers.length > 0).length,
     distinctTipos: new Set(productList.flatMap((product) => product.tipo ?? [])).size,
     productsByDepartment: sortedCounts(
       productList.reduce<Record<string, number>>((counts, product) => {

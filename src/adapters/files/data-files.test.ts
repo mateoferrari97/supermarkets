@@ -30,7 +30,11 @@ const vocabulary = {
   groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
 };
 
-const catalogProduct = (productId: string, department: string) => ({
+const catalogProduct = (
+  productId: string,
+  department: string,
+  fields: Record<string, unknown> = {},
+) => ({
   productId,
   skuIds: [`${productId}0`],
   name: `Yerba ${productId}`,
@@ -40,8 +44,13 @@ const catalogProduct = (productId: string, department: string) => ({
   seccion: null,
   familia: null,
   tipo: "Yerba",
+  price: 1000,
   measureUnit: null,
   consumptionQuantity: null,
+  measurementUnit: "un",
+  unitMultiplier: 1,
+  teasers: [],
+  ...fields,
 });
 
 beforeEach(() => {
@@ -142,6 +151,109 @@ describe("loadOrderFiles", () => {
       errors: [
         "No Catalog Snapshot at .data/carrefour/products.json. Run pnpm carrefour:catalog first.",
         'Tipo "Yerba" maps to unknown Product Type "mate"',
+      ],
+    });
+  });
+});
+
+describe("loadCatalogProducts", () => {
+  const load = (...products: unknown[]) => {
+    write(".data/carrefour/products.json", { products });
+    return createDataFiles(root).loadCatalogProducts();
+  };
+
+  it("reads a product sold by weight with its Sale Step and no size", () => {
+    const loaded = load(
+      catalogProduct("719074", "Frutas y verduras", {
+        name: "Banana selección x kg.",
+        tipo: "Banana",
+        price: 1999,
+        measureUnit: "GRM",
+        consumptionQuantity: "1000.00",
+        measurementUnit: "kg",
+        unitMultiplier: 0.5,
+      }),
+    );
+    assert.deepEqual(loaded, {
+      ok: true,
+      value: [
+        {
+          productId: "719074",
+          itemId: "7190740",
+          name: "Banana selección x kg.",
+          brand: null,
+          department: "Frutas y verduras",
+          tipo: "Banana",
+          price: 1999,
+          inStock: true,
+          sale: { kind: "by-weight", saleStepKg: 0.5 },
+          teasers: [],
+        },
+      ],
+    });
+  });
+
+  it("reads a packaged product's size from its measure, normalized, with its teasers", () => {
+    const teasers = [{ name: "PROMO-2do al 50%", minimumQuantity: 2 }];
+    const loaded = load(
+      catalogProduct("30138", "Bebidas", {
+        name: "Gaseosa cola Coca Cola sabor original 1,5 lts",
+        brand: "Coca Cola",
+        availableQuantity: 0,
+        measureUnit: "CM3",
+        consumptionQuantity: "1500",
+        teasers,
+      }),
+    );
+    assert.deepEqual(
+      loaded.ok &&
+        loaded.value.map(({ brand, inStock, sale, teasers }) => ({
+          brand,
+          inStock,
+          sale,
+          teasers,
+        })),
+      [
+        {
+          brand: "Coca Cola",
+          inStock: false,
+          sale: { kind: "packaged", size: { dimension: "volume", amount: 1500 } },
+          teasers,
+        },
+      ],
+    );
+  });
+
+  it("gives no size to a product without a measure, whatever its name says", () => {
+    const loaded = load(
+      catalogProduct("1", "Bebidas", { name: "Gaseosa cola Pepsi en lata 354 ml" }),
+    );
+    assert.deepEqual(loaded.ok && loaded.value.map(({ sale }) => sale), [
+      { kind: "packaged", size: null },
+    ]);
+  });
+
+  it("keeps a product without tipo", () => {
+    const loaded = load(catalogProduct("1", "Almacén", { tipo: null }));
+    assert.deepEqual(
+      loaded.ok && loaded.value.map(({ productId, tipo }) => ({ productId, tipo })),
+      [{ productId: "1", tipo: null }],
+    );
+  });
+
+  it("fails on a record of an older download and tells to download it again", () => {
+    const {
+      measurementUnit: _measurementUnit,
+      unitMultiplier: _unitMultiplier,
+      teasers: _teasers,
+      ...old
+    } = catalogProduct("1", "Almacén");
+    assert.deepEqual(load(old), {
+      ok: false,
+      errors: [
+        "The Catalog Snapshot at .data/carrefour/products.json does not have what this version " +
+          'reads (at "products.0.measurementUnit": Invalid input: expected string, received undefined). ' +
+          "Run pnpm carrefour:catalog again.",
       ],
     });
   });

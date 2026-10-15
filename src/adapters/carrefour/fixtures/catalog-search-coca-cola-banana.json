@@ -1,0 +1,119 @@
+[
+  {
+    "productId": "30138",
+    "productName": "Gaseosa cola Coca Cola sabor original 2,25 lts",
+    "brand": "Coca Cola",
+    "categories": ["/Bebidas/Gaseosas/Gaseosas cola/", "/Bebidas/Gaseosas/", "/Bebidas/"],
+    "EC_Sector": ["P.G.C."],
+    "EC_Sección": ["BEBIDAS"],
+    "EC_Grupo": ["GASEOSAS"],
+    "EC_Familia": ["GASEOSAS COLAS"],
+    "EC_Subfamilia": ["GASEOSA COLA REG FAMILIAR"],
+    "Tipo de producto": ["Gaseosa"],
+    "Gramaje de unidad de medida": ["CM3"],
+    "Gramaje de unidad de consumo": ["2250.00"],
+    "Gramaje factor de conversión": ["0.00100000"],
+    "Precio x unidad": ["($2,666.67 x 1 L.)"],
+    "items": [
+      {
+        "itemId": "3807",
+        "ean": "7790895000997",
+        "measurementUnit": "un",
+        "unitMultiplier": 1.0,
+        "sellers": [
+          {
+            "sellerId": "1",
+            "commertialOffer": {
+              "Price": 6000.0,
+              "ListPrice": 6000.0,
+              "AvailableQuantity": 99999,
+              "PromotionTeasers": [
+                {
+                  "Name": "PROMO-2do al 50% Max 48 unidades Combinable COCA COLA-Reg-2-50-Aniv2 9 al 15.10",
+                  "GeneralValues": {},
+                  "Conditions": {
+                    "MinimumQuantity": 2,
+                    "Parameters": []
+                  },
+                  "Effects": {
+                    "Parameters": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "productId": "719074",
+    "productName": "Banana selección x kg.",
+    "brand": "Genérico",
+    "categories": ["/Frutas y verduras/Frutas/", "/Frutas y verduras/"],
+    "EC_Sector": ["PRODUCTOS FRESCO"],
+    "EC_Sección": ["FRUTAS Y VERDURAS"],
+    "EC_Grupo": ["FRUTAS"],
+    "EC_Familia": ["TROPICAL"],
+    "EC_Subfamilia": ["BANANA"],
+    "Tipo de producto": ["Banana"],
+    "Gramaje de unidad de medida": ["GRM"],
+    "Gramaje de unidad de consumo": ["1000.00"],
+    "Gramaje factor de conversión": ["0.00100000"],
+    "Precio x unidad": ["($1,999.00 x 1 K.)"],
+    "items": [
+      {
+        "itemId": "185818",
+        "ean": "2508844000005",
+        "measurementUnit": "kg",
+        "unitMultiplier": 0.5,
+        "sellers": [
+          {
+            "sellerId": "1",
+            "commertialOffer": {
+              "Price": 1999.0,
+              "ListPrice": 1999.0,
+              "AvailableQuantity": 99999,
+              "PromotionTeasers": []
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "productId": "644286",
+    "productName": "Chips de banana 100 g.",
+    "brand": "Genérico",
+    "categories": ["/Frutas y verduras/Frutos secos/", "/Frutas y verduras/"],
+    "EC_Sector": ["PRODUCTOS FRESCO"],
+    "EC_Sección": ["FRUTAS Y VERDURAS"],
+    "EC_Grupo": ["FRUTAS SECAS"],
+    "EC_Familia": ["DESECADAS"],
+    "EC_Subfamilia": ["FRUTA GLACEADA"],
+    "Tipo de producto": ["Chips de banana"],
+    "Gramaje de unidad de medida": ["GRM"],
+    "Gramaje de unidad de consumo": ["100.00"],
+    "Gramaje factor de conversión": ["0.00100000"],
+    "Precio x unidad": ["($37,990.00 x 1 K.)"],
+    "items": [
+      {
+        "itemId": "35284",
+        "ean": "7798143351198",
+        "measurementUnit": "un",
+        "unitMultiplier": 1.0,
+        "sellers": [
+          {
+            "sellerId": "1",
+            "commertialOffer": {
+              "Price": 3799.0,
+              "ListPrice": 3799.0,
+              "AvailableQuantity": 100,
+              "PromotionTeasers": []
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
