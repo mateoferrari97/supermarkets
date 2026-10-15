@@ -128,12 +128,15 @@ describe("scoreRun", () => {
   it("fails an Item that asks when it should pick", () => {
     const score = scoreRun(
       caseOf({ items: [expected()] }),
-      orderRun([itemRun({ fits: [], pick: null, question: "¿Cuál coca?" })]),
+      orderRun([
+        itemRun({ fits: [], pick: null, question: "¿Cuál coca?", alternatives: ["coca-354"] }),
+      ]),
       allLive,
     );
     assert.equal(score.passed, false);
     assert.equal(score.items[0]?.asked, true);
     assert.equal(score.items[0]?.wrongPickUnseen, false);
+    assert.deepEqual(score.items[0]?.alternatives, { hits: 0, total: 0 });
     assert.deepEqual(score.problems, ['Coca Cola: asked "¿Cuál coca?"']);
   });
 

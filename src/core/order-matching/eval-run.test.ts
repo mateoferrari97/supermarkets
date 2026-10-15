@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CatalogProduct, PackageSize } from "./catalog-product.ts";
-import { orderRunOf, pickOnSnapshot } from "./eval-run.ts";
+import { matchOrder, orderRunOf, pickOnSnapshot } from "./eval-run.ts";
 import type { Item } from "./item.ts";
 
 const coca = (itemId: string, price: number | null, size: PackageSize | null): CatalogProduct => ({
@@ -66,7 +66,6 @@ describe("orderRunOf", () => {
             item: item(),
             matches: [small, big],
             fits: [small, big],
-            alternatives: [],
             note: "Tomé coca",
             question: null,
           },
@@ -74,9 +73,8 @@ describe("orderRunOf", () => {
             item: item({ original: "birra" }),
             matches: [small],
             fits: [],
-            alternatives: [small],
             note: null,
-            question: "¿Cuál birra?",
+            question: { text: "¿Cuál birra?", alternatives: [small] },
           },
         ],
       }),
@@ -104,5 +102,36 @@ describe("orderRunOf", () => {
         ],
       },
     );
+  });
+});
+
+describe("matchOrder", () => {
+  it("reads the order with call 1 and matches its Items with the search and call 2", async () => {
+    const big = coca("2", 3200, ml(2250));
+    const searched: unknown[] = [];
+    const matched = await matchOrder("coca grande, pago con Visa", {
+      search: {
+        findMatches: (searchItem) => {
+          searched.push(searchItem);
+          return [big];
+        },
+      },
+      llm: {
+        parseOrder: (orderText) =>
+          Promise.resolve({ items: [item({ original: orderText })], ignoredPreference: true }),
+        fitProducts: () => Promise.resolve({ fits: [1], closest: [], note: null, question: null }),
+      },
+    });
+    assert.equal(matched.ignoredPreference, true);
+    assert.deepEqual(matched.items, [
+      {
+        item: item({ original: "coca grande, pago con Visa" }),
+        matches: [big],
+        fits: [big],
+        note: null,
+        question: null,
+      },
+    ]);
+    assert.equal(searched.length, 1);
   });
 });

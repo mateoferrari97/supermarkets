@@ -1,20 +1,19 @@
 import { candidatesFor, snapshotTotal, type Candidate } from "../product-selection/candidates.ts";
 import { rankBySelectionPolicy } from "../product-selection/selection-policy.ts";
+import type { Llm } from "../order-resolution/llm.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
+import type { CatalogSearch } from "./catalog-search.ts";
 import type { StaleId } from "./eval-set.ts";
 import type { ItemRun, OrderRun, RunScore, Totals } from "./eval-score.ts";
 import type { Item } from "./item.ts";
+import { matchItems, type ItemMatch } from "./match-items.ts";
 
-export type MatchedItem = {
-  item: Item;
-  matches: CatalogProduct[];
-  fits: CatalogProduct[];
-  alternatives: CatalogProduct[];
-  note: string | null;
-  question: string | null;
+export type MatchedOrder = { items: ItemMatch[]; ignoredPreference: boolean };
+
+export type MatchOrderDependencies = {
+  search: CatalogSearch;
+  llm: Pick<Llm, "parseOrder" | "fitProducts">;
 };
-
-export type MatchedOrder = { items: MatchedItem[]; ignoredPreference: boolean };
 
 export type EvalCaseRunRecord = {
   error: string | null;
@@ -55,20 +54,29 @@ export function pickOnSnapshot(item: Item, fits: CatalogProduct[]): Candidate | 
   return rankBySelectionPolicy(priced)[0]?.candidate ?? null;
 }
 
+export async function matchOrder(
+  orderText: string,
+  { search, llm }: MatchOrderDependencies,
+  signal: AbortSignal = new AbortController().signal,
+): Promise<MatchedOrder> {
+  const { items, ignoredPreference } = await llm.parseOrder(orderText, signal);
+  return { items: await matchItems(items, { search, llm }, { signal }), ignoredPreference };
+}
+
 export function orderRunOf({ items, ignoredPreference }: MatchedOrder): OrderRun {
   return { items: items.map(itemRunOf), ignoredPreference };
 }
 
-function itemRunOf(matched: MatchedItem): ItemRun {
+function itemRunOf(matched: ItemMatch): ItemRun {
   const ids = (products: CatalogProduct[]) => products.map(({ productId }) => productId);
   const pick = matched.question === null ? pickOnSnapshot(matched.item, matched.fits) : null;
   return {
     item: matched.item,
     matches: ids(matched.matches),
     fits: ids(matched.fits),
-    alternatives: ids(matched.alternatives),
+    alternatives: ids(matched.question?.alternatives ?? []),
     note: matched.note,
-    question: matched.question,
+    question: matched.question?.text ?? null,
     pick:
       pick === null
         ? null

@@ -157,9 +157,10 @@ function scoreItem(
     fitsRecall: ratio(overlap(liveFits, actual.fits), liveFits.length),
     pickRight,
     asked,
-    alternatives: asked
-      ? ratio(overlap(actual.alternatives, liveAlternatives), actual.alternatives.length)
-      : ratio(0, 0),
+    alternatives:
+      asked && shouldAsk
+        ? ratio(overlap(actual.alternatives, liveAlternatives), actual.alternatives.length)
+        : ratio(0, 0),
     wrongPickUnseen: wrongPick && !seen,
     passed,
     problems,
