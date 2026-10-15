@@ -42,7 +42,7 @@ describe("loggedStore", () => {
 
     assert.equal(await logged.checkDelivery("1425", signal), "delivers");
     const simulation = await logged.simulate(
-      { postalCode: "1425", card: null, items: [{ itemId: "7", quantity: 2 }] },
+      { postalCode: "1425", items: [{ itemId: "7", quantity: 2 }] },
       signal,
     );
     const link = logged.cartLink([{ itemId: "7", quantity: 2 }]);
@@ -61,7 +61,7 @@ describe("loggedStore", () => {
       {
         type: "store-call",
         method: "simulate",
-        input: { postalCode: "1425", card: null, items: [{ itemId: "7", quantity: 2 }] },
+        input: { postalCode: "1425", items: [{ itemId: "7", quantity: 2 }] },
         output: simulation,
         error: null,
         durationMs: 10,
@@ -84,7 +84,7 @@ describe("loggedStore", () => {
       postalCode: "1425",
       tipos: ["Yerba"],
       brands: [],
-      sort: "price:asc" as const,
+      sort: "discount:desc" as const,
       limit: 5,
     };
 

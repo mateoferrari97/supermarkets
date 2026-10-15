@@ -104,8 +104,7 @@ type Script = {
   answers: Record<string, ResolveItemOutput>;
   rewordings?: Record<string, string>;
   replies?: Record<string, MapAnswerOutput>;
-  paymentCard?: string | null;
-  preference?: string | null;
+  ignoredPreference?: boolean;
 };
 
 type Seen = { resolved: ResolveItemInput[]; reworded: ResolveItemInput[]; asked: MapAnswerInput[] };
@@ -121,12 +120,11 @@ const fakeLlm = ({
   answers,
   rewordings = {},
   replies = {},
-  paymentCard = null,
-  preference = null,
+  ignoredPreference = false,
 }: Script) => {
   const seen: Seen = { resolved: [], reworded: [], asked: [] };
   const llm: Llm = {
-    splitOrder: () => Promise.resolve({ items, paymentCard, preference }),
+    splitOrder: () => Promise.resolve({ items, ignoredPreference }),
     resolveItem: (input) => {
       seen.resolved.push(input);
       return scripted(answers, input.item.phrase, "answer");
@@ -139,7 +137,6 @@ const fakeLlm = ({
       seen.asked.push(input);
       return scripted(replies, input.answer, "reply");
     },
-    translatePreference: () => Promise.reject(new Error("order resolution never translates")),
   };
   return { llm, seen };
 };
@@ -189,8 +186,7 @@ describe("resolveOrder", () => {
           terms: ["1 l"],
         }),
       ],
-      paymentCard: null,
-      preference: null,
+      ignoredPreference: false,
       message: null,
     });
   });
@@ -489,8 +485,7 @@ describe("answerQuestions", () => {
     ]);
     assert.deepEqual(resolution, {
       items: [resolved("yerba mate", "yerba", { quantity: 2 })],
-      paymentCard: null,
-      preference: null,
+      ignoredPreference: false,
       message: null,
     });
   });
@@ -520,8 +515,7 @@ describe("answerQuestions", () => {
     const { resolution } = await run({ items: [item("yerba")], answers: { yerba } });
     assert.deepEqual(resolution, {
       items: [resolved("yerba", "yerba")],
-      paymentCard: null,
-      preference: null,
+      ignoredPreference: false,
       message: null,
     });
   });
@@ -542,19 +536,17 @@ describe("answerQuestions", () => {
     assert.ok(!resolution.message?.includes("código postal"));
   });
 
-  it("keeps the order's Payment Card and preference through the questions round", async () => {
+  it("keeps an ignored card or preference through the questions round", async () => {
     const { resolution } = await runAndAnswer(
       {
         items: [item("leche")],
         answers: { leche },
-        paymentCard: "Tarjeta Carrefour Mastercard",
-        preference: "solo La Serenísima",
+        ignoredPreference: true,
         replies: { entera: reply({ options: [1] }) },
       },
       "entera",
     );
     assert.equal(resolution.message, null);
-    assert.equal(resolution.paymentCard, "Tarjeta Carrefour Mastercard");
-    assert.equal(resolution.preference, "solo La Serenísima");
+    assert.equal(resolution.ignoredPreference, true);
   });
 });

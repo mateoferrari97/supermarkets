@@ -67,7 +67,7 @@ type Script = {
   items?: Item[];
   answers?: Record<string, ResolveItemOutput>;
   replies?: Record<string, MapAnswerOutput>;
-  preference?: string | null;
+  ignoredPreference?: boolean;
   deliveries?: Record<string, Delivery>;
 };
 
@@ -75,7 +75,7 @@ const conversation = ({
   items = [],
   answers = {},
   replies = {},
-  preference = null,
+  ignoredPreference = false,
   deliveries = {},
 }: Script = {}) => {
   const calls: string[] = [];
@@ -87,7 +87,7 @@ const conversation = ({
   const llm: Llm = {
     splitOrder: (_text, signal) => {
       seen("splitOrder", signal);
-      return Promise.resolve({ items, paymentCard: null, preference });
+      return Promise.resolve({ items, ignoredPreference });
     },
     resolveItem: (input, signal) => {
       seen("resolveItem", signal);
@@ -102,16 +102,6 @@ const conversation = ({
       seen("mapAnswer", signal);
       const reply = replies[input.answer];
       return reply ? Promise.resolve(reply) : Promise.reject(new Error("no reply"));
-    },
-    translatePreference: (_input, signal) => {
-      seen("translatePreference", signal);
-      return Promise.resolve({
-        ranking: "cheapest-per-unit",
-        brandsOnly: [],
-        brandsPreferred: [],
-        brandsExcluded: [],
-        unexpressed: [],
-      });
     },
   };
   const store: OnlineStore = {
@@ -141,7 +131,6 @@ const conversation = ({
     products,
     vocabulary,
     mapping,
-    paymentCards: { cards: [] },
     snapshot: [],
     llm,
     store,
@@ -233,7 +222,6 @@ describe("takeTurn", () => {
       assert.equal(turn.state.stage, "done");
       assert.equal(turn.reply.kind, "selection");
       if (turn.reply.kind !== "selection") return;
-      assert.equal(turn.reply.paymentCard, null);
       assert.equal(turn.reply.selection.postalCode, "1425");
       assert.deepEqual(
         turn.reply.selection.lines.map(({ phrase, product }) => [phrase, product?.itemId]),
@@ -302,9 +290,9 @@ describe("takeTurn", () => {
 
   describe("steps", () => {
     it("reports each step started and done, in order", async () => {
-      const { deps } = conversation({ ...yerba, preference: "lo más barato" });
+      const { deps } = conversation(yerba);
       const events: StepEvent[] = [];
-      await takeTurn(ordering, "yerba, lo más barato", deps, (event) => events.push(event));
+      await takeTurn(ordering, "yerba", deps, (event) => events.push(event));
       assert.deepEqual(
         events.map(({ status, step }) => [status, step.kind]),
         [
@@ -312,8 +300,6 @@ describe("takeTurn", () => {
           ["done", "understand-order"],
           ["started", "search-item"],
           ["done", "search-item"],
-          ["started", "translate-preference"],
-          ["done", "translate-preference"],
           ["started", "find-candidates"],
           ["done", "find-candidates"],
           ["started", "simulate-cart"],
@@ -321,11 +307,7 @@ describe("takeTurn", () => {
         ],
       );
       assert.deepEqual(events[2]?.step, { kind: "search-item", phrase: "yerba" });
-      assert.deepEqual(events[4]?.step, {
-        kind: "translate-preference",
-        preference: "lo más barato",
-      });
-      assert.deepEqual(events[6]?.step, { kind: "find-candidates", phrase: "yerba" });
+      assert.deepEqual(events[4]?.step, { kind: "find-candidates", phrase: "yerba" });
     });
 
     it("reports understanding the answer to the questions", async () => {
@@ -342,7 +324,7 @@ describe("takeTurn", () => {
 
   describe("abort", () => {
     it("passes the turn's signal to every call of both ports", async () => {
-      const { deps, calls, signals } = conversation({ ...yerba, preference: "barato" });
+      const { deps, calls, signals } = conversation(yerba);
       const controller = new AbortController();
       const { state } = await takeTurn(NEW_CONVERSATION, "1425", {
         ...deps,
@@ -351,14 +333,7 @@ describe("takeTurn", () => {
       await takeTurn(state, "yerba", { ...deps, signal: controller.signal });
       assert.deepEqual(
         new Set(calls),
-        new Set([
-          "checkDelivery",
-          "splitOrder",
-          "resolveItem",
-          "translatePreference",
-          "findCandidates",
-          "simulate",
-        ]),
+        new Set(["checkDelivery", "splitOrder", "resolveItem", "findCandidates", "simulate"]),
       );
       assert.ok(signals.every((signal) => signal === controller.signal));
     });

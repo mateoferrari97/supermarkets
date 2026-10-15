@@ -293,11 +293,7 @@ function CartView({ cart }: { cart: Cart }) {
           ))}
           <tr>
             <td colSpan={3}>
-              <strong>Total</strong>{" "}
-              <span className="muted small">
-                CP {cart.postalCode}
-                {cart.paymentCard ? `, ${cart.paymentCard}` : ""}
-              </span>
+              <strong>Total</strong> <span className="muted small">CP {cart.postalCode}</span>
             </td>
             <td className="num">
               <strong>{money.format(cart.total)}</strong>
@@ -310,9 +306,6 @@ function CartView({ cart }: { cart: Cart }) {
           {notice}
         </div>
       ))}
-      {cart.unexpressed.length > 0 ? (
-        <div className="block">No pude aplicar: {cart.unexpressed.join("; ")}.</div>
-      ) : null}
       {cart.cartLink ? (
         <div className="block">
           <a className="btn" href={cart.cartLink} target="_blank" rel="noreferrer">

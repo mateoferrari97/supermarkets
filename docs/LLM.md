@@ -2,11 +2,11 @@
 
 ## The LLM translates, code decides
 
-The LLM turns the Owner's words into fixed forms; plain code makes every choice that must be repeatable (ADR 0002). It splits an order into Items, picks Product Types for an Item from the tree, rewords an Item nothing matched, maps a free-text answer onto the options offered, and translates a preference into a Selection Policy. Code builds the evidence and the options from the Catalog Snapshot, drops any Product Type id that is not in the tree, and picks the products from live search and checkout simulation with the fixed rules of the Selection Policy (ADR 0003, ADR 0004, ADR 0005). Never let the LLM choose a product, compute a price or invent an option.
+The LLM turns the Owner's words into fixed forms; plain code makes every choice that must be repeatable (ADR 0002, ADR 0011). It splits an order into Items, picks Product Types for an Item from the tree, rewords an Item nothing matched, and maps a free-text answer onto the options offered. Code builds the evidence and the options from the Catalog Snapshot, drops any Product Type id that is not in the tree, and picks the products from live search and checkout simulation with the fixed rules of the Selection Policy (ADR 0003, ADR 0004, ADR 0005). Never let the LLM choose a product, compute a price or invent an option.
 
 ## The port and its adapter
 
-- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`, `translatePreference`) with the input and output types of each call.
+- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
 - `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. The default model is `claude-haiku-5-5`, which takes no `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
@@ -14,7 +14,7 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/order-resolution/`, named after the task: `split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`, `translate-preference.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/order-resolution/`, named after the task: `split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 

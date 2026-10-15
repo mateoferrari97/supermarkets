@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { Item, SelectionPolicy } from "../order-resolution/concepts.ts";
+import type { Item } from "../order-resolution/concepts.ts";
 import type { OrderItem, OrderResolution } from "../order-resolution/resolve-order.ts";
 import { pickProducts, type PickDependencies } from "./pick-products.ts";
 import type {
@@ -19,10 +19,6 @@ const mapping = {
   "Yerba compuesta": "yerba-compuesta",
   Banana: "banana",
   "Leche balsámica": null,
-};
-
-const paymentCards = {
-  cards: [{ names: ["Tarjeta Carrefour Mastercard"], paymentSystem: "502", bin: "507858" }],
 };
 
 const product = (
@@ -46,7 +42,6 @@ type Price = {
   savings?: number;
   promotion?: string;
   available?: boolean;
-  withCard?: Omit<Price, "withCard">;
   atLeast?: { quantity: number; unit: number; promotion: string };
 };
 
@@ -67,11 +62,10 @@ const fakeStore = (
       simulations.push(request);
       const lines = request.items.map(({ itemId, quantity }): SimulatedLine => {
         const listed = prices[itemId] ?? { unit: 0, available: false };
-        const carded = request.card && listed.withCard ? listed.withCard : listed;
         const price =
           listed.atLeast && quantity >= listed.atLeast.quantity
-            ? { ...carded, unit: listed.atLeast.unit, promotion: listed.atLeast.promotion }
-            : carded;
+            ? { ...listed, unit: listed.atLeast.unit, promotion: listed.atLeast.promotion }
+            : listed;
         return {
           itemId,
           quantity,
@@ -103,18 +97,8 @@ const orderItem = (phrase: string, ids: string[], overrides: Partial<Item> = {})
 
 const order = (...items: OrderItem[]): OrderResolution => ({
   items,
-  paymentCard: null,
-  preference: null,
+  ignoredPreference: false,
   message: null,
-});
-
-const policy = (overrides: Partial<SelectionPolicy> = {}): SelectionPolicy => ({
-  ranking: "savings-first",
-  brandsOnly: [],
-  brandsPreferred: [],
-  brandsExcluded: [],
-  unexpressed: [],
-  ...overrides,
 });
 
 const depending = (
@@ -123,8 +107,6 @@ const depending = (
 ): PickDependencies => ({
   mapping,
   store,
-  llm: { translatePreference: () => Promise.reject(new Error("no preference was written")) },
-  paymentCards,
   snapshot: [],
   ...overrides,
 });
@@ -132,24 +114,9 @@ const depending = (
 const pick = (resolution: OrderResolution, dependencies: PickDependencies) =>
   pickProducts(resolution, "1425", dependencies);
 
-const translating = (translated: SelectionPolicy) => {
-  const asked: string[] = [];
-  return {
-    asked,
-    llm: {
-      translatePreference: ({ preference }: { preference: string }) => {
-        asked.push(preference);
-        return Promise.resolve(translated);
-      },
-    },
-  };
-};
-
 const coca = product("3807", "Coca Cola 2,25 lts", 2250, { brand: "Coca Cola" });
 const zero = product("11324", "Coca Cola Zero 2,25 lts", 2250, { brand: "Coca Cola" });
 const lata = product("1000", "Coca Cola lata 354 ml", 354, { brand: "Coca Cola" });
-const pepsi = product("2000", "Pepsi 2,25 lts", 2250, { brand: "Pepsi" });
-const manaos = product("4000", "Manaos cola 2,25 lts", 2250, { brand: "Manaos" });
 const banana = product("185818", "Banana selección x kg.", null, {
   measure: { dimension: "weight", amount: 500 },
   weightStepKg: 0.5,
@@ -214,7 +181,6 @@ describe("pickProducts", () => {
       total: 9000,
       cartLink: "3807x2",
       notices: [],
-      unexpressed: [],
     });
   });
 
@@ -340,154 +306,41 @@ describe("pickProducts", () => {
   });
 
   describe("Selection Policy", () => {
-    it("asks the LLM for no policy when the order has no preference", async () => {
-      const { store } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const { unexpressed } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
-      assert.deepEqual(unexpressed, []);
-    });
-
-    it("with cheapest-per-unit sorts search by price and ignores savings", async () => {
-      const { llm, asked } = translating(policy({ ranking: "cheapest-per-unit" }));
-      const { store, queries } = fakeStore(() => [zero, coca], {
+    it("puts a Candidate with savings before a cheaper one without", async () => {
+      const { store } = fakeStore(() => [zero, coca], {
         "11324": { unit: 4000 },
         "3807": { unit: 4500, savings: 3000, promotion: "2do al 50%" },
       });
-      const { lines } = await pick(
-        { ...order(orderItem("coca", ["gaseosa"])), preference: "lo más barato por litro" },
-        depending(store, { llm }),
-      );
-      assert.deepEqual(asked, ["lo más barato por litro"]);
-      assert.equal(queries[0]?.sort, "price:asc");
-      assert.equal(lines[0]?.product, zero);
-      assert.equal(lines[0]?.reason, "Es el más barato por litro.");
-    });
-
-    it("restricts search to the brands the Owner accepts only", async () => {
-      const { llm } = translating(policy({ brandsOnly: ["La Serenísima"] }));
-      const { store, queries } = fakeStore(() => [], {});
-      await pick(
-        { ...order(orderItem("leche", ["leche-entera"])), preference: "solo La Serenísima" },
-        depending(store, { llm }),
-      );
-      assert.deepEqual(
-        queries.map(({ brands }) => brands),
-        [["La Serenísima"]],
-      );
-    });
-
-    it("tries the preferred brands first and falls back to any brand, saying so", async () => {
-      const { llm } = translating(policy({ brandsPreferred: ["Pepsi"] }));
-      const { store, queries } = fakeStore(
-        (query) => (query.brands.length > 0 ? [] : [coca, zero]),
-        { "3807": { unit: 6000 }, "11324": { unit: 6000 } },
-      );
-      const { lines } = await pick(
-        { ...order(orderItem("gaseosa", ["gaseosa"])), preference: "prefiero Pepsi" },
-        depending(store, { llm }),
-      );
-      assert.deepEqual(
-        queries.map(({ brands }) => brands),
-        [["Pepsi"], []],
-      );
+      const { lines } = await pick(order(orderItem("coca", ["gaseosa"])), depending(store));
       assert.equal(lines[0]?.product, coca);
-      assert.deepEqual(lines[0]?.notices, ["No encontré Pepsi disponible: elegí otra marca."]);
+      assert.equal(lines[0]?.reason, "Promoción: 2do al 50%.");
     });
 
-    it("keeps the preferred brand when it has a Candidate", async () => {
-      const { llm } = translating(policy({ brandsPreferred: ["Pepsi"] }));
-      const { store, queries } = fakeStore(
-        (query) => (query.brands.includes("Pepsi") ? [pepsi] : [coca]),
-        { "2000": { unit: 7000 }, "3807": { unit: 5000 } },
-      );
-      const { lines } = await pick(
-        { ...order(orderItem("gaseosa", ["gaseosa"])), preference: "prefiero Pepsi" },
-        depending(store, { llm }),
-      );
-      assert.equal(queries.length, 1);
-      assert.equal(lines[0]?.product, pepsi);
-    });
-
-    it("never makes an excluded brand a Candidate, searching deeper to make up for it", async () => {
-      const { llm } = translating(policy({ brandsExcluded: ["Manaos"] }));
-      const { store, queries, items } = fakeStore(() => [manaos, pepsi], {
-        "4000": { unit: 1000 },
-        "2000": { unit: 5000 },
-      });
-      const { lines } = await pick(
-        { ...order(orderItem("gaseosa", ["gaseosa"])), preference: "nada de Manaos" },
-        depending(store, { llm }),
-      );
-      assert.equal(queries[0]?.limit, 50);
-      assert.equal(
-        items().some((simulated) => simulated.some(({ itemId }) => itemId === "4000")),
-        false,
-      );
-      assert.equal(lines[0]?.product, pepsi);
-    });
-
-    it("lets a brand on the Item win over the order's brand rules", async () => {
-      const { llm } = translating(
-        policy({ brandsOnly: ["Pepsi"], brandsExcluded: ["Coca-Cola", "Coca Cola"] }),
-      );
+    it("searches only the Item's own brand", async () => {
       const { store, queries } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const { lines } = await pick(
-        {
-          ...order(orderItem("coca", ["gaseosa"], { brand: "Coca-Cola" })),
-          preference: "solo Pepsi, nada de Coca",
-        },
-        depending(store, { llm }),
+      await pick(
+        order(
+          orderItem("coca", ["gaseosa"], { brand: "Coca-Cola" }),
+          orderItem("gaseosa", ["gaseosa"]),
+        ),
+        depending(store),
       );
-      assert.deepEqual(queries[0]?.brands, ["Coca-Cola"]);
-      assert.equal(lines[0]?.product, coca);
+      assert.deepEqual(
+        queries.map(({ brands }) => brands),
+        [["Coca-Cola"], []],
+      );
     });
 
-    it("reports the preferences no rule could express and goes ahead with the rest", async () => {
-      const { llm } = translating(policy({ unexpressed: ["que sea orgánico"] }));
+    it("tells the Owner a card or preference in the order was not taken into account", async () => {
       const { store } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
       const selection = await pick(
-        { ...order(orderItem("coca", ["gaseosa"])), preference: "que sea orgánico" },
-        depending(store, { llm }),
-      );
-      assert.deepEqual(selection.unexpressed, ["que sea orgánico"]);
-      assert.equal(selection.lines[0]?.product, coca);
-    });
-  });
-
-  describe("Payment Card", () => {
-    it("simulates with the named card so its promotions count and show in the reason", async () => {
-      const { store, simulations } = fakeStore(() => [zero, coca], {
-        "11324": { unit: 5000 },
-        "3807": {
-          unit: 6000,
-          withCard: { unit: 4800, savings: 1200, promotion: "Tarjeta Carrefour 20% Off Martes" },
-        },
-      });
-      const selection = await pick(
-        {
-          ...order(orderItem("coca", ["gaseosa"])),
-          paymentCard: "tarjeta carrefour mastercard",
-        },
+        { ...order(orderItem("coca", ["gaseosa"])), ignoredPreference: true },
         depending(store),
       );
-      assert.ok(
-        simulations.every(({ card }) => card?.paymentSystem === "502" && card.bin === "507858"),
-      );
-      assert.equal(selection.lines[0]?.product, coca);
-      assert.equal(selection.lines[0]?.reason, "Promoción: Tarjeta Carrefour 20% Off Martes.");
-      assert.equal(selection.total, 4800);
-      assert.deepEqual(selection.notices, []);
-    });
-
-    it("reports a card not in the table and picks products without a card", async () => {
-      const { store, simulations } = fakeStore(() => [coca], { "3807": { unit: 6000 } });
-      const selection = await pick(
-        { ...order(orderItem("coca", ["gaseosa"])), paymentCard: "Visa Galicia" },
-        depending(store),
-      );
-      assert.ok(simulations.every(({ card }) => card === null));
       assert.deepEqual(selection.notices, [
-        'No conozco la tarjeta "Visa Galicia": elegí los productos sin sus promociones.',
+        "Por ahora no tengo en cuenta tarjetas ni preferencias.",
       ]);
+      assert.equal(selection.lines[0]?.product, coca);
     });
   });
 

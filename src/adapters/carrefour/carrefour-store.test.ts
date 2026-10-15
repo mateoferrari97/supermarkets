@@ -192,7 +192,7 @@ describe("createCarrefourStore", () => {
         postalCode: "1425",
         tipos: ["Gaseosa"],
         brands: ["Coca-Cola", "Pepsi", "Marca Inventada"],
-        sort: "price:asc",
+        sort: "discount:desc",
         limit: 3,
       },
       signal,
@@ -201,7 +201,7 @@ describe("createCarrefourStore", () => {
       candidates.map(({ brand }) => brand),
       ["Coca Cola", "Pepsi", "Pepsi"],
     );
-    assert.equal(new URL(seen.at(-1)!.url).searchParams.get("sort"), "price:asc");
+    assert.equal(new URL(seen.at(-1)!.url).searchParams.get("sort"), "discount:desc");
   });
 
   it("finds a brand written with one letter wrong", async () => {
@@ -252,10 +252,7 @@ describe("createCarrefourStore", () => {
       Promise.reject(new Error("Carrefour GET answered 503")),
     );
     await assert.rejects(
-      store.simulate(
-        { postalCode: "1425", card: null, items: [{ itemId: "3807", quantity: 1 }] },
-        signal,
-      ),
+      store.simulate({ postalCode: "1425", items: [{ itemId: "3807", quantity: 1 }] }, signal),
       /503/,
     );
   });
@@ -265,7 +262,6 @@ describe("createCarrefourStore", () => {
     const simulation = await store.simulate(
       {
         postalCode: "1425",
-        card: null,
         items: [{ itemId: "3807", quantity: 2 }],
       },
       signal,
@@ -293,33 +289,11 @@ describe("createCarrefourStore", () => {
     });
   });
 
-  it("simulates with the Payment Card's payment system and BIN so its promotions apply", async () => {
-    const { store, seen } = recorded([[/orderForms\/simulation/, "simulation-card"]]);
-    const simulation = await store.simulate(
-      {
-        postalCode: "1425",
-        card: { paymentSystem: "502", bin: "507858" },
-        items: [{ itemId: "3807", quantity: 2 }],
-      },
-      signal,
-    );
-    assert.deepEqual(simulation.lines[0]?.promotions, [
-      "2do al 70% Tarjeta Carrefour o Cuenta digital Max 48 Combinable 9 al 15.10 COCA COLA",
-    ]);
-    assert.equal(simulation.total, 7800);
-    assert.deepEqual((seen[0]!.body as { paymentData: unknown }).paymentData, {
-      payments: [
-        { paymentSystem: "502", bin: "507858", installments: 1, value: 0, referenceValue: 0 },
-      ],
-    });
-  });
-
   it("marks an item checkout cannot deliver as unavailable and leaves it out of the total", async () => {
     const { store } = recorded([[/orderForms\/simulation/, "simulation-unavailable"]]);
     const simulation = await store.simulate(
       {
         postalCode: "1425",
-        card: null,
         items: [{ itemId: "11187", quantity: 1 }],
       },
       signal,
@@ -404,7 +378,7 @@ describe("createCarrefourStore and its signal", () => {
       controller.signal,
     );
     await store.simulate(
-      { postalCode: "1425", card: null, items: [{ itemId: "7870", quantity: 1 }] },
+      { postalCode: "1425", items: [{ itemId: "7870", quantity: 1 }] },
       controller.signal,
     );
     assert.ok(seen.length >= 5);

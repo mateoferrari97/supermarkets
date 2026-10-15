@@ -28,12 +28,12 @@ export const NEW_CONVERSATION: ConversationState = { stage: "postal-code" };
 export type Reply =
   | { kind: "ask"; text: string }
   | { kind: "questions"; text: string; items: OrderItem[] }
-  | { kind: "selection"; selection: ProductSelection; paymentCard: string | null };
+  | { kind: "selection"; selection: ProductSelection };
 
 export type Turn = { state: ConversationState; reply: Reply };
 
 export type ConversationDependencies = Omit<OrderDependencies, "llm"> &
-  Omit<PickDependencies, "llm" | "store"> & {
+  Omit<PickDependencies, "store"> & {
     llm: Llm;
     store: OnlineStore;
     signal?: AbortSignal;
@@ -111,7 +111,7 @@ async function resolved(
   const selection = await pickProducts(resolution, postalCode, deps, options);
   return {
     state: { stage: "done", postalCode, selection },
-    reply: { kind: "selection", selection, paymentCard: resolution.paymentCard },
+    reply: { kind: "selection", selection },
   };
 }
 

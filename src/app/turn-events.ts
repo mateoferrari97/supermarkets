@@ -2,7 +2,7 @@ import type { ProductSelection } from "../core/product-selection/pick-products.t
 
 export type AskedQuestion = { number: number; options: string[] };
 
-export type Cart = ProductSelection & { paymentCard: string | null };
+export type Cart = ProductSelection;
 
 export type TurnEvent =
   | { type: "session"; sessionId: string }

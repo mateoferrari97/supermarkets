@@ -44,6 +44,11 @@ Facts about the public endpoints of https://www.carrefour.com.ar that the code d
 
 `/checkout/cart/add?sku=<id>&qty=<n>&seller=1&...&sc=1` adds items to a cart; `sku`, `qty` and `seller` repeat per item (VTEX tutorial: https://help.vtex.com/api/llm-content?section=tutorials&locale=en&slug=how-to-assemble-the-cart-url). VTEX ties carts to browser cookies (https://developers.vtex.com/docs/guides/headless-cart-and-checkout), so the cart is expected to be built in the browser of whoever opens the link; VTEX does not document this for the cart link itself.
 
+A cart link never sums quantities, and what happens to the cart already there depends on the session, as observed on 2026-10-15 with Leche entera larga vida Ilolay 1 l (sku `9100`) and Yerba mate La Cumbrecita con palo 500 g (sku `105933`), starting from an empty cart and opening, in order, `9100`×1, then `105933`×1 + `9100`×2, then `105933`×1:
+
+- Logged out (incognito), the link replaces the cart: it ends with only `105933`×1.
+- Logged in, the link adds its lines and sets the quantity of lines already there: it ends with `105933`×1 + `9100`×2, so items of an earlier link stay in the cart.
+
 ## Catalog search (legacy)
 
 `GET /api/catalog_system/pub/products/search` is what `src/adapters/carrefour/catalog-download.ts` uses to download the Catalog Snapshot.
@@ -76,6 +81,5 @@ Recorded answers live in `src/adapters/carrefour/fixtures/` and are read by `src
 | `search-gaseosa-coca-cola.json`, `search-gaseosa-coca-cola-pepsi.json` | A search by Tipo and one or two brands |
 | `search-banana.json` | A product sold by weight, with `unitMultiplier` |
 | `simulation-promotion.json` | A quantity promotion ("2do al 50%") at quantity 2 |
-| `simulation-card.json` | A card promotion with payment data ("2do al 70% Tarjeta Carrefour") |
 | `simulation-unavailable.json` | An item with availability `cannotBeDelivered` |
 | `simulation-banana.json`, `simulation-two.json` | A weighed item and a two-unit item; no test reads them today |

@@ -1,6 +1,6 @@
-import type { Measure, PaymentCard } from "./concepts.ts";
+import type { Measure } from "./concepts.ts";
 
-export type SearchSort = "discount:desc" | "price:asc";
+export type SearchSort = "discount:desc";
 
 export type Teaser = { name: string; minimumQuantity: number };
 
@@ -28,7 +28,6 @@ export type SimulationItem = { itemId: string; quantity: number };
 
 export type SimulationRequest = {
   postalCode: string;
-  card: PaymentCard | null;
   items: SimulationItem[];
 };
 

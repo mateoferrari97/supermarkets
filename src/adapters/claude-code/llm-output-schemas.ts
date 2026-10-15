@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { SelectionPolicy } from "../../core/order-resolution/concepts.ts";
 import type {
   MapAnswerOutput,
   ResolveItemOutput,
@@ -17,8 +16,7 @@ export const splitOrderOutputSchema: z.ZodType<SplitOrderOutput> = z.strictObjec
       vagueWords: z.array(z.string().min(1)),
     }),
   ),
-  paymentCard: z.string().min(1).nullable(),
-  preference: z.string().min(1).nullable(),
+  ignoredPreference: z.boolean(),
 });
 
 export const resolveItemOutputSchema: z.ZodType<ResolveItemOutput> = z.strictObject({
@@ -39,12 +37,4 @@ export const mapAnswerOutputSchema: z.ZodType<MapAnswerOutput> = z.strictObject(
 
 export const rewordItemOutputSchema: z.ZodType<RewordItemOutput> = z.strictObject({
   phrase: z.string().min(1),
-});
-
-export const selectionPolicySchema: z.ZodType<SelectionPolicy> = z.strictObject({
-  ranking: z.enum(["savings-first", "cheapest-per-unit"]),
-  brandsOnly: z.array(z.string().min(1)),
-  brandsPreferred: z.array(z.string().min(1)),
-  brandsExcluded: z.array(z.string().min(1)),
-  unexpressed: z.array(z.string().min(1)),
 });

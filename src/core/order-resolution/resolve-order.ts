@@ -24,10 +24,7 @@ export type Question =
 
 export type OrderItem = Item & { productTypes: ProductTypeRef[]; question: Question | null };
 
-export type OrderDetails = {
-  paymentCard: string | null;
-  preference: string | null;
-};
+export type OrderDetails = { ignoredPreference: boolean };
 
 export type OrderResolution = OrderDetails & { items: OrderItem[]; message: string | null };
 
@@ -229,20 +226,19 @@ export function createOrderResolver({
   return {
     resolveOrder: async (orderText, options) => {
       const steps = stepsFrom(options);
-      const { items, paymentCard, preference } = await steps.run({ kind: "understand-order" }, () =>
+      const { items, ignoredPreference } = await steps.run({ kind: "understand-order" }, () =>
         llm.splitOrder(orderText, steps.signal),
       );
       return withMessage(await Promise.all(items.map((item) => resolveItem(item, steps))), {
-        paymentCard,
-        preference,
+        ignoredPreference,
       });
     },
     answerQuestions,
   };
 }
 
-function detailsOf({ paymentCard, preference }: OrderDetails): OrderDetails {
-  return { paymentCard, preference };
+function detailsOf({ ignoredPreference }: OrderDetails): OrderDetails {
+  return { ignoredPreference };
 }
 
 function itemFields(orderItem: OrderItem): Item {

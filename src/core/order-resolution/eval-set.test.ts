@@ -45,7 +45,7 @@ const score = (
 ) =>
   scoreCase(
     { id: "case", order: "pedido", ...evalCase },
-    { ...resolution, paymentCard: null, preference: null, message: null },
+    { ...resolution, ignoredPreference: false, message: null },
     vocabulary,
   );
 

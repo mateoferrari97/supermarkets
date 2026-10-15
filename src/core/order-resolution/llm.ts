@@ -1,9 +1,8 @@
-import type { Evidence, Item, SelectionPolicy } from "./concepts.ts";
+import type { Evidence, Item } from "./concepts.ts";
 
 export type SplitOrderOutput = {
   items: Item[];
-  paymentCard: string | null;
-  preference: string | null;
+  ignoredPreference: boolean;
 };
 
 export type ResolveItemOutput = {
@@ -34,15 +33,9 @@ export type QuestionInput = {
 
 export type MapAnswerInput = { questions: QuestionInput[]; answer: string };
 
-export type TranslatePreferenceInput = { preference: string };
-
 export type Llm = {
   splitOrder(orderText: string, signal: AbortSignal): Promise<SplitOrderOutput>;
   resolveItem(input: ResolveItemInput, signal: AbortSignal): Promise<ResolveItemOutput>;
   rewordItem(input: ResolveItemInput, signal: AbortSignal): Promise<RewordItemOutput>;
   mapAnswer(input: MapAnswerInput, signal: AbortSignal): Promise<MapAnswerOutput>;
-  translatePreference(
-    input: TranslatePreferenceInput,
-    signal: AbortSignal,
-  ): Promise<SelectionPolicy>;
 };

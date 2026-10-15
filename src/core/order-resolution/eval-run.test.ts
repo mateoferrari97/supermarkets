@@ -25,8 +25,7 @@ const resolvedTo = (id: string): OrderItem => ({
 });
 
 const resolution = (items: OrderItem[]): OrderResolution => ({
-  paymentCard: null,
-  preference: null,
+  ignoredPreference: false,
   items,
   message: null,
 });

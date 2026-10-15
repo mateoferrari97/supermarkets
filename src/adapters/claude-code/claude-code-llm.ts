@@ -9,7 +9,6 @@ import {
   mapAnswerOutputSchema,
   resolveItemOutputSchema,
   rewordItemOutputSchema,
-  selectionPolicySchema,
   splitOrderOutputSchema,
 } from "./llm-output-schemas.ts";
 import type { Llm, ResolveItemInput } from "../../core/order-resolution/llm.ts";
@@ -146,14 +145,6 @@ export function createClaudeCodeLlm({
       ),
     mapAnswer: (input, signal) =>
       ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input, signal),
-    translatePreference: (input, signal) =>
-      ask(
-        "translate-preference",
-        prompt("translate-preference"),
-        selectionPolicySchema,
-        input,
-        signal,
-      ),
   };
 }
 

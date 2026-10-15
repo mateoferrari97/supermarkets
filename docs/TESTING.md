@@ -27,4 +27,4 @@ Tests never call Carrefour or start a Claude Code session.
 
 ## Data validators
 
-`pnpm product-types`, `pnpm payment-cards` and `pnpm order:eval-set` validate the committed data in `vocabulary/` and `evals/` and run in `pnpm check` after the tests.
+`pnpm product-types` and `pnpm order:eval-set` validate the committed data in `vocabulary/` and `evals/` and run in `pnpm check` after the tests.

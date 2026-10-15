@@ -1,5 +1,5 @@
 ---
-Status: accepted
+Status: superseded by ADR-0011
 ---
 
 # The LLM translates the Owner's preference into a Selection Policy; code picks the products

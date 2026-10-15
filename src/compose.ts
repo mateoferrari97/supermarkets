@@ -19,7 +19,6 @@ import {
   type OrderResolver,
 } from "./core/order-resolution/resolve-order.ts";
 import type { OnlineStore, SnapshotProduct } from "./core/product-selection/online-store.ts";
-import type { PaymentCardTable } from "./core/product-selection/payment-cards.ts";
 import type { TipoMapping, Vocabulary } from "./core/product-types/schema.ts";
 
 export type { LlmCall } from "./adapters/claude-code/claude-code-llm.ts";
@@ -32,7 +31,6 @@ export type OrderData = {
   snapshot: SnapshotProduct[];
   vocabulary: Vocabulary;
   mapping: TipoMapping;
-  paymentCards: PaymentCardTable;
 };
 
 export type ConversationDependenciesWithoutSignal = Omit<ConversationDependencies, "signal">;
@@ -50,7 +48,6 @@ const files = createDataFiles();
 export const {
   loadCatalog,
   loadProductTypes,
-  loadPaymentCards,
   loadEvalSet,
   saveParts,
   loadParts,
@@ -75,7 +72,7 @@ export function createOnlineStore(): OnlineStore {
 export function loadOrderData(): Checked<OrderData> {
   const loaded = files.loadOrderFiles();
   if (!loaded.ok) return loaded;
-  const { catalog, vocabulary, mapping, paymentCards } = loaded.value;
+  const { catalog, vocabulary, mapping } = loaded.value;
   return {
     ok: true,
     value: {
@@ -92,7 +89,6 @@ export function loadOrderData(): Checked<OrderData> {
       ),
       vocabulary,
       mapping,
-      paymentCards,
     },
   };
 }
@@ -111,7 +107,7 @@ export function createOrderResolver({
 export function createConversationDependencies(): Checked<ConversationDependenciesWithoutSignal> {
   const data = loadOrderData();
   if (!data.ok) return data;
-  const { products, snapshot, vocabulary, mapping, paymentCards } = data.value;
+  const { products, snapshot, vocabulary, mapping } = data.value;
   return {
     ok: true,
     value: {
@@ -119,7 +115,6 @@ export function createConversationDependencies(): Checked<ConversationDependenci
       snapshot,
       vocabulary,
       mapping,
-      paymentCards,
       llm: createLlm({ vocabulary }),
       store: createOnlineStore(),
     },

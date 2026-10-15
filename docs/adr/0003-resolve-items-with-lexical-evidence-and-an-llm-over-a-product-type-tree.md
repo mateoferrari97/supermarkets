@@ -1,5 +1,5 @@
 ---
-Status: accepted
+Status: superseded by ADR-0012
 ---
 
 # Resolve each Item with lexical evidence and an LLM over a tree of Product Types

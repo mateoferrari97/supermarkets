@@ -27,7 +27,7 @@
 
 ## Before every push
 
-Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test`, `pnpm product-types`, `pnpm payment-cards` and `pnpm order:eval-set`.
+Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test`, `pnpm product-types` and `pnpm order:eval-set`.
 
 If a step fails, fix it or tell the user; never push with a failing step, and never skip a step to make it pass. When a test, build or check is added, add it to `pnpm check`.
 
@@ -52,7 +52,7 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - `pnpm typecheck`, `pnpm lint`, `pnpm format` (`--check` to only check), `pnpm no-comments`.
 - The operator commands below run one file each in `src/cli/` and read and write data only through the loaders and savers of `src/compose.ts`.
 - `pnpm order:eval [filter...]`: runs the order resolution eval set with real Claude Code sessions ([LLM](docs/LLM.md#changing-a-prompt)).
-- `pnpm order:eval-set`, `pnpm product-types`, `pnpm payment-cards`: validate the committed data in `evals/` and `vocabulary/` with the same loaders every command uses.
+- `pnpm order:eval-set`, `pnpm product-types`: validate the committed data in `evals/` and `vocabulary/` with the same loaders every command uses.
 - `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `.data/carrefour/` (`products.json`, `tipos.json`), or into the directory given as its argument. `.data/` is not committed.
 - `pnpm seed:split`, `pnpm seed:check-proposal <part-id>`, `pnpm seed:consolidate`, `pnpm seed:coverage`, `pnpm seed:doubts [size]`: the Product Type seed, run by the `seed-product-types` and `review-product-type-doubts` skills.
 

@@ -1,10 +1,7 @@
 import { stepsFrom, type StepOptions } from "../order-conversation/steps.ts";
 import type { TipoMapping } from "../product-types/schema.ts";
 import { nameMatchesTerm, productMatchesBrand, sizesIn } from "../catalog/catalog.ts";
-import { DEFAULT_SELECTION_POLICY, type SelectionPolicy } from "../order-resolution/concepts.ts";
-import type { Llm } from "../order-resolution/llm.ts";
 import type { OrderItem, OrderResolution } from "../order-resolution/resolve-order.ts";
-import { findPaymentCard, type PaymentCardTable } from "./payment-cards.ts";
 import { postalCodeFrom } from "./postal-code.ts";
 import type {
   OnlineStore,
@@ -34,18 +31,13 @@ export type ProductSelection = {
   total: number;
   cartLink: string | null;
   notices: string[];
-  unexpressed: string[];
 };
 
 export type PickDependencies = {
   mapping: TipoMapping;
   store: OnlineStore;
-  llm: Pick<Llm, "translatePreference">;
-  paymentCards: PaymentCardTable;
   snapshot: SnapshotProduct[];
 };
-
-type Ranking = SelectionPolicy["ranking"];
 
 type Priced = { product: StoreProduct; quantity: number; line: SimulatedLine };
 
@@ -54,12 +46,11 @@ type ItemPick = { item: OrderItem; ranked: Priced[]; chosen: number; notices: st
 export async function pickProducts(
   resolution: OrderResolution,
   postalCode: string,
-  { mapping, store, llm, paymentCards, snapshot }: PickDependencies,
+  { mapping, store, snapshot }: PickDependencies,
   options?: StepOptions,
 ): Promise<ProductSelection> {
   const steps = stepsFrom(options);
   const { signal } = steps;
-  const { paymentCard, preference } = resolution;
   if (resolution.message !== null) {
     throw new Error("Products can only be picked once every question of the order is answered");
   }
@@ -67,18 +58,10 @@ export async function pickProducts(
     throw new Error("Products can only be picked for an accepted postal code");
   }
 
-  const policy =
-    preference === null
-      ? DEFAULT_SELECTION_POLICY
-      : await steps.run({ kind: "translate-preference", preference }, () =>
-          llm.translatePreference({ preference }, signal),
-        );
-  const card = paymentCard === null ? null : findPaymentCard(paymentCards, paymentCard);
-  const orderNotices =
-    paymentCard !== null && card === null
-      ? [`No conozco la tarjeta "${paymentCard}": elegí los productos sin sus promociones.`]
-      : [];
-  const simulate = (items: SimulationItem[]) => store.simulate({ postalCode, card, items }, signal);
+  const orderNotices = resolution.ignoredPreference
+    ? ["Por ahora no tengo en cuenta tarjetas ni preferencias."]
+    : [];
+  const simulate = (items: SimulationItem[]) => store.simulate({ postalCode, items }, signal);
 
   const tiposOf = (item: OrderItem) => {
     const ids = new Set(item.productTypes.map(({ id }) => id));
@@ -114,47 +97,37 @@ export async function pickProducts(
 
   const pick = async (item: OrderItem): Promise<ItemPick> => {
     const tipos = tiposOf(item);
-    const rules = brandRules(item, policy);
+    const brands = item.brand ? [item.brand] : [];
     const wanted = (product: StoreProduct) =>
-      !rules.excluded.some((brand) => productMatchesBrand(product, brand)) &&
       termsFor(item, product).every((term) => nameMatchesTerm(product.name, term));
     const notices: string[] = [];
 
-    for (const [attempt, brands] of rules.searches.entries()) {
-      const found = await store.findCandidates(
-        {
-          postalCode,
-          tipos,
-          brands,
-          sort: policy.ranking === "cheapest-per-unit" ? "price:asc" : "discount:desc",
-          limit:
-            item.terms.length > 0 || rules.excluded.length > 0 ? SEARCH_LIMIT : SIMULATION_LIMIT,
-        },
-        signal,
-      );
-      const available = await firstAvailable(item, found.filter(wanted), CANDIDATES_PER_ITEM);
-      if (available.length > 0) {
-        if (attempt > 0) {
-          notices.push(
-            `No encontré ${rules.searches[0]!.join(" ni ")} disponible: elegí otra marca.`,
-          );
-        }
-        return { item, ranked: rank(available, policy.ranking), chosen: 0, notices };
-      }
+    const found = await store.findCandidates(
+      {
+        postalCode,
+        tipos,
+        brands,
+        sort: "discount:desc",
+        limit: item.terms.length > 0 ? SEARCH_LIMIT : SIMULATION_LIMIT,
+      },
+      signal,
+    );
+    const available = await firstAvailable(item, found.filter(wanted), CANDIDATES_PER_ITEM);
+    if (available.length > 0) {
+      return { item, ranked: rank(available), chosen: 0, notices };
     }
 
     const fromSnapshot = snapshot.filter(
       (product) =>
         tipos.includes(product.tipo) &&
-        (rules.strict.length === 0 ||
-          rules.strict.some((brand) => productMatchesBrand(product, brand))) &&
+        brands.every((brand) => productMatchesBrand(product, brand)) &&
         wanted(product),
     );
-    const available = await firstAvailable(item, fromSnapshot, 1, CANDIDATES_PER_ITEM);
-    if (available.length > 0) {
+    const fallback = await firstAvailable(item, fromSnapshot, 1, CANDIDATES_PER_ITEM);
+    if (fallback.length > 0) {
       notices.push("La búsqueda no lo encontró: lo elegí del catálogo.");
     }
-    return { item, ranked: rank(available, policy.ranking), chosen: 0, notices };
+    return { item, ranked: rank(fallback), chosen: 0, notices };
   };
 
   const picks = await Promise.all(
@@ -241,7 +214,7 @@ export async function pickProducts(
         quantity: best.quantity,
         unitPrice: line.total / best.quantity,
         total: line.total,
-        reason: reasonFor({ ...best, line }, ranked.length === 1, policy.ranking),
+        reason: reasonFor({ ...best, line }, ranked.length === 1),
         notices: [notice, ...notices, changed, hint].filter(
           (text): text is string => text !== null,
         ),
@@ -258,22 +231,7 @@ export async function pickProducts(
     total: cart.total,
     cartLink: bought.length > 0 ? store.cartLink(bought) : null,
     notices: orderNotices,
-    unexpressed: policy.unexpressed,
   };
-}
-
-type BrandRules = { searches: string[][]; strict: string[]; excluded: string[] };
-
-function brandRules(item: OrderItem, policy: SelectionPolicy): BrandRules {
-  if (item.brand) return { searches: [[item.brand]], strict: [item.brand], excluded: [] };
-  const excluded = policy.brandsExcluded;
-  if (policy.brandsOnly.length > 0) {
-    return { searches: [policy.brandsOnly], strict: policy.brandsOnly, excluded };
-  }
-  if (policy.brandsPreferred.length > 0) {
-    return { searches: [policy.brandsPreferred, []], strict: [], excluded };
-  }
-  return { searches: [[]], strict: [], excluded };
 }
 
 const weightKg = (term: string) => {
@@ -329,12 +287,10 @@ async function promotionHint(
   return `Llevando ${teaser.minimumQuantity} sale ${money(cheaper)} c/u en vez de ${money(unit)} (${teaser.name}).`;
 }
 
-function rank(candidates: Priced[], ranking: Ranking): Priced[] {
+function rank(candidates: Priced[]): Priced[] {
   return [...candidates].sort((a, b) => {
-    if (ranking === "savings-first") {
-      const saves = Number(b.line.savings > 0) - Number(a.line.savings > 0);
-      if (saves !== 0) return saves;
-    }
+    const saves = Number(b.line.savings > 0) - Number(a.line.savings > 0);
+    if (saves !== 0) return saves;
     const byPrice = pricePerUnit(a, b) ?? a.line.total / a.quantity - b.line.total / b.quantity;
     if (byPrice !== 0) return byPrice;
     return Number(a.product.itemId) - Number(b.product.itemId);
@@ -347,17 +303,13 @@ function pricePerUnit(a: Priced, b: Priced): number | null {
   return a.line.total / (a.quantity * first.amount) - b.line.total / (b.quantity * second.amount);
 }
 
-function reasonFor({ product, line }: Priced, alone: boolean, ranking: Ranking): string {
+function reasonFor({ product, line }: Priced, alone: boolean): string {
   const cheapest =
     product.measure?.dimension === "volume"
       ? "Es el más barato por litro"
       : product.measure?.dimension === "weight"
         ? "Es el más barato por kilo"
         : "Es el más barato";
-  if (ranking === "cheapest-per-unit") {
-    const base = alone ? "Es el único disponible entre los candidatos" : cheapest;
-    return line.promotions.length > 0 ? `${base}, con ${line.promotions.join("; ")}.` : `${base}.`;
-  }
   if (line.promotions.length > 0) return `Promoción: ${line.promotions.join("; ")}.`;
   if (line.savings > 0) return `Tiene ${money(line.savings)} de descuento.`;
   if (alone) return "Es el único disponible entre los candidatos.";

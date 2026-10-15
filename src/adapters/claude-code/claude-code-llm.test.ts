@@ -14,7 +14,6 @@ import {
 const promptsDir = mkdtempSync(join(tmpdir(), "prompts-"));
 writeFileSync(join(promptsDir, "split-order.md"), "Split the order.");
 writeFileSync(join(promptsDir, "resolve-item.md"), "Resolve the Item.");
-writeFileSync(join(promptsDir, "translate-preference.md"), "Translate the preference.");
 
 const vocabulary = {
   groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
@@ -83,49 +82,6 @@ describe("createClaudeCodeLlm", () => {
     assert.equal("$schema" in JSON.parse(args[args.indexOf("--json-schema") + 1]!), false);
     assert.ok(
       args[args.indexOf("--system-prompt") + 1]!.includes("grupo-yerba (Yerba): yerba (Yerba)"),
-    );
-  });
-
-  it("translates a preference into a validated Selection Policy with its own prompt", async () => {
-    const argsSeen: string[][] = [];
-    const policy = {
-      ranking: "cheapest-per-unit",
-      brandsOnly: [],
-      brandsPreferred: ["Sancor", "Ilolay"],
-      brandsExcluded: ["Marolio"],
-      unexpressed: ["que sea orgánico"],
-    };
-    const llm = llmWith(session({ structured_output: policy }), [], argsSeen);
-    assert.deepEqual(
-      await llm.translatePreference(
-        { preference: "lo más barato, prefiero Sancor o Ilolay" },
-        signal,
-      ),
-      policy,
-    );
-    const args = argsSeen[0]!;
-    assert.equal(args[args.indexOf("--system-prompt") + 1], "Translate the preference.");
-    const schema = JSON.parse(args[args.indexOf("--json-schema") + 1]!) as {
-      properties: { ranking: { enum: string[] } };
-    };
-    assert.deepEqual(schema.properties.ranking.enum, ["savings-first", "cheapest-per-unit"]);
-  });
-
-  it("fails on a Selection Policy with a ranking no rule knows", async () => {
-    const llm = llmWith(
-      session({
-        structured_output: {
-          ranking: "best-quality",
-          brandsOnly: [],
-          brandsPreferred: [],
-          brandsExcluded: [],
-          unexpressed: [],
-        },
-      }),
-    );
-    await assert.rejects(
-      llm.translatePreference({ preference: "lo mejor" }, signal),
-      /translate-preference returned an invalid answer/,
     );
   });
 

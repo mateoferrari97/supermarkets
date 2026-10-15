@@ -18,11 +18,6 @@ import {
 } from "../../core/order-resolution/eval-set.ts";
 import type { EvalRun } from "../../core/order-resolution/eval-run.ts";
 import {
-  paymentCardTableSchema,
-  validatePaymentCards,
-  type PaymentCardTable,
-} from "../../core/product-selection/payment-cards.ts";
-import {
   decisionsSchema,
   renderSummary,
   type Consolidation,
@@ -55,7 +50,6 @@ export const DOUBTS_PATH = `${SEED_DIR}/doubts.json`;
 export const SUMMARY_PATH = `${SEED_DIR}/summary.md`;
 export const VOCABULARY_PATH = "vocabulary/product-types.json";
 export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
-export const PAYMENT_CARDS_PATH = "vocabulary/carrefour-payment-cards.json";
 export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
 export const PROMPTS_DIR = "prompts/order-resolution";
@@ -88,10 +82,7 @@ export type CatalogRecord = z.infer<typeof catalogSchema>["products"][number];
 
 export type ProductTypes = { vocabulary: Vocabulary; mapping: TipoMapping };
 
-export type OrderFiles = ProductTypes & {
-  catalog: CatalogRecord[];
-  paymentCards: PaymentCardTable;
-};
+export type OrderFiles = ProductTypes & { catalog: CatalogRecord[] };
 
 export type CheckedEvalSet = { evalSet: EvalSet; vocabulary: Vocabulary };
 
@@ -147,12 +138,6 @@ export function createDataFiles(root = ".") {
     });
   };
 
-  const loadPaymentCards = (): Checked<PaymentCardTable> => {
-    const input = readJson(PAYMENT_CARDS_PATH);
-    const errors = validatePaymentCards(input);
-    return errors.length > 0 ? failed(errors) : ok(paymentCardTableSchema.parse(input));
-  };
-
   const loadEvalSet = (): Checked<CheckedEvalSet> => {
     const productTypes = loadProductTypes();
     if (!productTypes.ok) return productTypes;
@@ -167,17 +152,13 @@ export function createDataFiles(root = ".") {
   const loadOrderFiles = (): Checked<OrderFiles> => {
     const catalog = loadCatalog();
     const productTypes = loadProductTypes();
-    const paymentCards = loadPaymentCards();
-    if (!catalog.ok || !productTypes.ok || !paymentCards.ok) {
-      return failed(
-        [catalog, productTypes, paymentCards].flatMap((loaded) => (loaded.ok ? [] : loaded.errors)),
-      );
+    if (!catalog.ok || !productTypes.ok) {
+      return failed([catalog, productTypes].flatMap((loaded) => (loaded.ok ? [] : loaded.errors)));
     }
     const grocery = new Set<string>(GROCERY_DEPARTMENTS);
     return ok({
       catalog: catalog.value.filter((product) => grocery.has(product.department)),
       ...productTypes.value,
-      paymentCards: paymentCards.value,
     });
   };
 
@@ -298,7 +279,6 @@ export function createDataFiles(root = ".") {
     openConversationLog,
     loadCatalog,
     loadProductTypes,
-    loadPaymentCards,
     loadEvalSet,
     loadOrderFiles,
     saveParts,

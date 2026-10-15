@@ -32,7 +32,7 @@ function replyEvent(reply: Reply): TurnEvent {
           .map((options, index) => ({ number: index + 1, options })),
       };
     case "selection":
-      return { type: "cart", cart: { ...reply.selection, paymentCard: reply.paymentCard } };
+      return { type: "cart", cart: reply.selection };
   }
 }
 

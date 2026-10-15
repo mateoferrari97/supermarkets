@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { sameBrand, sizesIn } from "../../core/catalog/catalog.ts";
 import { normalize } from "../../core/catalog/text.ts";
-import type { Measure, PaymentCard } from "../../core/product-selection/concepts.ts";
+import type { Measure } from "../../core/product-selection/concepts.ts";
 import type {
   CandidateQuery,
   Delivery,
@@ -249,7 +249,7 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
   };
 
   const simulate = async (
-    { postalCode, card, items }: SimulationRequest,
+    { postalCode, items }: SimulationRequest,
     signal: AbortSignal,
   ): Promise<Simulation> => {
     const url = `${CARREFOUR_URL}/api/checkout/pub/orderForms/simulation?sc=1&RnbBehavior=0`;
@@ -261,7 +261,6 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
           items: items.map(({ itemId, quantity }) => ({ id: itemId, quantity, seller: "1" })),
           country: "ARG",
           postalCode,
-          ...(card ? { paymentData: { payments: [payment(card)] } } : {}),
         },
         signal,
       }),
@@ -332,16 +331,6 @@ export function snapshotProducts(records: SnapshotRecord[]): SnapshotProduct[] {
       },
     ];
   });
-}
-
-function payment({ paymentSystem, bin }: PaymentCard) {
-  return {
-    paymentSystem,
-    ...(bin ? { bin } : {}),
-    installments: 1,
-    value: 0,
-    referenceValue: 0,
-  };
 }
 
 function measureOf(

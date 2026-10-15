@@ -12,7 +12,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { validateEvalSet } from "../../core/order-resolution/eval-set.ts";
-import { validatePaymentCards } from "../../core/product-selection/payment-cards.ts";
 import { validateProductTypes } from "../../core/product-types/validate.ts";
 import { createDataFiles } from "./data-files.ts";
 
@@ -49,9 +48,6 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "data-files-"));
   write("vocabulary/product-types.json", vocabulary);
   write("vocabulary/carrefour-tipos.json", { Yerba: "yerba" });
-  write("vocabulary/carrefour-payment-cards.json", {
-    cards: [{ names: ["Visa"], paymentSystem: "2", bin: null }],
-  });
   write("evals/order-resolution.json", {
     cases: [{ id: "yerba", order: "una yerba", items: [{ productType: "yerba" }] }],
   });
@@ -65,7 +61,6 @@ describe("the committed data", () => {
   it("loads with no errors", () => {
     const files = createDataFiles(repoRoot);
     assert.equal(files.loadProductTypes().ok, true);
-    assert.equal(files.loadPaymentCards().ok, true);
     assert.equal(files.loadEvalSet().ok, true);
   });
 });
@@ -100,35 +95,6 @@ describe("loadProductTypes", () => {
         'Tipo "Yerba" maps to unknown Product Type "mate"',
         'Tipo "Leche" maps to Product Type Group "grupo-yerba" instead of a Product Type',
       ],
-    });
-  });
-});
-
-describe("loadPaymentCards", () => {
-  it("fails with the validator's errors", () => {
-    const table = {
-      cards: [
-        { names: ["Visa"], paymentSystem: "2", bin: null },
-        { names: ["visa"], paymentSystem: "x", bin: null },
-      ],
-    };
-    write("vocabulary/carrefour-payment-cards.json", table);
-    assert.deepEqual(createDataFiles(root).loadPaymentCards(), {
-      ok: false,
-      errors: validatePaymentCards(table),
-    });
-  });
-
-  it("fails on a name used twice", () => {
-    write("vocabulary/carrefour-payment-cards.json", {
-      cards: [
-        { names: ["Visa"], paymentSystem: "2", bin: null },
-        { names: ["visa"], paymentSystem: "4", bin: null },
-      ],
-    });
-    assert.deepEqual(createDataFiles(root).loadPaymentCards(), {
-      ok: false,
-      errors: ['payment card name "visa" is used more than once'],
     });
   });
 });
@@ -171,13 +137,11 @@ describe("loadOrderFiles", () => {
 
   it("fails with every error when data is missing or invalid", () => {
     write("vocabulary/carrefour-tipos.json", { Yerba: "mate" });
-    write("vocabulary/carrefour-payment-cards.json", { cards: "none" });
     assert.deepEqual(createDataFiles(root).loadOrderFiles(), {
       ok: false,
       errors: [
         "No Catalog Snapshot at .data/carrefour/products.json. Run pnpm carrefour:catalog first.",
         'Tipo "Yerba" maps to unknown Product Type "mate"',
-        "payment cards cards: Invalid input: expected array, received string",
       ],
     });
   });
