@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { describe, it } from "vitest";
 import type { CatalogProduct } from "../../core/order-matching/catalog-product.ts";
 import type { FitProductsInput } from "../../core/order-matching/match-items.ts";
+import type { ReadReplyInput } from "../../core/order-matching/read-reply.ts";
 import {
   createClaudeCodeLlm,
   createProcessRunner,
@@ -20,6 +21,7 @@ writeFileSync(join(promptsDir, "order-resolution", "split-order.md"), "Split the
 writeFileSync(join(promptsDir, "order-resolution", "resolve-item.md"), "Resolve the Item.");
 writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
 writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
+writeFileSync(join(promptsDir, "order-matching", "read-reply.md"), "Read the reply.");
 
 const vocabulary = {
   groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
@@ -378,6 +380,229 @@ describe("fitProducts", () => {
       llm.fitProducts(input(), signal),
       /fit-products returned an invalid answer/,
     );
+  });
+});
+
+describe("readReply", () => {
+  const product = (name: string, brand: string | null): CatalogProduct => ({
+    productId: name,
+    itemId: name,
+    name,
+    brand,
+    department: "Bebidas",
+    tipo: null,
+    price: 1000,
+    inStock: true,
+    sale: { kind: "packaged", size: null },
+    teasers: [],
+  });
+  const input: ReadReplyInput = {
+    items: [
+      {
+        kind: "asked",
+        original: "cerveza artesanal de tamarindo",
+        question: {
+          text: "No encontré cerveza de tamarindo. ¿Te sirve alguna?",
+          alternatives: [
+            product("Cerveza ipa República Artesanal 473 ml", "República Artesanal"),
+            product("Cerveza roja Patagonia 730 cc", "Patagonia"),
+          ],
+        },
+      },
+      {
+        kind: "bought",
+        original: "coca cola zero grande",
+        product: product("Gaseosa cola Coca Cola Zero 2,25 lts", "Coca Cola"),
+      },
+      {
+        kind: "asked",
+        original: "1 bolsa de carbon",
+        question: {
+          text: "¿Te sirve este?",
+          alternatives: [product("Carbón vegetal 4 kg", null)],
+        },
+      },
+    ],
+    reply: "la 2, y sacá el carbón",
+  };
+  const line = (fields: Record<string, unknown>) => ({
+    original: "un vino tinto",
+    product: "Vino tinto",
+    brand: null,
+    size: "common",
+    quantity: "minimum",
+    ...fields,
+  });
+  const answer = (entries: Record<string, unknown>[], newLines: unknown[] = []) =>
+    session({ structured_output: { entries, newLines, ignoredPreference: false } });
+
+  it("runs Sonnet at low effort with its prompt and the Items and reply it renders", async () => {
+    const calls: LlmCall[] = [];
+    const argsSeen: string[][] = [];
+    const inputsSeen: string[] = [];
+    const llm = llmWith(
+      answer([
+        { item: 1, kind: "choice", alternative: 2 },
+        { item: 3, kind: "drop" },
+      ]),
+      calls,
+      argsSeen,
+      [],
+      inputsSeen,
+    );
+    assert.deepEqual(await llm.readReply(input, signal), {
+      entries: [
+        { item: 1, kind: "choice", alternative: 2 },
+        { item: 3, kind: "drop" },
+      ],
+      newLines: [],
+      ignoredPreference: false,
+    });
+    const args = argsSeen[0]!;
+    assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
+    assert.equal(args[args.indexOf("--effort") + 1], "low");
+    assert.equal(args[args.indexOf("--system-prompt") + 1], "Read the reply.");
+    const rendered = [
+      "<items>",
+      '<item number="1" state="asked">',
+      "<original>cerveza artesanal de tamarindo</original>",
+      "<question>No encontré cerveza de tamarindo. ¿Te sirve alguna?</question>",
+      "<alternatives>",
+      "1. Cerveza ipa República Artesanal 473 ml | República Artesanal",
+      "2. Cerveza roja Patagonia 730 cc | Patagonia",
+      "</alternatives>",
+      "</item>",
+      '<item number="2" state="in-cart">',
+      "<original>coca cola zero grande</original>",
+      "<bought>Gaseosa cola Coca Cola Zero 2,25 lts | Coca Cola</bought>",
+      "</item>",
+      '<item number="3" state="asked">',
+      "<original>1 bolsa de carbon</original>",
+      "<question>¿Te sirve este?</question>",
+      "<alternatives>",
+      "1. Carbón vegetal 4 kg | sin marca",
+      "</alternatives>",
+      "</item>",
+      "</items>",
+      "<reply>",
+      "la 2, y sacá el carbón",
+      "</reply>",
+    ].join("\n");
+    assert.deepEqual(inputsSeen, [rendered]);
+    assert.deepEqual(
+      calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
+      [{ task: "read-reply", model: "claude-sonnet-5-5", effort: "low", input: rendered }],
+    );
+  });
+
+  it("parses the size and quantity of replacing lines and new lines into Items", async () => {
+    const llm = llmWith(
+      answer(
+        [
+          {
+            item: 2,
+            kind: "lines",
+            lines: [
+              line({
+                original: "la coca de 1,5",
+                product: "Gaseosa cola zero",
+                brand: "Coca Cola",
+                size: "1.5 l",
+              }),
+            ],
+          },
+        ],
+        [line({ quantity: "2 unit" })],
+      ),
+    );
+    assert.deepEqual(await llm.readReply(input, signal), {
+      entries: [
+        {
+          item: 1,
+          kind: "unanswered",
+          question: null,
+        },
+        {
+          item: 2,
+          kind: "lines",
+          lines: [
+            {
+              original: "la coca de 1,5",
+              product: "Gaseosa cola zero",
+              brand: "Coca Cola",
+              size: { kind: "exact", dimension: "volume", amount: 1500 },
+              quantity: { kind: "minimum" },
+            },
+          ],
+        },
+        { item: 3, kind: "unanswered", question: null },
+      ],
+      newLines: [
+        {
+          original: "un vino tinto",
+          product: "Vino tinto",
+          brand: null,
+          size: { kind: "common" },
+          quantity: { kind: "units", count: 2 },
+        },
+      ],
+      ignoredPreference: false,
+    });
+  });
+
+  it("adds an unanswered entry for each asked Item the answer leaves out, in Item order", async () => {
+    const llm = llmWith(answer([{ item: 3, kind: "drop" }]));
+    assert.deepEqual((await llm.readReply(input, signal)).entries, [
+      { item: 1, kind: "unanswered", question: null },
+      { item: 3, kind: "drop" },
+    ]);
+  });
+
+  it("keeps a question for an ambiguous Correction of an Item in the cart", async () => {
+    const llm = llmWith(
+      answer([
+        { item: 1, kind: "choice", alternative: 1 },
+        { item: 2, kind: "unanswered", question: "¿Cuál coca, la zero o la normal?" },
+        { item: 3, kind: "unanswered", question: null },
+      ]),
+    );
+    assert.deepEqual((await llm.readReply(input, signal)).entries[1], {
+      item: 2,
+      kind: "unanswered",
+      question: "¿Cuál coca, la zero o la normal?",
+    });
+  });
+
+  it.each([
+    ["an Item outside the list", [{ item: 4, kind: "drop" }]],
+    [
+      "two entries for one Item",
+      [
+        { item: 1, kind: "drop" },
+        { item: 1, kind: "choice", alternative: 1 },
+      ],
+    ],
+    ["an alternative outside the question", [{ item: 1, kind: "choice", alternative: 3 }]],
+    ["an alternative of zero", [{ item: 1, kind: "choice", alternative: 0 }]],
+    ["a choice for an Item in the cart", [{ item: 2, kind: "choice", alternative: 1 }]],
+    [
+      "an unanswered Item in the cart without a question",
+      [{ item: 2, kind: "unanswered", question: null }],
+    ],
+    ["lines without a line", [{ item: 2, kind: "lines", lines: [] }]],
+    [
+      "a line with a size it cannot read",
+      [{ item: 2, kind: "lines", lines: [line({ size: "1,5" })] }],
+    ],
+    ["an unknown kind", [{ item: 1, kind: "any" }]],
+  ])("fails on %s", async (_case, entries) => {
+    const llm = llmWith(answer(entries));
+    await assert.rejects(llm.readReply(input, signal), /read-reply returned an invalid answer/);
+  });
+
+  it("fails on a new line with a quantity it cannot read", async () => {
+    const llm = llmWith(answer([], [line({ quantity: "0 unit" })]));
+    await assert.rejects(llm.readReply(input, signal), /read-reply returned an invalid answer/);
   });
 });
 

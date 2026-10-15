@@ -87,6 +87,7 @@ const conversation = ({
   const llm: Llm = {
     parseOrder: () => Promise.reject(new Error("no parse")),
     fitProducts: () => Promise.reject(new Error("no fit")),
+    readReply: () => Promise.reject(new Error("no reply")),
     splitOrder: (_text, signal) => {
       seen("splitOrder", signal);
       return Promise.resolve({ items, ignoredPreference });

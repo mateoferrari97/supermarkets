@@ -6,8 +6,8 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 ## The port and its adapter
 
-- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
-- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` runs on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012); the other tasks run on `claude-haiku-5-5` at its default effort until they are deleted. Neither model takes a `temperature`, so the same text can resolve differently between runs.
+- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `readReply`, `splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
+- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` and `read-reply` run on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012); the other tasks run on `claude-haiku-5-5` at its default effort until they are deleted. Neither model takes a `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
 - The adapter's `onCall` reports every session that returns a result: task, model, effort, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
@@ -31,9 +31,15 @@ The LLM returns `{ fits, closest, note, question }`: the numbers of the Matches 
 
 `matchItems` in `src/core/order-matching/match-items.ts` runs the task for a set of Items, at most 10 calls at a time: for each Item it reports the step "Eligiendo productos para '<original>'", searches 30 Matches with `CatalogSearch`, runs the call, and maps the numbers back to products. It returns per Item its Matches, Fits and Note, or its question with the Alternatives in the order the LLM gave them. One call failing fails the whole set, and no further call starts. The chat does not call it yet.
 
+## The `read-reply` task
+
+`readReply({ items, reply }, signal)` is call 1 in follow-up mode (ADR 0012): it reads the Owner's reply to questions or to a cart. `items` holds every Item of the conversation, types in `src/core/order-matching/read-reply.ts`: an asked Item with its `original` and its question (text and Alternatives), or an Item in the cart with its `original` and the product bought. The adapter numbers them from 1 inside `<items>`, each `<item number="n" state="asked|in-cart">` with `<original>` and either `<question>` and `<alternatives>` (numbered from 1 as `number. name | brand`) or `<bought>`, then sends the reply inside `<reply>`. The chat does not call it yet.
+
+The LLM returns `entries`, one per Item the reply touches: `{ item, kind: "choice", alternative }`, `{ item, kind: "lines", lines }` (Items that replace it), `{ item, kind: "drop" }` or `{ item, kind: "unanswered", question }`; plus `newLines` for things the reply adds and `ignoredPreference`. Lines come back as the strings of `parse-order` and are parsed the same way. The adapter checks what the schema cannot: one entry at most per Item, every Item number in the list, every `alternative` among that Item's Alternatives, `choice` only for an asked Item, and `unanswered` for an Item in the cart only with a question (an ambiguous Correction, "¿Cuál coca, la zero o la normal?"). A failed check fails the call. It then adds `{ kind: "unanswered", question: null }` for every asked Item with no entry and returns the entries in Item order, so every asked Item has exactly one.
+
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-resolution/split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, `order-matching/fit-products.md`, `order-matching/read-reply.md`, and `order-resolution/split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 

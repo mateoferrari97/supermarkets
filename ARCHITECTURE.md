@@ -31,7 +31,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
 
 Three things are ports (ADR 0006, ADR 0012):
 
-- `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer; `parseOrder`, which reads an order into the Items of `src/core/order-matching/item.ts`, and `fitProducts`, which keeps the Fits of one Item among its Matches (ADR 0012); neither is called by the chat yet.
+- `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer; `parseOrder`, which reads an order into the Items of `src/core/order-matching/item.ts`, and `fitProducts`, which keeps the Fits of one Item among its Matches, and `readReply`, which reads the Owner's reply to questions or a cart into entries per Item with the input types of `src/core/order-matching/read-reply.ts` (ADR 0012); none is called by the chat yet.
 - `OnlineStore` (`src/core/product-selection/online-store.ts`): check delivery to a postal code, find candidates, simulate a cart, build the cart link.
 - `CatalogSearch` (`src/core/order-matching/catalog-search.ts`): `findMatches({ product, brand }, limit)` returns the Matches of one Item, 30 by default, synchronously. It is a port because the search is planned to move to Postgres, not because two adapters exist.
 
