@@ -1,5 +1,6 @@
 import { downloadCatalog as downloadCarrefourCatalog } from "./adapters/carrefour/catalog-download.ts";
 import { createCarrefourStore, snapshotProducts } from "./adapters/carrefour/carrefour-store.ts";
+import { createInMemoryCatalogSearch } from "./adapters/catalog-search/in-memory-catalog-search.ts";
 import {
   DEFAULT_MODEL,
   createClaudeCodeLlm,
@@ -12,6 +13,7 @@ import {
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
+import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
 import type { Llm } from "./core/order-resolution/llm.ts";
 import {
   createOrderResolver as createResolver,
@@ -60,6 +62,12 @@ export function createLlm(options: LlmOptions): Llm {
 
 export function createOnlineStore(): OnlineStore {
   return createCarrefourStore();
+}
+
+export function createCatalogSearch(): Checked<CatalogSearch> {
+  const products = loadCatalogProducts();
+  if (!products.ok) return products;
+  return { ok: true, value: createInMemoryCatalogSearch(products.value) };
 }
 
 export function loadOrderData(): Checked<OrderData> {

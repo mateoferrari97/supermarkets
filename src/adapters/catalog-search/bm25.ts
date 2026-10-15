@@ -1,7 +1,10 @@
 const K1 = 1.2;
 const B = 0.75;
 
-export type Bm25Index = { search(query: string, limit: number): number[] };
+export type Bm25Index = {
+  scores(query: string): Map<number, number>;
+  search(query: string, limit: number): number[];
+};
 
 export function tokenize(text: string): string[] {
   return text
@@ -41,22 +44,25 @@ export function buildBm25Index(documents: string[]): Bm25Index {
     }
   });
 
-  return {
-    search(query, limit) {
-      const scores = new Map<number, number>();
-      for (const token of new Set(tokenize(query))) {
-        const matches = postings.get(token);
-        if (!matches) continue;
-        const idf = Math.log(
-          1 + (documents.length - matches.length + 0.5) / (matches.length + 0.5),
-        );
-        for (const index of matches) {
-          const frequency = termFrequencies[index]!.get(token)!;
-          const norm = frequency + K1 * (1 - B + (B * lengths[index]!) / averageLength);
-          scores.set(index, (scores.get(index) ?? 0) + (idf * frequency * (K1 + 1)) / norm);
-        }
+  const scores = (query: string) => {
+    const result = new Map<number, number>();
+    for (const token of new Set(tokenize(query))) {
+      const matches = postings.get(token);
+      if (!matches) continue;
+      const idf = Math.log(1 + (documents.length - matches.length + 0.5) / (matches.length + 0.5));
+      for (const index of matches) {
+        const frequency = termFrequencies[index]!.get(token)!;
+        const norm = frequency + K1 * (1 - B + (B * lengths[index]!) / averageLength);
+        result.set(index, (result.get(index) ?? 0) + (idf * frequency * (K1 + 1)) / norm);
       }
-      return [...scores]
+    }
+    return result;
+  };
+
+  return {
+    scores,
+    search(query, limit) {
+      return [...scores(query)]
         .sort((a, b) => b[1] - a[1] || a[0] - b[0])
         .slice(0, limit)
         .map(([index]) => index);
