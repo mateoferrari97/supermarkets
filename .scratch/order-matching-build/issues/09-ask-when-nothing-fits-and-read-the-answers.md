@@ -18,10 +18,10 @@
 
 ## Acceptance
 
-- [ ] `takeTurn` tests with fakes: questions with Alternatives and no simulation; each entry kind; a missing entry; re-ask in code with the same Alternatives; the 2-question limit dropping an Item; `newLines`; a cart once the last question is answered.
+- [x] `takeTurn` tests with fakes: questions with Alternatives and no simulation; each entry kind; a missing entry; re-ask in code with the same Alternatives; the 2-question limit dropping an Item; `newLines`; a cart once the last question is answered.
 - [x] Adapter tests for `read-reply`: input, schema, the checks.
 - [ ] Answer cases validated by `pnpm order:eval-set` and run once by `pnpm order:eval`; results noted under Comments.
-- [ ] One real conversation in the chat with a question answered by number and one by a new brand: Conversation Log path noted under Comments.
+- [x] One real conversation in the chat with a question answered by number and one by a new brand: Conversation Log path noted under Comments.
 - [x] `docs/LLM.md` describes `read-reply`.
 - [x] `pnpm check` exits 0.
 
@@ -49,3 +49,27 @@ Built only the `read-reply` LLM task; `takeTurn`, the chat and the eval answer c
 
 All 8 outputs are what the spec expects. "un vino tinto" and "una Patagonia" come back as `1 unit` rather than `minimum`; both buy one unit of a packaged product, so the cart is the same.
 
+
+### Turn and chat part (2026-10-15)
+
+- `takeTurn` (`src/core/order-conversation/take-turn.ts`) has a `questions` stage. Its state keeps per Item either the Item to buy (Candidates of its Fits, not recomputed) or the asked Item with its `Question`, the questions spent and whether it is a re-ask; plus the block Notes (dropped after two questions, removed) and `ignoredPreference`. The reply kind `questions` carries the text and, per question, the Alternative names for the chips. The temporary "not got" of ticket 08 is gone.
+- Message: "Tengo una pregunta:" or "Tengo unas preguntas:", one numbered question per asked Item with its Alternatives as `   n) name ($price)` (price left out when the snapshot has none), then the hint 'Respondé con el número ("la 2"), con otro producto o marca ("dale, una Patagonia") o "sacala".' A re-ask is "Me falta saber de <original>: <stored text>" with the same Alternatives. An empty reply re-sends the same questions with no call.
+- `choice` uses `candidateOf` (`src/core/product-selection/candidates.ts`): the Item's quantity applied to that product, no size rule; when the quantity cannot apply (a weight for a product not sized by weight) it falls back to one unit.
+- Question count, as read from the Decisions: the first question spends 1; `unanswered` and lines with no Fit spend one more; an Item that would need a third is dropped with the block Note 'No conseguí "<original>": te pregunté 2 veces y no encontré qué llevar'. Lines that replace an asked Item inherit its count (the spec says "each with 2 new questions", which would let an Item be asked three times; the ticket's "at most 2 questions per Item" wins). `newLines` start at 0.
+- Block order after the table: Items not got (dropped after two questions, then every Candidate unavailable), Items removed ("Saqué: <original>"), the ignored card or preference.
+- Chat: one chip per Alternative, which adds its name to the reply; the "cualquiera" chip is removed. The chat still ends on the cart (ticket 10).
+- Tests: `describe("questions")` in `take-turn.test.ts`, 14 cases, plus the Notes test now drops its asked Item through a reply.
+
+Real conversations through `pnpm dev` (`POST /api/turn`, the chat's endpoint), CP 1425, commit 09002b3. Conversation Logs in this worktree's `.data/conversations/` (not committed):
+
+| Log | Order | Reply | Result | Turn times |
+|---|---|---|---|---|
+| `2026-10-15-182215-afcce55e-fe3b-4420-9fef-9cc805387c0b.jsonl` | "cerveza artesanal de tamarindo y un vino de frutilla": 2 questions, 5 and 3 Alternatives | "la cerveza la 5. el vino dale, uno de Toro" | `choice` 5: Cerveza Amber República Artesanal 473 ml; `lines` "uno de Toro": call 2 picked Vino tinto Merlot Alaris 750 ml with Note "No hay vino Toro; elegí otra marca." Cart $5200.85, empty block | 7.4 s, 9.8 s (read-reply 3.4 s, call 2 5.3 s, simulation 1.1 s) |
+| `2026-10-15-182019-450d51f4-42cc-461d-b10e-326e8119bba1.jsonl` | yerba Playadito 1 kg, cerveza de tamarindo, vino de frutilla: 3 questions | "la yerba la 1, la cerveza dale una Patagonia, y el vino sacalo" | choice, lines (Patagonia Amber Lager 730 ml), drop ("Saqué: un vino de frutilla"); the chosen yerba was unavailable in the Branch, so it went to the block | 14.6 s, 11.1 s |
+| `2026-10-15-182102-04fc91c9-20b4-4fa2-ac89-e9dd7a2d8db1.jsonl` | cerveza de tamarindo, jugo de mburucuyá, yerba | "la cerveza dale, una Patagonia. el jugo la 2" | lines and choice; the chosen Clight (itemId 157405) was unavailable alone in the Branch | 9.8 s, 11.0 s |
+| `2026-10-15-182140-0a919325-f406-42cc-8c1f-9616e4455226.jsonl` | cerveza de tamarindo, vino de frutilla, una docena de huevos | "la cerveza la 4. el vino no, dale un vino tinto Toro" | choice of an Antares unavailable in the Branch; lines to Alaris | 11.6 s, 9.6 s |
+
+Every `read-reply` output was right. Seen, outside this ticket:
+
+- Three of four chosen Alternatives were unavailable in the Branch: Alternatives come from Matches, filtered only by snapshot stock, and a chosen one is a single Candidate, so it goes to the block with no question, as the spec says.
+- "yerba playadito 1 kg" got no Fit (call 2 asked for "Playadito tradicional"), and "una docena de huevos" bought 12 packs of 6 eggs (call 1 or the quantity rule; tickets 04 and 06).
