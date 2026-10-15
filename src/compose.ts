@@ -13,7 +13,9 @@ import {
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
+import type { CatalogProduct as SnapshotCatalogProduct } from "./core/order-matching/catalog-product.ts";
 import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
+import { matchOrder, type MatchedOrder } from "./core/order-matching/eval-run.ts";
 import type { Llm } from "./core/order-resolution/llm.ts";
 import {
   createOrderResolver as createResolver,
@@ -52,6 +54,7 @@ const files = createDataFiles();
 export const {
   loadCatalog,
   loadCatalogProducts,
+  loadSnapshotFetchedAt,
   loadProductTypes,
   loadEvalSet,
   saveEvalRun,
@@ -106,6 +109,33 @@ export function createOrderResolver({ onCall }: OrderResolverOptions = {}): Chec
   return {
     ok: true,
     value: { ...createResolver({ products, vocabulary, mapping, llm }), model: DEFAULT_MODEL },
+  };
+}
+
+export type OrderMatcher = {
+  products: SnapshotCatalogProduct[];
+  snapshotFetchedAt: string | null;
+  matchOrder(orderText: string): Promise<MatchedOrder>;
+};
+
+export function createOrderMatcher({ onCall }: OrderResolverOptions = {}): Checked<OrderMatcher> {
+  const products = loadCatalogProducts();
+  const productTypes = loadProductTypes();
+  if (!products.ok || !productTypes.ok) {
+    return {
+      ok: false,
+      errors: [products, productTypes].flatMap((loaded) => (loaded.ok ? [] : loaded.errors)),
+    };
+  }
+  const search = createInMemoryCatalogSearch(products.value);
+  const llm = createLlm({ vocabulary: productTypes.value.vocabulary, onCall });
+  return {
+    ok: true,
+    value: {
+      products: products.value,
+      snapshotFetchedAt: files.loadSnapshotFetchedAt(),
+      matchOrder: (orderText) => matchOrder(orderText, { search, llm }),
+    },
   };
 }
 
