@@ -642,5 +642,135 @@
         }
       ]
     }
+  ],
+  "answers": [
+    {
+      "id": "answer-by-number",
+      "items": [
+        {
+          "original": "1 bolsa de carbon de 10 kg",
+          "question": "No hay carbón en bolsa de 10 kg. ¿Te sirve alguno de estos?",
+          "alternatives": ["563893", "646684"]
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "la 2",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "choice",
+          "alternative": 2
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-with-another-brand",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "dale, una Patagonia",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "lines",
+          "lines": [
+            {
+              "product": "Cerveza",
+              "brand": "Patagonia"
+            }
+          ]
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-drop",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "carbón para el asado",
+          "bought": "563893"
+        }
+      ],
+      "reply": "sacala",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "drop"
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-ignored",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "un jugo de mburucuyá",
+          "question": "No encontré jugo de mburucuyá solo. ¿Te sirve este?",
+          "alternatives": ["723172"]
+        }
+      ],
+      "reply": "¿a qué hora llega el pedido?",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "unanswered"
+        },
+        {
+          "item": 2,
+          "kind": "unanswered"
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-and-add",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "la república, y agregá un vino tinto",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "choice",
+          "alternative": 4
+        }
+      ],
+      "newLines": [
+        {
+          "product": "Vino tinto",
+          "brand": null
+        }
+      ]
+    }
   ]
 }

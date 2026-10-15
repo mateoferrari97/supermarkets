@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { answerCaseErrors, answerCaseIds, answerCaseSchema } from "./eval-answers.ts";
 import { parseQuantity } from "./item.ts";
 
 const productIdsSchema = z.array(z.string().min(1)).min(1);
@@ -24,7 +25,10 @@ export const evalCaseSchema = z.strictObject({
   items: z.array(expectedItemSchema).min(1),
 });
 
-export const evalSetSchema = z.strictObject({ cases: z.array(evalCaseSchema).min(1) });
+export const evalSetSchema = z.strictObject({
+  cases: z.array(evalCaseSchema).min(1),
+  answers: z.array(answerCaseSchema).optional(),
+});
 
 export type ExpectedItem = z.infer<typeof expectedItemSchema>;
 export type EvalCase = z.infer<typeof evalCaseSchema>;
@@ -63,6 +67,12 @@ export function validateEvalSet(input: unknown, examples: readonly string[]): st
       errors.push(...itemErrors(item).map((error) => `${where} item ${index + 1} ${error}`));
     }
   }
+  for (const answerCase of parsed.data.answers ?? []) {
+    const where = `answer case "${answerCase.id}"`;
+    if (seen.has(answerCase.id)) errors.push(`${where} id is used more than once`);
+    seen.add(answerCase.id);
+    errors.push(...answerCaseErrors(answerCase).map((error) => `${where} ${error}`));
+  }
   return errors;
 }
 
@@ -82,13 +92,21 @@ function itemErrors({ fits, pick, alternatives }: ExpectedItem): string[] {
 }
 
 export function staleIds(evalSet: EvalSet, inStock: ReadonlyMap<string, boolean>): StaleId[] {
-  return evalSet.cases.flatMap((evalCase) =>
-    [...new Set(evalCase.items.flatMap(expectedIds))].flatMap((productId): StaleId[] => {
+  const idsPerCase = [
+    ...evalSet.cases.map((evalCase) => ({
+      caseId: evalCase.id,
+      ids: [...new Set(evalCase.items.flatMap(expectedIds))],
+    })),
+    ...(evalSet.answers ?? []).map((answerCase) => ({
+      caseId: answerCase.id,
+      ids: answerCaseIds(answerCase),
+    })),
+  ];
+  return idsPerCase.flatMap(({ caseId, ids }) =>
+    ids.flatMap((productId): StaleId[] => {
       const stock = inStock.get(productId);
       if (stock === true) return [];
-      return [
-        { caseId: evalCase.id, productId, reason: stock === false ? "out of stock" : "missing" },
-      ];
+      return [{ caseId, productId, reason: stock === false ? "out of stock" : "missing" }];
     }),
   );
 }

@@ -16,6 +16,7 @@ import type { ConversationDependencies } from "./core/order-conversation/take-tu
 import type { CatalogProduct as SnapshotCatalogProduct } from "./core/order-matching/catalog-product.ts";
 import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
 import { matchOrder, type MatchedOrder } from "./core/order-matching/eval-run.ts";
+import type { ReadReplyInput, ReadReplyOutput } from "./core/order-matching/read-reply.ts";
 import type { Llm } from "./core/order-resolution/llm.ts";
 import {
   createOrderResolver as createResolver,
@@ -116,6 +117,7 @@ export type OrderMatcher = {
   products: SnapshotCatalogProduct[];
   snapshotFetchedAt: string | null;
   matchOrder(orderText: string): Promise<MatchedOrder>;
+  readReply(input: ReadReplyInput): Promise<ReadReplyOutput>;
 };
 
 export function createOrderMatcher({ onCall }: OrderResolverOptions = {}): Checked<OrderMatcher> {
@@ -135,6 +137,7 @@ export function createOrderMatcher({ onCall }: OrderResolverOptions = {}): Check
       products: products.value,
       snapshotFetchedAt: files.loadSnapshotFetchedAt(),
       matchOrder: (orderText) => matchOrder(orderText, { search, llm }),
+      readReply: (input) => llm.readReply(input, new AbortController().signal),
     },
   };
 }

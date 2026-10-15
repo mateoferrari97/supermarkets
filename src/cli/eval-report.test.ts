@@ -54,6 +54,24 @@ const run: EvalRun = {
       ],
     },
   ],
+  answers: [
+    { id: "la-2", reply: "la 2", expectedToFail: null, passed: true, runs: [] },
+    {
+      id: "sacala",
+      reply: "sacala",
+      expectedToFail: null,
+      passed: false,
+      runs: [
+        {
+          error: null,
+          output: { entries: [], newLines: [], ignoredPreference: false },
+          score: { passed: false, problems: ["item 1 expects drop, got no entry"] },
+          durationMs: 1,
+          costUsd: 0,
+        },
+      ],
+    },
+  ],
 };
 
 describe("formatReport", () => {
@@ -79,6 +97,12 @@ describe("formatReport", () => {
       report,
       /4 Claude Code sessions on fit-products claude-sonnet-5-5, parse-order claude-sonnet-5-5 low, 12.3 s, US\$ 0.1234$/,
     );
+    assert.match(report, /- Answer cases passed: 1\/2; errors: 0 of 1 runs/);
+    assert.match(
+      report,
+      /## Failed: sacala\n\n"sacala"\n\nRun 1:\n- item 1 expects drop, got no entry/,
+    );
     assert.doesNotMatch(report, /Failed: yerba/);
+    assert.doesNotMatch(report, /Failed: la-2/);
   });
 });

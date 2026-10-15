@@ -4,7 +4,7 @@
 
 **Blocked by:** 08
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Decisions (agreed with the Owner)
 
@@ -20,7 +20,7 @@
 
 - [x] `takeTurn` tests with fakes: questions with Alternatives and no simulation; each entry kind; a missing entry; re-ask in code with the same Alternatives; the 2-question limit dropping an Item; `newLines`; a cart once the last question is answered.
 - [x] Adapter tests for `read-reply`: input, schema, the checks.
-- [ ] Answer cases validated by `pnpm order:eval-set` and run once by `pnpm order:eval`; results noted under Comments.
+- [x] Answer cases validated by `pnpm order:eval-set` and run once by `pnpm order:eval`; results noted under Comments.
 - [x] One real conversation in the chat with a question answered by number and one by a new brand: Conversation Log path noted under Comments.
 - [x] `docs/LLM.md` describes `read-reply`.
 - [x] `pnpm check` exits 0.
@@ -73,3 +73,10 @@ Every `read-reply` output was right. Seen, outside this ticket:
 
 - Three of four chosen Alternatives were unavailable in the Branch: Alternatives come from Matches, filtered only by snapshot stock, and a chosen one is a single Candidate, so it goes to the block with no question, as the spec says.
 - "yerba playadito 1 kg" got no Fit (call 2 asked for "Playadito tradicional"), and "una docena de huevos" bought 12 packs of 6 eggs (call 1 or the quantity rule; tickets 04 and 06).
+
+### Answer cases (2026-10-15)
+
+- Answer cases live under `answers` in `evals/order-matching.json`; schema, checks and scoring in `src/core/order-matching/eval-answers.ts`, run by `pnpm order:eval` after the order cases (the same filter matches an answer case's id or reply) and validated by `pnpm order:eval-set`. `docs/LLM.md` describes them.
+- Five cases, Alternatives and products bought labelled from the Catalog Snapshot of 2026-10-15T20:44:49Z: `answer-by-number` ("la 2"), `answer-with-another-brand` ("dale, una Patagonia", no Patagonia among the Alternatives), `answer-drop` ("sacala"), `answer-ignored` ("¿a qué hora llega el pedido?", two asked Items), `answer-and-add` ("la república, y agregá un vino tinto").
+- `pnpm order:eval answer-`, 3 runs each, `.data/order-matching/eval-runs/2026-10-15T21-27-32.613Z.json`: 5/5 passed, 0 errors in 15 runs, 63.3 s, US$ 0.0342. Run times 2.9 to 9.0 s, most 3 to 4 s.
+- A first version of `answer-drop` paired "sacala" with an asked jugo and a coca in the cart; all 3 runs dropped the coca, which is the feminine noun, so the case was ambiguous, not the prompt. It now pairs an asked cerveza with a carbón in the cart.
