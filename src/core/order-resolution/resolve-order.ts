@@ -1,6 +1,7 @@
 import { stepsFrom, type StepOptions, type Steps } from "../order-conversation/steps.ts";
 import type { TipoMapping, Vocabulary } from "../product-types/schema.ts";
-import { buildBm25Index } from "./bm25.ts";
+// eslint-disable-next-line no-restricted-imports
+import { buildBm25Index } from "../../adapters/catalog-search/bm25.ts";
 import { distinctSizes, nameMatchesTerm, productMatchesBrand } from "../catalog/catalog.ts";
 import type { Evidence, Item } from "./concepts.ts";
 import type { Llm, MapAnswerOutput, QuestionInput } from "./llm.ts";
