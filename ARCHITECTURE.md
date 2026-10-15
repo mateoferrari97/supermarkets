@@ -14,7 +14,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
   - `src/core/order-matching/`: the order matching flow being built beside the old one; for now the catalog product it reads from the Catalog Snapshot (`catalog-product.ts`): sold by weight with its Sale Step or packaged with its size, price, stock, department, Tipo and teasers.
   - `src/core/order-conversation/`: the conversation of an order, `takeTurn` (`take-turn.ts`), and the step events it reports while it works (`steps.ts`).
   - `src/core/order-resolution/`: from the order text to resolved Items and questions; the `Llm` port; the eval set and its scoring.
-  - `src/core/product-selection/`: from resolved Items to a cart; the `OnlineStore` port; postal codes.
+  - `src/core/product-selection/`: from resolved Items to a cart; the `OnlineStore` port; postal codes; and, not yet called by the chat, the size and quantity rule that turns an Item's Fits into Candidates (`candidates.ts`) and the Selection Policy over simulated Candidates (`selection-policy.ts`).
   - `src/core/product-types/`: the schema and validation of the Product Type vocabulary and the Carrefour Tipo mapping.
 - `src/adapters/<technology>/`: implementations of the ports. They import `core`, `node:*` and zod.
   - `src/adapters/carrefour/`: `OnlineStore` over Carrefour's public API ([Carrefour API](docs/references/carrefour-api.md)) and the conversion of Catalog Snapshot records.

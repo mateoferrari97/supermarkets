@@ -4,7 +4,7 @@
 
 **Blocked by:** 02, 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Decisions (agreed with the Owner)
 
@@ -18,8 +18,17 @@
 
 ## Acceptance
 
-- [ ] Table tests for each rule above with its Note, including: coca "grande" picks 2,25 l among 354 ml to 2,25 l; "chica" picks the smallest; "2.25 l" missing gives 2 l with a Note; "300 g" of jamón compares a 200 g pack ×2 against 0.3 kg sold by weight by total price; "3 manzanas" with only Fits sold by weight gives 1.5 kg at a 0.5 kg Sale Step with a Note; "picaña 2 kg" at a 1.25 kg Sale Step gives 2.5 kg with a Note; a mode tie broken by price per unit; more than 10 options cut to the 10 cheapest per unit.
-- [ ] Selection Policy tests: savings over price, price per unit across sizes, `itemId` tie.
-- [ ] `pnpm check` exits 0.
+- [x] Table tests for each rule above with its Note, including: coca "grande" picks 2,25 l among 354 ml to 2,25 l; "chica" picks the smallest; "2.25 l" missing gives 2 l with a Note; "300 g" of jamón compares a 200 g pack ×2 against 0.3 kg sold by weight by total price; "3 manzanas" with only Fits sold by weight gives 1.5 kg at a 0.5 kg Sale Step with a Note; "picaña 2 kg" at a 1.25 kg Sale Step gives 2.5 kg with a Note; a mode tie broken by price per unit; more than 10 options cut to the 10 cheapest per unit.
+- [x] Selection Policy tests: savings over price, price per unit across sizes, `itemId` tie.
+- [x] `pnpm check` exits 0.
 
 ## Comments
+
+- Built on 2026-10-15. `candidatesFor(item, fits)` in `src/core/product-selection/candidates.ts` returns up to 10 Candidates `{ product, quantity, measured, notes }`: `quantity` is what goes to Carrefour (packages, or Sale Steps of a product sold by weight), `measured` the amount the price per unit divides by (ml, g, units, or the weight asked for a `weight` quantity, so those options compete by total price), `notes` the code Notes of that Candidate in flow order (size, Sale Step rounding, units of a product sold by weight). `snapshotTotal` gives its Catalog Snapshot total. `rankBySelectionPolicy` in `selection-policy.ts` ranks simulated Candidates `{ candidate, total, savings }`: savings first, then simulated total ÷ `measured`, then lowest `itemId`; ticket 08 takes the first and falls back down the list.
+- Tests: `candidates.test.ts` (21 table rows plus the 10-limit, missing price and no-Fit cases, and `snapshotTotal`), `selection-policy.test.ts` (savings over price, price per unit across sizes, savings ties by price per unit, `itemId` tie). `pnpm check` exits 0 (18 files, 262 tests).
+- Choices the spec left open, for the Owner to confirm:
+  - Rounding Note template is "Picaña se vende de a 1,25 kg: llevo 2,5 kg" (the Item's `product`, capitalized, no article), since code cannot know the article.
+  - Size ignored when no Fit has a size (`biggest`/`smallest`): "Carrefour no lo vende por tamaño: no pude elegir el más grande" / "… el más chico". An `exact` size with no Fit of its dimension is ignored with "No hay de 2,25 l".
+  - Under `common`, Fits sold by weight and packaged Fits without size stay beside the mode size.
+  - A `weight` quantity keeps only Fits sold by weight and packaged Fits whose size is a weight; with none of them the Item gets no Candidates.
+  - A Fit with no snapshot price ranks after every priced Fit; a tie on the majority dimension of `biggest`/`smallest` goes to the dimension of the first Fit.
