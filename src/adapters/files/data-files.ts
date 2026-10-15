@@ -5,7 +5,6 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -18,19 +17,6 @@ import {
 } from "../../core/order-resolution/eval-set.ts";
 import type { EvalRun } from "../../core/order-resolution/eval-run.ts";
 import {
-  decisionsSchema,
-  renderSummary,
-  type Consolidation,
-  type Decision,
-  type RemainingDoubt,
-} from "../../core/product-type-seed/consolidate.ts";
-import {
-  proposalSchema,
-  validateProposal,
-  type Proposal,
-} from "../../core/product-type-seed/proposal.ts";
-import { GROCERY_DEPARTMENTS, type Part } from "../../core/product-type-seed/split.ts";
-import {
   tipoMappingSchema,
   vocabularySchema,
   type TipoMapping,
@@ -42,18 +28,25 @@ export type Checked<T> = { ok: true; value: T } | { ok: false; errors: string[] 
 
 export const CATALOG_DIR = ".data/carrefour";
 export const CATALOG_PATH = `${CATALOG_DIR}/products.json`;
-export const SEED_DIR = `${CATALOG_DIR}/seed`;
-export const PARTS_DIR = `${SEED_DIR}/parts`;
-export const PROPOSALS_DIR = `${SEED_DIR}/proposals`;
-export const DECISIONS_PATH = `${SEED_DIR}/decisions.json`;
-export const DOUBTS_PATH = `${SEED_DIR}/doubts.json`;
-export const SUMMARY_PATH = `${SEED_DIR}/summary.md`;
 export const VOCABULARY_PATH = "vocabulary/product-types.json";
 export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
 export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
 export const PROMPTS_DIR = "prompts/order-resolution";
 export const CONVERSATIONS_DIR = ".data/conversations";
+
+const GROCERY_DEPARTMENTS = [
+  "Almacén",
+  "Desayuno y merienda",
+  "Bebidas",
+  "Lácteos y productos frescos",
+  "Carnes y pescados",
+  "Frutas y verduras",
+  "Panadería",
+  "Congelados",
+  "Limpieza",
+  "Perfumería y farmacia",
+];
 
 const catalogSchema = z.object({
   products: z.array(
@@ -99,7 +92,7 @@ export const conversationFileName = (sessionId: string, startedAt: Date): string
   `${two(startedAt.getHours())}${two(startedAt.getMinutes())}${two(startedAt.getSeconds())}-` +
   `${sessionId}.jsonl`;
 
-export type CatalogDownload = { meta: object; products: unknown[]; tipos: unknown[] };
+export type CatalogDownload = { meta: object; products: unknown[] };
 
 const writeJsonText = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -162,66 +155,10 @@ export function createDataFiles(root = ".") {
     });
   };
 
-  const saveParts = (parts: Part[]) => {
-    rmSync(at(PARTS_DIR), { recursive: true, force: true });
-    mkdirSync(at(PARTS_DIR), { recursive: true });
-    for (const part of parts)
-      writeText(`${PARTS_DIR}/${part.id}.json`, JSON.stringify(part, null, 2));
-  };
-
-  const loadParts = (): Part[] => {
-    if (!exists(PARTS_DIR)) return [];
-    return readdirSync(at(PARTS_DIR))
-      .filter((file) => file.endsWith(".json"))
-      .sort()
-      .map((file) => readJson(`${PARTS_DIR}/${file}`) as Part);
-  };
-
-  const loadPart = (partId: string): Checked<Part> => {
-    const path = `${PARTS_DIR}/${partId}.json`;
-    return exists(path) ? ok(readJson(path) as Part) : failed([`Missing ${path}`]);
-  };
-
-  const hasProposal = (partId: string) => exists(`${PROPOSALS_DIR}/${partId}.json`);
-
-  const loadProposal = (part: Part): Checked<Proposal> => {
-    const path = `${PROPOSALS_DIR}/${part.id}.json`;
-    if (!exists(path)) return failed([`Missing ${path}`]);
-    const input = readJson(path);
-    const errors = validateProposal(input, part);
-    return errors.length > 0 ? failed(errors) : ok(proposalSchema.parse(input));
-  };
-
-  const loadDecisions = (): Checked<Decision[]> => {
-    const decisions = decisionsSchema.safeParse(
-      exists(DECISIONS_PATH) ? readJson(DECISIONS_PATH) : [],
-    );
-    if (decisions.success) return ok(decisions.data);
-    return failed(
-      decisions.error.issues.map(
-        (issue) => `${DECISIONS_PATH} at "${issue.path.join(".")}": ${issue.message}`,
-      ),
-    );
-  };
-
-  const loadDoubts = (): Checked<RemainingDoubt[]> =>
-    exists(DOUBTS_PATH)
-      ? ok(readJson(DOUBTS_PATH) as RemainingDoubt[])
-      : failed([`No ${DOUBTS_PATH}. Run pnpm seed:consolidate first.`]);
-
-  const saveConsolidation = (consolidation: Consolidation): string[] => {
-    writeText(VOCABULARY_PATH, writeJsonText(consolidation.vocabulary));
-    writeText(CARREFOUR_MAPPING_PATH, writeJsonText(consolidation.mapping));
-    writeText(DOUBTS_PATH, writeJsonText(consolidation.doubts));
-    writeText(SUMMARY_PATH, renderSummary(consolidation));
-    return [VOCABULARY_PATH, CARREFOUR_MAPPING_PATH, DOUBTS_PATH, SUMMARY_PATH];
-  };
-
-  const saveCatalog = ({ meta, products, tipos }: CatalogDownload, outputDir = CATALOG_DIR) => {
+  const saveCatalog = ({ meta, products }: CatalogDownload, outputDir = CATALOG_DIR) => {
     const directory = resolve(root, outputDir);
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, "products.json"), JSON.stringify({ ...meta, products }, null, 2));
-    writeFileSync(join(directory, "tipos.json"), JSON.stringify({ ...meta, tipos }, null, 2));
     return outputDir;
   };
 
@@ -281,14 +218,6 @@ export function createDataFiles(root = ".") {
     loadProductTypes,
     loadEvalSet,
     loadOrderFiles,
-    saveParts,
-    loadParts,
-    loadPart,
-    hasProposal,
-    loadProposal,
-    loadDecisions,
-    loadDoubts,
-    saveConsolidation,
     saveCatalog,
     saveEvalRun,
     loadLatestEvalRun,

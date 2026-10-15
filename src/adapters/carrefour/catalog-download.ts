@@ -7,7 +7,6 @@ const MAX_FROM = 2500;
 const WINDOW = MAX_FROM + PAGE_SIZE;
 const CONCURRENCY = 8;
 const MAX_ATTEMPTS = 4;
-const EXAMPLES_PER_TIPO = 5;
 
 type Category = { id: number; name: string; children: Category[] };
 
@@ -66,16 +65,6 @@ export type CatalogProduct = {
   unitPrice: string | null;
 };
 
-export type TipoSummary = {
-  tipo: string;
-  products: number;
-  availableProducts: number;
-  secciones: Record<string, number>;
-  familias: Record<string, number>;
-  measureUnits: Record<string, number>;
-  examples: string[];
-};
-
 type Page = { products: RawProduct[]; total: number };
 
 type CategoryResult = {
@@ -109,7 +98,6 @@ export type CatalogMeta = {
 export type DownloadedCatalog = {
   meta: CatalogMeta;
   products: CatalogProduct[];
-  tipos: TipoSummary[];
 };
 
 let activeRequests = 0;
@@ -242,41 +230,6 @@ function sortedCounts(counts: Record<string, number>): Record<string, number> {
   return Object.fromEntries(Object.entries(counts).sort(([, a], [, b]) => b - a));
 }
 
-export function summarizeTipos(products: CatalogProduct[]): TipoSummary[] {
-  const byTipo = new Map<string, CatalogProduct[]>();
-  for (const product of products) {
-    if (product.tipo === null) continue;
-    const group = byTipo.get(product.tipo) ?? [];
-    group.push(product);
-    byTipo.set(product.tipo, group);
-  }
-  return [...byTipo.entries()]
-    .map(([tipo, group]) => {
-      const secciones: Record<string, number> = {};
-      const familias: Record<string, number> = {};
-      const measureUnits: Record<string, number> = {};
-      for (const product of group) {
-        increment(secciones, product.seccion);
-        increment(familias, product.familia);
-        increment(measureUnits, product.measureUnit);
-      }
-      const available = group.filter((product) => product.availableQuantity > 0);
-      const examples = [...available, ...group.filter((product) => !available.includes(product))]
-        .slice(0, EXAMPLES_PER_TIPO)
-        .map((product) => product.name);
-      return {
-        tipo,
-        products: group.length,
-        availableProducts: available.length,
-        secciones: sortedCounts(secciones),
-        familias: sortedCounts(familias),
-        measureUnits: sortedCounts(measureUnits),
-        examples,
-      };
-    })
-    .sort((a, b) => b.products - a.products || a.tipo.localeCompare(b.tipo, "es"));
-}
-
 export async function downloadCatalog(
   onCategory: (done: number) => void = () => undefined,
 ): Promise<DownloadedCatalog> {
@@ -330,7 +283,6 @@ export async function downloadCatalog(
       childrenTotal: result.children.reduce((sum, child) => sum + (totals.get(child.path) ?? 0), 0),
     }))
     .filter((category) => category.total > category.childrenTotal);
-  const tipos = summarizeTipos(productList);
 
   const meta: CatalogMeta = {
     fetchedAt,
@@ -342,7 +294,7 @@ export async function downloadCatalog(
     uniqueProducts: productList.length,
     availableProducts: productList.filter((product) => product.availableQuantity > 0).length,
     productsWithoutTipo: productList.filter((product) => product.tipo === null).length,
-    distinctTipos: tipos.length,
+    distinctTipos: new Set(productList.flatMap((product) => product.tipo ?? [])).size,
     productsByDepartment: sortedCounts(
       productList.reduce<Record<string, number>>((counts, product) => {
         increment(counts, product.department);
@@ -353,5 +305,5 @@ export async function downloadCatalog(
     productsOnlyInSplitCategories,
   };
 
-  return { meta, products: productList, tipos };
+  return { meta, products: productList };
 }

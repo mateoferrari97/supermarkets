@@ -36,7 +36,7 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - [ARCHITECTURE.md](ARCHITECTURE.md): the product, layers and ports, an order end to end, and the data folders.
 - [GLOSSARY.md](GLOSSARY.md): domain terms; use them in code, docs and tickets.
 - [docs/adr/](docs/adr/README.md): architecture decisions.
-- [docs/product-specs/](docs/product-specs/README.md): rules the product follows, such as the Product Type seed rules.
+- [docs/product-specs/](docs/product-specs/README.md): rules the product follows.
 - [docs/references/](docs/references/README.md): facts about external systems, such as the Carrefour API.
 - [docs/agents/](docs/agents/README.md): how the agent skills use this repo.
 - [docs/LLM.md](docs/LLM.md): what the LLM does, where prompts live, how to change and measure one.
@@ -53,8 +53,7 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - The operator commands below run one file each in `src/cli/` and read and write data only through the loaders and savers of `src/compose.ts`.
 - `pnpm order:eval [filter...]`: runs the order resolution eval set with real Claude Code sessions ([LLM](docs/LLM.md#changing-a-prompt)).
 - `pnpm order:eval-set`, `pnpm product-types`: validate the committed data in `evals/` and `vocabulary/` with the same loaders every command uses.
-- `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `.data/carrefour/` (`products.json`, `tipos.json`), or into the directory given as its argument. `.data/` is not committed.
-- `pnpm seed:split`, `pnpm seed:check-proposal <part-id>`, `pnpm seed:consolidate`, `pnpm seed:coverage`, `pnpm seed:doubts [size]`: the Product Type seed, run by the `seed-product-types` and `review-product-type-doubts` skills.
+- `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `products.json` in `.data/carrefour/`, or in the directory given as its argument. `.data/` is not committed.
 
 ## Workflow
 

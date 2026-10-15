@@ -147,102 +147,6 @@ describe("loadOrderFiles", () => {
   });
 });
 
-describe("the seed files", () => {
-  const part = {
-    id: "almacen",
-    department: "Almacén",
-    tipos: [
-      {
-        tipo: "Yerba",
-        products: 1,
-        availableProducts: 1,
-        familias: [],
-        measureUnits: [],
-        examples: ["Yerba 1"],
-      },
-    ],
-  };
-
-  it("saves parts, replacing the previous ones, and loads them back", () => {
-    const files = createDataFiles(root);
-    files.saveParts([{ ...part, id: "old" }]);
-    files.saveParts([part]);
-    assert.deepEqual(readdirSync(join(root, ".data/carrefour/seed/parts")), ["almacen.json"]);
-    assert.deepEqual(files.loadParts(), [part]);
-    assert.deepEqual(files.loadPart("almacen"), { ok: true, value: part });
-    assert.deepEqual(files.loadPart("bebidas"), {
-      ok: false,
-      errors: ["Missing .data/carrefour/seed/parts/bebidas.json"],
-    });
-  });
-
-  it("checks a proposal against its part", () => {
-    const files = createDataFiles(root);
-    assert.equal(files.hasProposal("almacen"), false);
-    assert.deepEqual(files.loadProposal(part), {
-      ok: false,
-      errors: ["Missing .data/carrefour/seed/proposals/almacen.json"],
-    });
-    write(".data/carrefour/seed/proposals/almacen.json", { part: "almacen" });
-    assert.equal(files.hasProposal("almacen"), true);
-    const loaded = files.loadProposal(part);
-    assert.equal(loaded.ok, false);
-    const proposal = {
-      part: "almacen",
-      groups: [
-        {
-          id: "grupo-yerba",
-          name: "Yerba",
-          productTypes: [{ id: "yerba", name: "Yerba", tipos: ["Yerba"] }],
-        },
-      ],
-      excluded: [],
-      doubts: [],
-    };
-    write(".data/carrefour/seed/proposals/almacen.json", proposal);
-    assert.deepEqual(files.loadProposal(part), { ok: true, value: proposal });
-  });
-
-  it("reads no decisions as an empty list and reports invalid ones with the path", () => {
-    const files = createDataFiles(root);
-    assert.deepEqual(files.loadDecisions(), { ok: true, value: [] });
-    write(".data/carrefour/seed/decisions.json", { op: "merge" });
-    assert.deepEqual(files.loadDecisions(), {
-      ok: false,
-      errors: [
-        '.data/carrefour/seed/decisions.json at "": Invalid input: expected array, received object',
-      ],
-    });
-  });
-
-  it("fails to load doubts before a consolidation wrote them", () => {
-    assert.deepEqual(createDataFiles(root).loadDoubts(), {
-      ok: false,
-      errors: ["No .data/carrefour/seed/doubts.json. Run pnpm seed:consolidate first."],
-    });
-  });
-
-  it("writes a consolidation and reads its doubts back", () => {
-    mkdirSync(join(root, ".data/carrefour/seed"), { recursive: true });
-    const files = createDataFiles(root);
-    const written = files.saveConsolidation({
-      vocabulary,
-      mapping: { Yerba: "yerba" },
-      doubts: [],
-      tree: [],
-      excluded: [],
-    });
-    assert.deepEqual(written, [
-      "vocabulary/product-types.json",
-      "vocabulary/carrefour-tipos.json",
-      ".data/carrefour/seed/doubts.json",
-      ".data/carrefour/seed/summary.md",
-    ]);
-    assert.deepEqual(read("vocabulary/carrefour-tipos.json"), { Yerba: "yerba" });
-    assert.deepEqual(files.loadDoubts(), { ok: true, value: [] });
-  });
-});
-
 describe("the eval runs", () => {
   const run = (startedAt: string) => ({
     startedAt,
@@ -271,10 +175,10 @@ describe("the eval runs", () => {
 });
 
 describe("saveCatalog", () => {
-  it("writes the products and the Tipos with the metadata into the output directory", () => {
+  it("writes the products with the metadata into the output directory", () => {
     const files = createDataFiles(root);
     const outputDir = files.saveCatalog(
-      { meta: { source: "carrefour" }, products: [{ productId: "1" }], tipos: [{ tipo: "Yerba" }] },
+      { meta: { source: "carrefour" }, products: [{ productId: "1" }] },
       "catalog",
     );
     assert.equal(outputDir, "catalog");
@@ -282,17 +186,11 @@ describe("saveCatalog", () => {
       source: "carrefour",
       products: [{ productId: "1" }],
     });
-    assert.deepEqual(read("catalog/tipos.json"), {
-      source: "carrefour",
-      tipos: [{ tipo: "Yerba" }],
-    });
+    assert.deepEqual(readdirSync(join(root, "catalog")), ["products.json"]);
   });
 
   it("writes into the Catalog Snapshot folder by default", () => {
-    assert.equal(
-      createDataFiles(root).saveCatalog({ meta: {}, products: [], tipos: [] }),
-      ".data/carrefour",
-    );
+    assert.equal(createDataFiles(root).saveCatalog({ meta: {}, products: [] }), ".data/carrefour");
     assert.deepEqual(read(".data/carrefour/products.json"), { products: [] });
   });
 });

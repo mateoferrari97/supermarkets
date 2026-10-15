@@ -45,21 +45,7 @@ export type OrderResolverOptions = { model?: string; onCall?: (call: LlmCall) =>
 
 const files = createDataFiles();
 
-export const {
-  loadCatalog,
-  loadProductTypes,
-  loadEvalSet,
-  saveParts,
-  loadParts,
-  loadPart,
-  hasProposal,
-  loadProposal,
-  loadDecisions,
-  loadDoubts,
-  saveConsolidation,
-  saveEvalRun,
-  loadLatestEvalRun,
-} = files;
+export const { loadCatalog, loadProductTypes, loadEvalSet, saveEvalRun, loadLatestEvalRun } = files;
 
 export function createLlm(options: LlmOptions): Llm {
   return createClaudeCodeLlm({ ...options, promptsDir: files.promptsDir });
