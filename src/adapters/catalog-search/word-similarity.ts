@@ -1,4 +1,4 @@
-import { normalize } from "../../core/catalog/text.ts";
+import { normalize } from "../../core/order-matching/text.ts";
 
 export type WordSimilarityIndex = { scores(query: string): Map<number, number> };
 

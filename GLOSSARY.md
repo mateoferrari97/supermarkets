@@ -14,14 +14,6 @@ _Avoid_: Region, seller, store, sucursal
 The state of an Online Store's catalog at one moment, downloaded to the local machine: products, prices, stock and promotions. It is searched for the Matches of each Item; its prices and stock are a first cut, and checkout simulation in the Branch has the last word (ADR 0012).
 _Avoid_: Cache, crawl, scrape
 
-**Product Type**:
-A kind of product in the Assistant's own vocabulary, such as "frutilla fresca" or "papel higiénico", independent of any Online Store. Products of one Product Type are interchangeable when choosing what to buy.
-_Avoid_: Category, tipo de producto, subfamily, product kind
-
-**Product Type Group**:
-A named set of Product Types that one loose word can refer to, such as "leche" over "leche entera" and "leche descremada". It is never bought as such: the Owner picks one of its Product Types or leaves the choice to the Selection Policy.
-_Avoid_: Category, parent type, family, department
-
 **Selection Policy**:
 The fixed rule that chooses one product per Item among its Candidates: promotions and discounts first, then the lowest price per unit of measure. The same Items with the same search and simulation answers always get the same products.
 _Avoid_: Strategy, criteria, mode, preference profile

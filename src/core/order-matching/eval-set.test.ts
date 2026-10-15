@@ -49,8 +49,8 @@ describe("validateEvalSet", () => {
       validateEvalSet(setOf(evalCase({ items: [item({ quantity: "2 units" })] })), []),
       ['eval set cases.0.items.0.quantity: expected "minimum", "<n> unit" or "<amount> <g|kg>"'],
     );
-    assert.deepEqual(validateEvalSet(setOf(evalCase({ productType: "yerba" })), []), [
-      'eval set cases.0: Unrecognized key: "productType"',
+    assert.deepEqual(validateEvalSet(setOf(evalCase({ tipo: "Yerba" })), []), [
+      'eval set cases.0: Unrecognized key: "tipo"',
     ]);
   });
 

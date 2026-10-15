@@ -12,7 +12,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { summarize } from "../../core/order-matching/eval-score.ts";
-import { validateProductTypes } from "../../core/product-types/validate.ts";
 import { createDataFiles } from "./data-files.ts";
 
 const repoRoot = join(import.meta.dirname, "../../..");
@@ -25,10 +24,6 @@ const write = (path: string, value: unknown) => {
 };
 
 const read = (path: string): unknown => JSON.parse(readFileSync(join(root, path), "utf8"));
-
-const vocabulary = {
-  groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
-};
 
 const yerbaCase = {
   id: "yerba",
@@ -61,8 +56,6 @@ const catalogProduct = (
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "data-files-"));
-  write("vocabulary/product-types.json", vocabulary);
-  write("vocabulary/carrefour-tipos.json", { Yerba: "yerba" });
   write("evals/order-matching.json", { cases: [yerbaCase] });
   write("prompts/order-matching/parse-order.md", "# Examples\n\n<order>\nyerba y sal\n</order>\n");
 });
@@ -74,42 +67,7 @@ afterEach(() => {
 describe("the committed data", () => {
   it("loads with no errors", () => {
     const files = createDataFiles(repoRoot);
-    assert.equal(files.loadProductTypes().ok, true);
     assert.equal(files.loadEvalSet().ok, true);
-  });
-});
-
-describe("loadProductTypes", () => {
-  it("returns the vocabulary and the mapping when they are valid", () => {
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), {
-      ok: true,
-      value: { vocabulary, mapping: { Yerba: "yerba" } },
-    });
-  });
-
-  it("fails with the validator's errors for a broken schema or reference", () => {
-    const brokenVocabulary = { groups: [{ id: "Grupo Yerba", productTypes: [] }] };
-    const brokenMapping = { Yerba: "mate", Leche: "grupo-yerba" };
-    write("vocabulary/product-types.json", brokenVocabulary);
-    write("vocabulary/carrefour-tipos.json", brokenMapping);
-    const expected = validateProductTypes(brokenVocabulary, brokenMapping);
-    assert.ok(expected.length > 0);
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), { ok: false, errors: expected });
-
-    const validVocabulary = {
-      groups: [
-        ...vocabulary.groups,
-        { id: "grupo-leche", name: "Leche", productTypes: [{ id: "leche", name: "Leche" }] },
-      ],
-    };
-    write("vocabulary/product-types.json", validVocabulary);
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), {
-      ok: false,
-      errors: [
-        'Tipo "Yerba" maps to unknown Product Type "mate"',
-        'Tipo "Leche" maps to Product Type Group "grupo-yerba" instead of a Product Type',
-      ],
-    });
   });
 });
 
@@ -143,27 +101,6 @@ describe("loadSnapshotFetchedAt", () => {
     assert.equal(createDataFiles(root).loadSnapshotFetchedAt(), null);
     write(".data/carrefour/products.json", { fetchedAt: "2026-10-15T20:44:49.211Z", products: [] });
     assert.equal(createDataFiles(root).loadSnapshotFetchedAt(), "2026-10-15T20:44:49.211Z");
-  });
-});
-
-describe("loadOrderFiles", () => {
-  it("returns the grocery products of the Catalog Snapshot with the validated data", () => {
-    write(".data/carrefour/products.json", {
-      products: [catalogProduct("1", "Almacén"), catalogProduct("2", "Electro")],
-    });
-    const loaded = createDataFiles(root).loadOrderFiles();
-    assert.deepEqual(loaded.ok && loaded.value.catalog.map(({ productId }) => productId), ["1"]);
-  });
-
-  it("fails with every error when data is missing or invalid", () => {
-    write("vocabulary/carrefour-tipos.json", { Yerba: "mate" });
-    assert.deepEqual(createDataFiles(root).loadOrderFiles(), {
-      ok: false,
-      errors: [
-        "No Catalog Snapshot at .data/carrefour/products.json. Run pnpm carrefour:catalog first.",
-        'Tipo "Yerba" maps to unknown Product Type "mate"',
-      ],
-    });
   });
 });
 

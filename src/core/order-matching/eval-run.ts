@@ -1,6 +1,6 @@
 import { candidatesFor, snapshotTotal, type Candidate } from "../product-selection/candidates.ts";
 import { rankBySelectionPolicy } from "../product-selection/selection-policy.ts";
-import type { Llm } from "../order-resolution/llm.ts";
+import type { Llm } from "./llm.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import type { CatalogSearch } from "./catalog-search.ts";
 import type { StaleId } from "./eval-set.ts";

@@ -128,7 +128,6 @@ const conversation = ({
         seen("checkDelivery", signal);
         return Promise.resolve(deliveries[postalCode] ?? "delivers");
       },
-      findCandidates: () => Promise.reject(new Error("live search is no longer called")),
       simulate: (request, signal) => {
         seen("simulate", signal);
         simulations.push(request);
@@ -354,7 +353,7 @@ describe("takeTurn", () => {
       );
     });
 
-    it("never calls the live search of Carrefour", async () => {
+    it("calls only call 1, call 2 and checkout simulation for an order", async () => {
       const { deps, calls } = conversation({ items: [item("yerba", "yerba")] });
       await takeTurn(ordering, "yerba", deps);
       assert.deepEqual(new Set(calls), new Set(["parseOrder", "fitProducts", "simulate"]));

@@ -1,4 +1,4 @@
-import { normalize } from "../catalog/text.ts";
+import { normalize } from "./text.ts";
 import type { EvalCase, ExpectedItem } from "./eval-set.ts";
 import { parseQuantity, type Item } from "./item.ts";
 

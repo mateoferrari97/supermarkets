@@ -21,30 +21,17 @@ import type {
   ReplyEntry,
 } from "../../core/order-matching/read-reply.ts";
 import type { CatalogProduct } from "../../core/order-matching/catalog-product.ts";
-import type { Vocabulary } from "../../core/product-types/schema.ts";
 import {
   fitProductsOutputSchema,
-  mapAnswerOutputSchema,
   parseOrderOutputSchema,
   readReplyOutputSchema,
-  resolveItemOutputSchema,
-  rewordItemOutputSchema,
-  splitOrderOutputSchema,
   type LineOutput,
 } from "./llm-output-schemas.ts";
-import type { Llm, ResolveItemInput } from "../../core/order-resolution/llm.ts";
+import type { Llm } from "../../core/order-matching/llm.ts";
 
-export const DEFAULT_MODEL = "claude-haiku-5-5";
 export const DEFAULT_BUDGET_USD = 0.25;
 
-export type LlmTask =
-  | "parse-order"
-  | "fit-products"
-  | "read-reply"
-  | "split-order"
-  | "resolve-item"
-  | "reword-item"
-  | "map-answer";
+export type LlmTask = "parse-order" | "fit-products" | "read-reply";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type TaskModel = { model: string; effort: Effort | null };
 
@@ -52,20 +39,12 @@ export const TASK_MODELS: Record<LlmTask, TaskModel> = {
   "parse-order": { model: "claude-sonnet-5-5", effort: "low" },
   "fit-products": { model: "claude-sonnet-5-5", effort: null },
   "read-reply": { model: "claude-sonnet-5-5", effort: "low" },
-  "split-order": { model: DEFAULT_MODEL, effort: null },
-  "resolve-item": { model: DEFAULT_MODEL, effort: null },
-  "reword-item": { model: DEFAULT_MODEL, effort: null },
-  "map-answer": { model: DEFAULT_MODEL, effort: null },
 };
 
 const PROMPT_FILES: Record<LlmTask, string> = {
   "parse-order": "order-matching/parse-order.md",
   "fit-products": "order-matching/fit-products.md",
   "read-reply": "order-matching/read-reply.md",
-  "split-order": "order-resolution/split-order.md",
-  "resolve-item": "order-resolution/resolve-item.md",
-  "reword-item": "order-resolution/reword-item.md",
-  "map-answer": "order-resolution/map-answer.md",
 };
 
 export type ProcessResult = { exitCode: number; stdout: string; stderr: string };
@@ -87,7 +66,6 @@ export type LlmCall = {
 };
 
 export type ClaudeCodeLlmOptions = {
-  vocabulary: Vocabulary;
   promptsDir: string;
   models?: Partial<Record<LlmTask, TaskModel>>;
   budgetUsd?: number;
@@ -105,7 +83,6 @@ const sessionResultSchema = z.object({
 });
 
 export function createClaudeCodeLlm({
-  vocabulary,
   promptsDir,
   models = {},
   budgetUsd = DEFAULT_BUDGET_USD,
@@ -113,7 +90,6 @@ export function createClaudeCodeLlm({
   onCall,
 }: ClaudeCodeLlmOptions): Llm {
   const prompt = (task: LlmTask) => readFileSync(join(promptsDir, PROMPT_FILES[task]), "utf8");
-  const tree = renderTree(vocabulary);
 
   const ask = async <T>(
     task: LlmTask,
@@ -208,32 +184,6 @@ export function createClaudeCodeLlm({
           signal,
         ),
       ),
-    splitOrder: (orderText, signal) =>
-      ask(
-        "split-order",
-        prompt("split-order"),
-        splitOrderOutputSchema,
-        { order: orderText },
-        signal,
-      ),
-    resolveItem: (input: ResolveItemInput, signal) =>
-      ask(
-        "resolve-item",
-        `${prompt("resolve-item")}\n\n# Product Type tree\n\n${tree}`,
-        resolveItemOutputSchema,
-        input,
-        signal,
-      ),
-    rewordItem: (input, signal) =>
-      ask(
-        "reword-item",
-        `${prompt("reword-item")}\n\n# Product Type tree\n\n${tree}`,
-        rewordItemOutputSchema,
-        input,
-        signal,
-      ),
-    mapAnswer: (input, signal) =>
-      ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input, signal),
   };
 }
 
@@ -375,15 +325,6 @@ function checkFitProducts(
 function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _dialect, ...rest } = z.toJSONSchema(schema);
   return rest;
-}
-
-export function renderTree(vocabulary: Vocabulary): string {
-  return vocabulary.groups
-    .map(
-      (group) =>
-        `${group.id} (${group.name}): ${group.productTypes.map((productType) => `${productType.id} (${productType.name})`).join(", ")}`,
-    )
-    .join("\n");
 }
 
 export function createProcessRunner(command: string): ProcessRunner {
