@@ -6,8 +6,8 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 ## The port and its adapter
 
-- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`parseOrder`, `splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
-- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` runs on `claude-sonnet-5-5` with `--effort low` (ADR 0012); the other tasks run on `claude-haiku-5-5` at its default effort until they are deleted. Neither model takes a `temperature`, so the same text can resolve differently between runs.
+- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
+- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` runs on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012); the other tasks run on `claude-haiku-5-5` at its default effort until they are deleted. Neither model takes a `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
 - The adapter's `onCall` reports every session that returns a result: task, model, effort, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
@@ -23,9 +23,17 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 A string the parser rejects, such as "0 kg" or "1.5 unit", fails the call like an answer that does not fit its schema.
 
+## The `fit-products` task
+
+`fitProducts({ item, alsoInThisLine, matches }, signal)` is call 2 of the order matching flow (ADR 0012): one call per Item, which keeps the Item's Fits among its Matches. The adapter sends one `<line>` with `<original>`, `<product>`, `<brand>`, `<also-in-this-line>` (the `product` of the other Items with the same `original`, only when there are any) and `<candidates>`, the Matches numbered from 1 as `number. name | brand | Tipo`.
+
+The LLM returns `{ fits, closest, note, question }`: the numbers of the Matches that fit, a Note for the Owner, and, only when nothing fits, a question with up to 5 `closest` numbers. The schema cannot say how these relate, so the adapter checks that every number is among the Matches, that `question` is set exactly when `fits` is empty, and that `closest` has at most 5 numbers and only when `fits` is empty. A failed check fails the call like an answer that does not fit its schema.
+
+`matchItems` in `src/core/order-matching/match-items.ts` runs the task for a set of Items, at most 10 calls at a time: for each Item it reports the step "Eligiendo productos para '<original>'", searches 30 Matches with `CatalogSearch`, runs the call, and maps the numbers back to products. It returns per Item its Matches, Fits and Note, or its question with the Alternatives in the order the LLM gave them. One call failing fails the whole set, and no further call starts. The chat does not call it yet.
+
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, and `order-resolution/split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-resolution/split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 

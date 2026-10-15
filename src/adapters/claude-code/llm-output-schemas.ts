@@ -53,3 +53,10 @@ export const parseOrderOutputSchema = z.strictObject({
     .min(1),
   ignoredPreference: z.boolean(),
 });
+
+export const fitProductsOutputSchema = z.strictObject({
+  fits: z.array(z.number().int().positive()),
+  closest: z.array(z.number().int().positive()),
+  note: z.string().min(1).nullable(),
+  question: z.string().min(1).nullable(),
+});

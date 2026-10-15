@@ -10,6 +10,8 @@ export function stepText(step: Step): string {
       return `Buscando "${step.phrase}" en el catálogo`;
     case "find-candidates":
       return `Carrefour: candidatos para "${step.phrase}"`;
+    case "choose-products":
+      return `Eligiendo productos para '${step.original}'`;
     case "simulate-cart":
       return "Carrefour: simulando el carrito";
   }

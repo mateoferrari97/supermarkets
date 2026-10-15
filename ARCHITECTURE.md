@@ -11,7 +11,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
 - `src/core/<feature>/`: domain rules, use cases and port types of one feature. It imports only `core` and zod.
   - `src/core/catalog/`: text normalization, sizes in product names and brand matching.
   - `src/core/conversation-log/`: the events of a Conversation Log and what records them (`conversation-log.ts`): `loggedStore` decorates `OnlineStore`, `loggedSteps` records each step with its duration, `loggedTurn` records the Owner's message, the reply and how the turn ended.
-  - `src/core/order-matching/`: the order matching flow being built beside the old one; for now the catalog product it reads from the Catalog Snapshot (`catalog-product.ts`): sold by weight with its Sale Step or packaged with its size, price, stock, department, Tipo and teasers; and the `CatalogSearch` port (`catalog-search.ts`), not yet called by the chat.
+  - `src/core/order-matching/`: the order matching flow being built beside the old one; for now the catalog product it reads from the Catalog Snapshot (`catalog-product.ts`): sold by weight with its Sale Step or packaged with its size, price, stock, department, Tipo and teasers; the `CatalogSearch` port (`catalog-search.ts`); and `matchItems` (`match-items.ts`), which searches each Item's Matches and keeps its Fits with `fit-products`, up to 10 calls at a time; none of it is called by the chat yet.
   - `src/core/order-conversation/`: the conversation of an order, `takeTurn` (`take-turn.ts`), and the step events it reports while it works (`steps.ts`).
   - `src/core/order-resolution/`: from the order text to resolved Items and questions; the `Llm` port; the eval set and its scoring.
   - `src/core/product-selection/`: from resolved Items to a cart; the `OnlineStore` port; postal codes; and, not yet called by the chat, the size and quantity rule that turns an Item's Fits into Candidates (`candidates.ts`) and the Selection Policy over simulated Candidates (`selection-policy.ts`).
@@ -31,7 +31,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
 
 Three things are ports (ADR 0006, ADR 0012):
 
-- `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer; and `parseOrder`, which reads an order into the Items of `src/core/order-matching/item.ts` (ADR 0012), not yet called by the chat.
+- `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer; `parseOrder`, which reads an order into the Items of `src/core/order-matching/item.ts`, and `fitProducts`, which keeps the Fits of one Item among its Matches (ADR 0012); neither is called by the chat yet.
 - `OnlineStore` (`src/core/product-selection/online-store.ts`): check delivery to a postal code, find candidates, simulate a cart, build the cart link.
 - `CatalogSearch` (`src/core/order-matching/catalog-search.ts`): `findMatches({ product, brand }, limit)` returns the Matches of one Item, 30 by default, synchronously. It is a port because the search is planned to move to Postgres, not because two adapters exist.
 

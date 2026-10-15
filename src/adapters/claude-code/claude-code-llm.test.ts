@@ -4,6 +4,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vitest";
+import type { CatalogProduct } from "../../core/order-matching/catalog-product.ts";
+import type { FitProductsInput } from "../../core/order-matching/match-items.ts";
 import {
   createClaudeCodeLlm,
   createProcessRunner,
@@ -17,6 +19,7 @@ mkdirSync(join(promptsDir, "order-matching"));
 writeFileSync(join(promptsDir, "order-resolution", "split-order.md"), "Split the order.");
 writeFileSync(join(promptsDir, "order-resolution", "resolve-item.md"), "Resolve the Item.");
 writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
+writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
 
 const vocabulary = {
   groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
@@ -264,6 +267,116 @@ describe("parseOrder", () => {
     await assert.rejects(
       llm.parseOrder("pago con Visa", signal),
       /parse-order returned an invalid answer/,
+    );
+  });
+});
+
+describe("fitProducts", () => {
+  const product = (name: string, brand: string | null, tipo: string | null): CatalogProduct => ({
+    productId: name,
+    itemId: name,
+    name,
+    brand,
+    department: "Carnes y pescados",
+    tipo,
+    price: 1000,
+    inStock: true,
+    sale: { kind: "packaged", size: null },
+    teasers: [],
+  });
+  const input = (alsoInThisLine: string[] = []): FitProductsInput => ({
+    item: {
+      original: "1 y 1 chorizo morzilla la divisa",
+      product: "Morcilla",
+      brand: "La Divisa",
+      size: { kind: "common" },
+      quantity: { kind: "units", count: 1 },
+    },
+    alsoInThisLine,
+    matches: [
+      product("Morcilla copetín al vacio La Divisa 400 grs", "La Divisa", "Morcilla"),
+      product("Chorizo puro de cerdo La Divisa 400 grs", "La Divisa", null),
+      product("Morcilla vasca Paladini x kg", null, "Morcilla"),
+    ],
+  });
+  const answer = (fields: Record<string, unknown>) =>
+    session({
+      structured_output: { fits: [1], closest: [], note: null, question: null, ...fields },
+    });
+
+  it("runs Sonnet at its default effort with its prompt and the line it renders", async () => {
+    const calls: LlmCall[] = [];
+    const argsSeen: string[][] = [];
+    const inputsSeen: string[] = [];
+    const llm = llmWith(
+      answer({ note: "Tomé 'morzilla' como morcilla." }),
+      calls,
+      argsSeen,
+      [],
+      inputsSeen,
+    );
+    assert.deepEqual(await llm.fitProducts(input(), signal), {
+      fits: [1],
+      closest: [],
+      note: "Tomé 'morzilla' como morcilla.",
+      question: null,
+    });
+    const args = argsSeen[0]!;
+    assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
+    assert.equal(args.includes("--effort"), false);
+    assert.equal(args[args.indexOf("--system-prompt") + 1], "Fit the products.");
+    const line = [
+      "<line>",
+      "<original>1 y 1 chorizo morzilla la divisa</original>",
+      "<product>Morcilla</product>",
+      "<brand>La Divisa</brand>",
+      "<candidates>",
+      "1. Morcilla copetín al vacio La Divisa 400 grs | La Divisa | Morcilla",
+      "2. Chorizo puro de cerdo La Divisa 400 grs | La Divisa | sin tipo",
+      "3. Morcilla vasca Paladini x kg | sin marca | Morcilla",
+      "</candidates>",
+      "</line>",
+    ].join("\n");
+    assert.deepEqual(inputsSeen, [line]);
+    assert.deepEqual(
+      calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
+      [{ task: "fit-products", model: "claude-sonnet-5-5", effort: null, input: line }],
+    );
+  });
+
+  it("names the other products of the same words in <also-in-this-line>", async () => {
+    const inputsSeen: string[] = [];
+    const llm = llmWith(answer({}), [], [], [], inputsSeen);
+    await llm.fitProducts(input(["Chorizo parrillero", "Salchicha parrillera"]), signal);
+    assert.match(
+      inputsSeen[0]!,
+      /<brand>La Divisa<\/brand>\n<also-in-this-line>Chorizo parrillero; Salchicha parrillera<\/also-in-this-line>\n<candidates>/,
+    );
+  });
+
+  it("returns a question with the closest candidates when nothing fits", async () => {
+    const llm = llmWith(answer({ fits: [], closest: [3, 1], question: "¿Te sirve alguna?" }));
+    assert.deepEqual(await llm.fitProducts(input(), signal), {
+      fits: [],
+      closest: [3, 1],
+      note: null,
+      question: "¿Te sirve alguna?",
+    });
+  });
+
+  it.each([
+    ["a fit outside the Matches", { fits: [4] }],
+    ["a closest outside the Matches", { fits: [], closest: [4], question: "¿Cuál?" }],
+    ["a question while products fit", { question: "¿Cuál?" }],
+    ["no question when nothing fits", { fits: [] }],
+    ["closest while products fit", { closest: [2] }],
+    ["more than 5 closest", { fits: [], closest: [1, 2, 3, 1, 2, 3], question: "¿Cuál?" }],
+    ["a number that is not a candidate number", { fits: [0] }],
+  ])("fails on %s", async (_case, fields) => {
+    const llm = llmWith(answer(fields));
+    await assert.rejects(
+      llm.fitProducts(input(), signal),
+      /fit-products returned an invalid answer/,
     );
   });
 });

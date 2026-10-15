@@ -86,6 +86,7 @@ const conversation = ({
   };
   const llm: Llm = {
     parseOrder: () => Promise.reject(new Error("no parse")),
+    fitProducts: () => Promise.reject(new Error("no fit")),
     splitOrder: (_text, signal) => {
       seen("splitOrder", signal);
       return Promise.resolve({ items, ignoredPreference });

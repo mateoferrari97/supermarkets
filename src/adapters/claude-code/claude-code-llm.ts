@@ -10,8 +10,14 @@ import {
   type Item,
   type ParseOrderOutput,
 } from "../../core/order-matching/item.ts";
+import {
+  ALTERNATIVES_LIMIT,
+  type FitProductsInput,
+  type FitProductsOutput,
+} from "../../core/order-matching/match-items.ts";
 import type { Vocabulary } from "../../core/product-types/schema.ts";
 import {
+  fitProductsOutputSchema,
   mapAnswerOutputSchema,
   parseOrderOutputSchema,
   resolveItemOutputSchema,
@@ -23,12 +29,14 @@ import type { Llm, ResolveItemInput } from "../../core/order-resolution/llm.ts";
 export const DEFAULT_MODEL = "claude-haiku-5-5";
 export const DEFAULT_BUDGET_USD = 0.25;
 
-export type LlmTask = "parse-order" | "split-order" | "resolve-item" | "reword-item" | "map-answer";
+export type LlmTask =
+  "parse-order" | "fit-products" | "split-order" | "resolve-item" | "reword-item" | "map-answer";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type TaskModel = { model: string; effort: Effort | null };
 
 export const TASK_MODELS: Record<LlmTask, TaskModel> = {
   "parse-order": { model: "claude-sonnet-5-5", effort: "low" },
+  "fit-products": { model: "claude-sonnet-5-5", effort: null },
   "split-order": { model: DEFAULT_MODEL, effort: null },
   "resolve-item": { model: DEFAULT_MODEL, effort: null },
   "reword-item": { model: DEFAULT_MODEL, effort: null },
@@ -37,6 +45,7 @@ export const TASK_MODELS: Record<LlmTask, TaskModel> = {
 
 const PROMPT_FILES: Record<LlmTask, string> = {
   "parse-order": "order-matching/parse-order.md",
+  "fit-products": "order-matching/fit-products.md",
   "split-order": "order-resolution/split-order.md",
   "resolve-item": "order-resolution/resolve-item.md",
   "reword-item": "order-resolution/reword-item.md",
@@ -161,6 +170,17 @@ export function createClaudeCodeLlm({
           signal,
         ),
       ),
+    fitProducts: async (input, signal) =>
+      checkFitProducts(
+        input,
+        await ask(
+          "fit-products",
+          prompt("fit-products"),
+          fitProductsOutputSchema,
+          renderLine(input),
+          signal,
+        ),
+      ),
     splitOrder: (orderText, signal) =>
       ask(
         "split-order",
@@ -205,6 +225,46 @@ function readParseOrder({
     return { original: line.original, product: line.product, brand: line.brand, size, quantity };
   });
   return { items, ignoredPreference };
+}
+
+export function renderLine({ item, alsoInThisLine, matches }: FitProductsInput): string {
+  return [
+    "<line>",
+    `<original>${item.original}</original>`,
+    `<product>${item.product}</product>`,
+    `<brand>${item.brand ?? "null"}</brand>`,
+    ...(alsoInThisLine.length > 0
+      ? [`<also-in-this-line>${alsoInThisLine.join("; ")}</also-in-this-line>`]
+      : []),
+    "<candidates>",
+    ...matches.map(
+      (product, index) =>
+        `${index + 1}. ${product.name} | ${product.brand ?? "sin marca"} | ${product.tipo ?? "sin tipo"}`,
+    ),
+    "</candidates>",
+    "</line>",
+  ].join("\n");
+}
+
+function checkFitProducts(
+  { item, matches }: FitProductsInput,
+  output: FitProductsOutput,
+): FitProductsOutput {
+  const fail = (problem: string) => {
+    throw new Error(
+      `Claude Code session for fit-products returned an invalid answer for "${item.original}": ${problem}`,
+    );
+  };
+  const outside = [...output.fits, ...output.closest].filter((number) => number > matches.length);
+  if (outside.length > 0) fail(`${outside.join(", ")} not among its ${matches.length} Matches`);
+  if ((output.question === null) !== output.fits.length > 0) {
+    fail("a question must be set exactly when no product fits");
+  }
+  if (output.closest.length > 0 && output.fits.length > 0) fail("closest set while products fit");
+  if (output.closest.length > ALTERNATIVES_LIMIT) {
+    fail(`${output.closest.length} closest, more than ${ALTERNATIVES_LIMIT}`);
+  }
+  return output;
 }
 
 function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
