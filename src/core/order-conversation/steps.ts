@@ -1,8 +1,6 @@
 export type Step =
   | { kind: "understand-order" }
   | { kind: "understand-answer" }
-  | { kind: "search-item"; phrase: string }
-  | { kind: "find-candidates"; phrase: string }
   | { kind: "choose-products"; original: string }
   | { kind: "simulate-cart" };
 

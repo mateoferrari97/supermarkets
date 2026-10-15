@@ -274,20 +274,18 @@ function CartView({ cart }: { cart: Cart }) {
           {cart.lines.map((line, index) => (
             <tr key={index}>
               <td>
-                <div>{line.product?.name ?? "Sin producto"}</div>
+                <div>{line.product.name}</div>
                 <div className="muted small">
-                  pediste &quot;{line.phrase}&quot; · {line.reason}
+                  pediste &quot;{line.original}&quot; · {line.reason}
                 </div>
-                {line.notices.map((notice) => (
-                  <div key={notice} className="notice">
-                    {notice}
+                {line.notes.map((note) => (
+                  <div key={note} className="notice">
+                    {note}
                   </div>
                 ))}
               </td>
               <td className="num">{line.quantity}</td>
-              <td className="num">
-                {line.unitPrice === null ? "—" : money.format(line.unitPrice)}
-              </td>
+              <td className="num">{money.format(line.unitPrice)}</td>
               <td className="num">{money.format(line.total)}</td>
             </tr>
           ))}
@@ -301,11 +299,12 @@ function CartView({ cart }: { cart: Cart }) {
           </tr>
         </tbody>
       </table>
-      {cart.notices.map((notice) => (
-        <div key={notice} className="notice block">
-          {notice}
+      {cart.notes.map((note) => (
+        <div key={note} className="notice block">
+          {note}
         </div>
       ))}
+      <div className="block">{cart.warning}</div>
       {cart.cartLink ? (
         <div className="block">
           <a className="btn" href={cart.cartLink} target="_blank" rel="noreferrer">

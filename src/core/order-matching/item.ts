@@ -19,6 +19,10 @@ export type ParseOrderOutput = {
   ignoredPreference: boolean;
 };
 
+export type ParseOrderLlm = {
+  parseOrder(orderText: string, signal: AbortSignal): Promise<ParseOrderOutput>;
+};
+
 const AMOUNT = /^(\d+(?:\.\d+)?) (ml|l|g|kg)$/;
 const UNITS = /^(\d+) unit$/;
 

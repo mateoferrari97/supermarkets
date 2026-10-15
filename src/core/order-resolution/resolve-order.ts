@@ -143,13 +143,12 @@ export function createOrderResolver({
     };
   };
 
-  const resolveItem = (item: Item, steps: Steps): Promise<OrderItem> =>
-    steps.run({ kind: "search-item", phrase: item.phrase }, async () => {
-      const first = await attempt(item, item.phrase, steps.signal);
-      if (first.question?.kind !== "phrase") return first;
-      const { phrase } = await llm.rewordItem({ item, evidence: evidenceFor(item) }, steps.signal);
-      return attempt(item, phrase, steps.signal);
-    });
+  const resolveItem = async (item: Item, steps: Steps): Promise<OrderItem> => {
+    const first = await attempt(item, item.phrase, steps.signal);
+    if (first.question?.kind !== "phrase") return first;
+    const { phrase } = await llm.rewordItem({ item, evidence: evidenceFor(item) }, steps.signal);
+    return attempt(item, phrase, steps.signal);
+  };
 
   const apply = (orderItem: OrderItem, answer: Answer, steps: Steps): Promise<OrderItem> | null => {
     const { question } = orderItem;

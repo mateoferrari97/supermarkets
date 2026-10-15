@@ -1,8 +1,8 @@
-import type { ProductSelection } from "../core/product-selection/pick-products.ts";
+import type { Cart } from "../core/order-conversation/take-turn.ts";
 
 export type AskedQuestion = { number: number; options: string[] };
 
-export type Cart = ProductSelection;
+export type { Cart };
 
 export type TurnEvent =
   | { type: "session"; sessionId: string }

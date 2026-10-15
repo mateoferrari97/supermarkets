@@ -2,7 +2,6 @@ import { z } from "zod";
 import { loggedSteps, loggedTurn } from "../../../core/conversation-log/conversation-log.ts";
 import type { StepEvent } from "../../../core/order-conversation/steps.ts";
 import { takeTurn, type Reply } from "../../../core/order-conversation/take-turn.ts";
-import { optionNames } from "../../../core/order-resolution/resolve-order.ts";
 import { claimSession, deleteSession, loadDependencies, releaseSession } from "../../sessions.ts";
 import { stepText } from "../../step-text.ts";
 import type { TurnEvent } from "../../turn-events.ts";
@@ -23,16 +22,8 @@ function replyEvent(reply: Reply): TurnEvent {
   switch (reply.kind) {
     case "ask":
       return { type: "questions", text: reply.text, questions: [] };
-    case "questions":
-      return {
-        type: "questions",
-        text: reply.text,
-        questions: reply.items
-          .flatMap((item) => (item.question === null ? [] : [optionNames(item.question)]))
-          .map((options, index) => ({ number: index + 1, options })),
-      };
-    case "selection":
-      return { type: "cart", cart: reply.selection };
+    case "cart":
+      return { type: "cart", cart: reply.cart };
   }
 }
 
@@ -98,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
             trackStep(event);
           }),
         );
-        if (turn.reply.kind === "selection") deleteSession(sessionId);
+        if (turn.reply.kind === "cart") deleteSession(sessionId);
         else releaseSession(sessionId, turn.state);
         send(replyEvent(turn.reply));
       } catch (error) {

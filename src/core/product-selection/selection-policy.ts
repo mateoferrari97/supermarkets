@@ -2,7 +2,7 @@ import { compareItemIds, type Candidate } from "./candidates.ts";
 
 export type SimulatedCandidate = { candidate: Candidate; total: number; savings: number };
 
-export function rankBySelectionPolicy(simulated: SimulatedCandidate[]): SimulatedCandidate[] {
+export function rankBySelectionPolicy<T extends SimulatedCandidate>(simulated: T[]): T[] {
   return [...simulated].sort(
     (a, b) =>
       Number(b.savings > 0) - Number(a.savings > 0) ||
