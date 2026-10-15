@@ -125,6 +125,8 @@ const fakeLlm = ({
   const seen: Seen = { resolved: [], reworded: [], asked: [] };
   const llm: Llm = {
     parseOrder: () => Promise.reject(new Error("no parse")),
+    fitProducts: () => Promise.reject(new Error("no fit")),
+    readReply: () => Promise.reject(new Error("no reply")),
     splitOrder: () => Promise.resolve({ items, ignoredPreference }),
     resolveItem: (input) => {
       seen.resolved.push(input);

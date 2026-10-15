@@ -19,10 +19,33 @@
 ## Acceptance
 
 - [ ] `takeTurn` tests with fakes: questions with Alternatives and no simulation; each entry kind; a missing entry; re-ask in code with the same Alternatives; the 2-question limit dropping an Item; `newLines`; a cart once the last question is answered.
-- [ ] Adapter tests for `read-reply`: input, schema, the checks.
+- [x] Adapter tests for `read-reply`: input, schema, the checks.
 - [ ] Answer cases validated by `pnpm order:eval-set` and run once by `pnpm order:eval`; results noted under Comments.
 - [ ] One real conversation in the chat with a question answered by number and one by a new brand: Conversation Log path noted under Comments.
-- [ ] `docs/LLM.md` describes `read-reply`.
-- [ ] `pnpm check` exits 0.
+- [x] `docs/LLM.md` describes `read-reply`.
+- [x] `pnpm check` exits 0.
 
 ## Comments
+
+### read-reply task part (2026-10-15)
+
+Built only the `read-reply` LLM task; `takeTurn`, the chat and the eval answer cases are left to the turn part, so their boxes stay open.
+
+- Prompt `prompts/order-matching/read-reply.md`; port `Llm.readReply` in `src/core/order-resolution/llm.ts`; input and output types in `src/core/order-matching/read-reply.ts` (`ReplyItem` is an asked Item with its `Question`, or an Item in the cart with the product bought, so ticket 10 needs no prompt change); schema `readReplyOutputSchema` and checks in `src/adapters/claude-code/`; `claude-sonnet-5-5 --effort low`.
+- The adapter fails the call on: an Item number outside the list, two entries for one Item, an `alternative` outside that Item's Alternatives, `choice` for an Item in the cart, `unanswered` without a question for an Item in the cart, empty `lines`, a line `size` or `quantity` the parser rejects. It adds `unanswered` with a null question for every asked Item with no entry and returns entries in Item order.
+- Adapter tests with a fake `ProcessRunner` in `src/adapters/claude-code/claude-code-llm.test.ts` (`describe("readReply")`). `docs/LLM.md` has a `read-reply` section; `ARCHITECTURE.md` lists `readReply`. `pnpm check` exits 0.
+- Real calls, one session each, made-up Items (not from the Catalog Snapshot) through a throwaway script calling `createClaudeCodeLlm(...).readReply`. Session time is `duration_ms` of the Claude Code result; wall time includes CLI start.
+
+| Reply | Items | Output | Session | Wall | Cost |
+|---|---|---|---|---|---|
+| "la 2 y el queso el primero" | 2 asked, 1 in cart | choice 2 for 1, choice 1 for 2 | 2.3 s | 3.8 s | $0.0196 (cold cache) |
+| "dale, una Patagonia" (Patagonia is Alternative 3) | 1 asked, 1 in cart | choice 3 | 3.0 s | 4.5 s | $0.0051 |
+| "dale, una Patagonia" (no Patagonia among Alternatives) | 1 asked, 1 in cart | lines: Cerveza, brand Patagonia, common, 1 unit | 2.2 s | 3.5 s | $0.0055 |
+| "sacala" | 1 asked, 1 in cart | drop | 2.1 s | 3.5 s | $0.0056 |
+| "¿a qué hora llega el pedido?" | 2 asked | unanswered for both | 1.9 s | 3.5 s | $0.0057 |
+| "la quilmes. agregá un vino tinto" | 1 asked, 1 in cart | choice 2; newLines: Vino tinto, common, 1 unit | 2.2 s | 4.0 s | $0.0056 |
+| "cambiá la coca" | 3 in cart (zero, normal, pan) | unanswered for 1 with "¿Cuál coca querés cambiar, la zero grande o la normal chica? ¿Y por cuál la cambio?" | 3.4 s | 4.8 s | $0.0054 |
+| "la coca zero mejor de 1,5 y sacá el pan" | 3 in cart | lines for 1: Gaseosa cola zero, Coca Cola, 1.5 l; drop 3 | 2.1 s | 3.5 s | $0.0058 |
+
+All 8 outputs are what the spec expects. "un vino tinto" and "una Patagonia" come back as `1 unit` rather than `minimum`; both buy one unit of a packaged product, so the cart is the same.
+
