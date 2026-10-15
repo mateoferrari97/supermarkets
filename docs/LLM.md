@@ -14,7 +14,7 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 ## The `parse-order` task
 
-`parseOrder(orderText, signal)` is call 1 of the order matching flow (ADR 0012); the chat does not call it yet. The adapter sends the Owner's text wrapped in `<order>` tags. The LLM returns one line per thing to buy, `{ original, product, brand, size, quantity }`, and `ignoredPreference`, true when the Owner named a payment card or a preference for the whole order (ADR 0011). A card or a preference is never a line.
+`parseOrder(orderText, signal)` is call 1 of the order matching flow (ADR 0012), called by the chat for each order. The adapter sends the Owner's text wrapped in `<order>` tags. The LLM returns one line per thing to buy, `{ original, product, brand, size, quantity }`, and `ignoredPreference`, true when the Owner named a payment card or a preference for the whole order (ADR 0011). A card or a preference is never a line.
 
 `size` and `quantity` come back as short strings that `src/core/order-matching/item.ts` parses:
 
@@ -29,7 +29,7 @@ A string the parser rejects, such as "0 kg" or "1.5 unit", fails the call like a
 
 The LLM returns `{ fits, closest, note, question }`: the numbers of the Matches that fit, a Note for the Owner, and, only when nothing fits, a question with up to 5 `closest` numbers. The schema cannot say how these relate, so the adapter checks that every number is among the Matches, that `question` is set exactly when `fits` is empty, and that `closest` has at most 5 numbers and only when `fits` is empty. A failed check fails the call like an answer that does not fit its schema.
 
-`matchItems` in `src/core/order-matching/match-items.ts` runs the task for a set of Items, at most 10 calls at a time: for each Item it reports the step "Eligiendo productos para '<original>'", searches 30 Matches with `CatalogSearch`, runs the call, and maps the numbers back to products. It returns per Item its Matches, Fits and Note, or its question with the Alternatives in the order the LLM gave them. One call failing fails the whole set, and no further call starts. The chat does not call it yet.
+`matchItems` in `src/core/order-matching/match-items.ts` runs the task for a set of Items, at most 10 calls at a time: for each Item it reports the step "Eligiendo productos para '<original>'", searches 30 Matches with `CatalogSearch`, runs the call, and maps the numbers back to products. It returns per Item its Matches, Fits and Note, or its question with the Alternatives in the order the LLM gave them. One call failing fails the whole set, and no further call starts. The chat calls it for each order.
 
 ## Prompts
 
