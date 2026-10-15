@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Match Items to catalog products with two LLM calls around a search
 
