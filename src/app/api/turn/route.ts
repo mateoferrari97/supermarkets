@@ -22,6 +22,8 @@ function replyEvent(reply: Reply): TurnEvent {
   switch (reply.kind) {
     case "ask":
       return { type: "questions", text: reply.text, questions: [] };
+    case "questions":
+      return { type: "questions", text: reply.text, questions: reply.questions };
     case "cart":
       return { type: "cart", cart: reply.cart };
   }
