@@ -6,15 +6,26 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 ## The port and its adapter
 
-- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
-- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. The default model is `claude-haiku-5-5`, which takes no `temperature`, so the same text can resolve differently between runs.
+- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`parseOrder`, `splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
+- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` runs on `claude-sonnet-5-5` with `--effort low` (ADR 0012); the other tasks run on `claude-haiku-5-5` at its default effort until they are deleted. Neither model takes a `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
-- The adapter's `onCall` reports every session that returns a result: task, model, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
+- The adapter's `onCall` reports every session that returns a result: task, model, effort, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
+
+## The `parse-order` task
+
+`parseOrder(orderText, signal)` is call 1 of the order matching flow (ADR 0012); the chat does not call it yet. The adapter sends the Owner's text wrapped in `<order>` tags. The LLM returns one line per thing to buy, `{ original, product, brand, size, quantity }`, and `ignoredPreference`, true when the Owner named a payment card or a preference for the whole order (ADR 0011). A card or a preference is never a line.
+
+`size` and `quantity` come back as short strings that `src/core/order-matching/item.ts` parses:
+
+- `size`: `common`, `biggest`, `smallest`, or `<amount> <ml|l|g|kg>` ("2.25 l"), parsed into `{ kind: "exact", dimension, amount }` with the amount in ml or g.
+- `quantity`: `minimum`, `<n> unit` with a whole `n`, or `<amount> <g|kg>`, parsed into `{ kind: "units", count }` or `{ kind: "weight", grams }`.
+
+A string the parser rejects, such as "0 kg" or "1.5 unit", fails the call like an answer that does not fit its schema.
 
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/order-resolution/`, named after the task: `split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, and `order-resolution/split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 

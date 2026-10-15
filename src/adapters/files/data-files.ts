@@ -52,7 +52,7 @@ export const VOCABULARY_PATH = "vocabulary/product-types.json";
 export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
 export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
-export const PROMPTS_DIR = "prompts/order-resolution";
+export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
 
 const catalogSchema = z.object({

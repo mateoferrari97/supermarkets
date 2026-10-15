@@ -30,7 +30,7 @@ The code is one package with the layers of ADR 0006 at the top and features insi
 
 Only two things vary per adapter, so only they are ports (ADR 0006):
 
-- `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer.
+- `Llm` (`src/core/order-resolution/llm.ts`): split an order, resolve an Item, reword an Item, map an answer; and `parseOrder`, which reads an order into the Items of `src/core/order-matching/item.ts` (ADR 0012), not yet called by the chat.
 - `OnlineStore` (`src/core/product-selection/online-store.ts`): check delivery to a postal code, find candidates, simulate a cart, build the cart link.
 
 Every method of both ports that calls out takes an `AbortSignal`: the Claude Code adapter kills its `claude` process on abort and the Carrefour adapter passes the signal to `fetch`. `cartLink` only builds a URL and takes none.
@@ -60,6 +60,6 @@ Every conversation is written, as it happens, to its Conversation Log. When `cla
 | --- | --- | --- | --- | --- |
 | `vocabulary/` | `product-types.json` (Product Type Groups and Product Types), `carrefour-tipos.json` (Carrefour Tipo to Product Type id, `null` for excluded) | `pnpm seed:consolidate` writes both from the seed proposals and decisions | Every loader in `src/adapters/files/`; `pnpm product-types` runs the same validation in `pnpm check` | Yes |
 | `evals/` | `order-resolution.json`, the Owner's eval set: orders and what each must resolve to | By hand | The eval set loader, also against the vocabulary; `pnpm order:eval-set` runs it in `pnpm check` | Yes |
-| `prompts/` | `order-resolution/<task>.md`, the system prompt of each `Llm` task | By hand ([LLM](docs/LLM.md#changing-a-prompt)) | Measured by `pnpm order:eval`; not checked by `pnpm docs:check` | Yes |
+| `prompts/` | `order-resolution/<task>.md` and `order-matching/<task>.md`, the system prompt of each `Llm` task | By hand ([LLM](docs/LLM.md#changing-a-prompt)) | Measured by `pnpm order:eval`; not checked by `pnpm docs:check` | Yes |
 | `.data/conversations/` | One Conversation Log per chat conversation, `<YYYY-MM-DD-HHmmss>-<sessionId>.jsonl`, one event per line | The chat (`pnpm dev`) through `openConversationLog` in `src/adapters/files/` | No validator; it is only read by people reviewing a mistake | No (`.gitignore`) |
 | `.data/` | `carrefour/products.json` and `carrefour/tipos.json` (the Catalog Snapshot), `carrefour/seed/` (parts, proposals, decisions, doubts, summary), `order-resolution/eval-runs/` (one file per eval run) | `pnpm carrefour:catalog`, the `seed:*` commands and the seed skills, `pnpm order:eval` | No validator command; `src/adapters/files/` parses the Catalog Snapshot, the seed decisions and the eval runs with zod, and checks each proposal against its part, when it reads them | No (`.gitignore`) |
