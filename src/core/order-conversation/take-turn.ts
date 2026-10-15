@@ -7,7 +7,7 @@ import {
   type Question,
 } from "../order-matching/match-items.ts";
 import type { ReadReplyLlm } from "../order-matching/read-reply.ts";
-import { candidateOf, candidatesFor } from "../product-selection/candidates.ts";
+import { candidateOf, candidatesFor, type Candidate } from "../product-selection/candidates.ts";
 import {
   CART_WARNING,
   money,
@@ -23,9 +23,13 @@ export const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
 export const ORDER_QUESTION = "¿Qué necesitás del súper?";
 export const IGNORED_PREFERENCE_NOTE = "Por ahora no tengo en cuenta tarjetas ni preferencias.";
 
+export type Mark = "new" | "changed";
+
+export type CartLineShown = CartLine & { mark: Mark | null };
+
 export type Cart = {
   postalCode: string;
-  lines: CartLine[];
+  lines: CartLineShown[];
   total: number;
   notes: string[];
   warning: string;
@@ -36,7 +40,7 @@ export type ConversationState =
   | { stage: "postal-code" }
   | { stage: "order"; postalCode: string }
   | ({ stage: "questions" } & Order)
-  | { stage: "done"; postalCode: string; cart: Cart };
+  | ({ stage: "cart" } & Order);
 
 export const NEW_CONVERSATION: ConversationState = { stage: "postal-code" };
 
@@ -84,10 +88,11 @@ async function turnFor(
       if (!reply) return ask(state, ORDER_QUESTION);
       return orderTurn(state, reply, deps, steps, onStep);
     case "questions":
-      if (!reply) return nextTurn(state, deps, steps);
-      return questionsTurn(state, reply, deps, steps, onStep);
-    case "done":
-      throw new Error("The conversation already delivered its cart");
+    case "cart": {
+      const { stage: _stage, ...order } = state;
+      if (!reply) return nextTurn(order, deps, steps);
+      return replyTurn(order, reply, deps, steps, onStep);
+    }
   }
 }
 
@@ -109,15 +114,25 @@ async function postalCodeTurn(reply: string, store: OnlineStore, signal: AbortSi
 
 export const MAX_QUESTIONS = 2;
 
+type InCart = {
+  item: Item;
+  candidate: Candidate;
+  reason: string;
+  questionsSpent: number;
+};
+
 export type TurnItem =
-  | { kind: "ready"; toBuy: ItemToBuy }
+  | { kind: "ready"; item: Item; toBuy: ItemToBuy; questionsSpent: number; mark: Mark | null }
   | {
       kind: "asked";
       item: Item;
       question: Question;
       questionsSpent: number;
       reasked: boolean;
-    };
+      mark: Mark | null;
+      inCart: InCart | null;
+    }
+  | ({ kind: "in-cart" } & InCart);
 
 type Order = {
   postalCode: string;
@@ -125,6 +140,7 @@ type Order = {
   dropped: string[];
   removed: string[];
   ignoredPreference: boolean;
+  cartShown: boolean;
 };
 
 async function orderTurn(
@@ -140,89 +156,121 @@ async function orderTurn(
   const matched = await matchItems(items, deps, { signal: steps.signal, onStep });
   const order: Order = {
     postalCode: state.postalCode,
-    items: matched.map((match) => turnItemOf(match, 0)),
+    items: matched.map((match) => turnItemOf(match, 0, null)),
     dropped: [],
     removed: [],
     ignoredPreference,
+    cartShown: false,
   };
   return nextTurn(order, deps, steps);
 }
 
-async function questionsTurn(
+type ToMatch = { item: Item; questionsSpent: number; mark: Mark | null };
+
+type Kept = TurnItem | { kind: "match"; from: number; count: number };
+
+async function replyTurn(
   order: Order,
   reply: string,
   deps: ConversationDependencies,
   steps: Steps,
   onStep: OnStep | undefined,
 ): Promise<Turn> {
-  const asked = order.items.filter((entry) => entry.kind === "asked");
+  const listed = order.items.filter((entry) => entry.kind !== "ready");
   const read = await steps.run({ kind: "understand-answer" }, () =>
     deps.llm.readReply(
       {
-        items: asked.map(({ item, question }) => ({
-          kind: "asked",
-          original: item.original,
-          question,
-        })),
+        items: listed.map((entry) =>
+          entry.kind === "asked"
+            ? { kind: "asked", original: entry.item.original, question: entry.question }
+            : { kind: "bought", original: entry.item.original, product: entry.candidate.product },
+        ),
         reply,
       },
       steps.signal,
     ),
   );
-  const entryOf = new Map(read.entries.map((entry) => [asked[entry.item - 1], entry]));
-  const toMatch: { item: Item; questionsSpent: number }[] = [];
+  const entryOf = new Map(read.entries.map((entry) => [listed[entry.item - 1], entry]));
+  const toMatch: ToMatch[] = [];
   const dropped = [...order.dropped];
   const removed = [...order.removed];
-  const kept: (TurnItem | { kind: "match"; from: number; count: number })[] = [];
+  const kept: Kept[] = [];
+  const replaceBy = (lines: Item[], questionsSpent: number, mark: Mark | null) => {
+    kept.push({ kind: "match", from: toMatch.length, count: lines.length });
+    toMatch.push(...lines.map((item) => ({ item, questionsSpent, mark })));
+  };
   for (const current of order.items) {
     if (current.kind === "ready") {
       kept.push(current);
       continue;
     }
-    const entry = entryOf.get(current) ?? { kind: "unanswered", question: null };
-    switch (entry.kind) {
+    const entry = entryOf.get(current);
+    if (current.kind === "in-cart") {
+      if (entry?.kind === "lines") replaceBy(entry.lines, 0, "changed");
+      else if (entry?.kind === "drop") removed.push(removedNote(current.item));
+      else if (entry?.kind === "unanswered" && entry.question !== null) {
+        kept.push(correctionQuestion(current, entry.question));
+      } else kept.push(current);
+      continue;
+    }
+    const answer = entry ?? { kind: "unanswered", question: null };
+    switch (answer.kind) {
       case "choice":
         kept.push({
           kind: "ready",
+          item: current.item,
           toBuy: {
             original: current.item.original,
             note: null,
             candidates: [
-              candidateOf(current.item, current.question.alternatives[entry.alternative - 1]!),
+              candidateOf(current.item, current.question.alternatives[answer.alternative - 1]!),
             ],
+            kept: false,
           },
+          questionsSpent: current.questionsSpent,
+          mark: current.mark,
         });
         break;
       case "lines":
-        kept.push({ kind: "match", from: toMatch.length, count: entry.lines.length });
-        toMatch.push(
-          ...entry.lines.map((item) => ({ item, questionsSpent: current.questionsSpent })),
-        );
+        replaceBy(answer.lines, current.questionsSpent, current.mark);
         break;
       case "drop":
         removed.push(removedNote(current.item));
         break;
       case "unanswered":
-        if (current.questionsSpent >= MAX_QUESTIONS) dropped.push(droppedNote(current.item));
-        else kept.push({ ...current, questionsSpent: current.questionsSpent + 1, reasked: true });
+        if (current.inCart !== null) {
+          kept.push({
+            kind: "in-cart",
+            ...current.inCart,
+            questionsSpent: current.questionsSpent,
+          });
+        } else if (current.questionsSpent >= MAX_QUESTIONS) {
+          dropped.push(droppedNote(current.item));
+        } else {
+          kept.push({ ...current, questionsSpent: current.questionsSpent + 1, reasked: true });
+        }
         break;
     }
   }
-  const added = read.newLines.map((item) => ({ item, questionsSpent: 0 }));
+  const added: ToMatch[] = read.newLines.map((item) => ({
+    item,
+    questionsSpent: 0,
+    mark: order.cartShown ? "new" : null,
+  }));
+  const queued = [...toMatch, ...added];
   const matched = await matchItems(
-    [...toMatch, ...added].map(({ item }) => item),
+    queued.map(({ item }) => item),
     deps,
     { signal: steps.signal, onStep },
   );
-  const spentOf = [...toMatch, ...added].map(({ questionsSpent }) => questionsSpent);
   const fromMatch = (from: number, count: number) =>
     matched.slice(from, from + count).flatMap((match, offset): TurnItem[] => {
-      const questionsSpent = spentOf[from + offset]!;
+      const { questionsSpent, mark } = queued[from + offset]!;
       if (match.question !== null && questionsSpent >= MAX_QUESTIONS) {
         dropped.push(droppedNote(match.item));
         return [];
       }
-      return [turnItemOf(match, questionsSpent)];
+      return [turnItemOf(match, questionsSpent, mark)];
     });
   const items = [
     ...kept.flatMap((entry) =>
@@ -232,7 +280,7 @@ async function questionsTurn(
   ];
   return nextTurn(
     {
-      postalCode: order.postalCode,
+      ...order,
       items,
       dropped,
       removed,
@@ -243,14 +291,42 @@ async function questionsTurn(
   );
 }
 
-function turnItemOf({ item, fits, note, question }: ItemMatch, questionsSpent: number): TurnItem {
+function correctionQuestion(inCart: InCart, text: string): TurnItem {
+  if (inCart.questionsSpent >= MAX_QUESTIONS) return { kind: "in-cart", ...inCart };
+  return {
+    kind: "asked",
+    item: inCart.item,
+    question: { text, alternatives: [] },
+    questionsSpent: inCart.questionsSpent + 1,
+    reasked: false,
+    mark: "changed",
+    inCart,
+  };
+}
+
+function turnItemOf(
+  { item, fits, note, question }: ItemMatch,
+  questionsSpent: number,
+  mark: Mark | null,
+): TurnItem {
   if (question === null) {
     return {
       kind: "ready",
-      toBuy: { original: item.original, note, candidates: candidatesFor(item, fits) },
+      item,
+      toBuy: { original: item.original, note, candidates: candidatesFor(item, fits), kept: false },
+      questionsSpent,
+      mark,
     };
   }
-  return { kind: "asked", item, question, questionsSpent: questionsSpent + 1, reasked: false };
+  return {
+    kind: "asked",
+    item,
+    question,
+    questionsSpent: questionsSpent + 1,
+    reasked: false,
+    mark,
+    inCart: null,
+  };
 }
 
 async function nextTurn(
@@ -272,15 +348,43 @@ async function nextTurn(
       },
     };
   }
-  const toBuy = order.items.flatMap((entry) => (entry.kind === "ready" ? [entry.toBuy] : []));
-  const simulated = await steps.run({ kind: "simulate-cart" }, () =>
-    simulateCart(toBuy, order.postalCode, store, steps.signal),
+  const toBuy = order.items.flatMap((entry) =>
+    entry.kind === "asked" ? [] : [{ entry, toBuy: toBuyOf(entry) }],
   );
-  const lines: CartLine[] = [];
+  const simulated = await steps.run({ kind: "simulate-cart" }, () =>
+    simulateCart(
+      toBuy.map(({ toBuy }) => toBuy),
+      order.postalCode,
+      store,
+      steps.signal,
+    ),
+  );
+  const lines: CartLineShown[] = [];
+  const inCart: TurnItem[] = [];
   const notGot: string[] = [];
-  for (const result of simulated.bought) {
-    if (result.kind === "bought") lines.push(result.line);
-    else notGot.push(result.note);
+  for (const [index, result] of simulated.bought.entries()) {
+    const { entry, toBuy: bought } = toBuy[index]!;
+    if (result.kind === "not-got") {
+      notGot.push(result.note);
+      continue;
+    }
+    const { line } = result;
+    const candidate = bought.candidates.find(
+      ({ product, quantity }) =>
+        product.itemId === line.product.itemId && quantity === line.quantity,
+    )!;
+    const shown =
+      entry.kind === "in-cart"
+        ? { ...line, reason: entry.reason, notes: [], mark: null }
+        : { ...line, mark: entry.mark };
+    lines.push(shown);
+    inCart.push({
+      kind: "in-cart",
+      item: entry.item,
+      candidate,
+      reason: shown.reason,
+      questionsSpent: entry.questionsSpent,
+    });
   }
   const cart: Cart = {
     postalCode: order.postalCode,
@@ -296,9 +400,22 @@ async function nextTurn(
     cartLink: simulated.cartLink,
   };
   return {
-    state: { stage: "done", postalCode: order.postalCode, cart },
+    state: {
+      stage: "cart",
+      postalCode: order.postalCode,
+      items: inCart,
+      dropped: [],
+      removed: [],
+      ignoredPreference: false,
+      cartShown: true,
+    },
     reply: { kind: "cart", cart },
   };
+}
+
+function toBuyOf(entry: TurnItem & { kind: "ready" | "in-cart" }): ItemToBuy {
+  if (entry.kind === "ready") return entry.toBuy;
+  return { original: entry.item.original, note: null, candidates: [entry.candidate], kept: true };
 }
 
 export const QUESTIONS_HINT =

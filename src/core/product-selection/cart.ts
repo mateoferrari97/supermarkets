@@ -9,7 +9,12 @@ export const SIMULATIONS_CONCURRENCY = 10;
 export const CART_WARNING =
   "Antes de abrir el link, vaciá tu carrito de Carrefour: el link agrega productos pero no saca los que ya estaban.";
 
-export type ItemToBuy = { original: string; note: string | null; candidates: Candidate[] };
+export type ItemToBuy = {
+  original: string;
+  note: string | null;
+  candidates: Candidate[];
+  kept: boolean;
+};
 
 export type CartLine = {
   original: string;
@@ -25,7 +30,7 @@ export type Bought = { kind: "bought"; line: CartLine } | { kind: "not-got"; not
 
 export type SimulatedCart = { bought: Bought[]; total: number; cartLink: string | null };
 
-type Priced = { candidate: Candidate; total: number; savings: number; line: SimulatedLine };
+type Priced = { candidate: Candidate; total: number; savings: number };
 
 type Pick = { item: ItemToBuy; ranked: Priced[]; chosen: number; notes: string[] };
 
@@ -42,23 +47,25 @@ export async function simulateCart(
     const { itemId } = candidate.product;
     const { lines } = await simulate([{ itemId, quantity }]);
     const line = lines.find((simulated) => simulated.itemId === itemId);
-    return line?.available ? { candidate, total: line.total, savings: line.savings, line } : null;
+    return line?.available ? { candidate, total: line.total, savings: line.savings } : null;
   };
 
   const queue = items.flatMap((item, index) =>
-    item.candidates.map((candidate) => ({ index, candidate })),
+    item.kept ? [] : item.candidates.map((candidate) => ({ index, candidate })),
   );
   const priced = await inParallel(queue, SIMULATIONS_CONCURRENCY, signal, ({ candidate }) =>
     priceAlone(candidate, candidate.quantity),
   );
   const picks: Pick[] = items.map((item, index) => ({
     item,
-    ranked: rankBySelectionPolicy(
-      queue.flatMap((queued, position) => {
-        const simulated = priced[position];
-        return queued.index === index && simulated ? [simulated] : [];
-      }),
-    ),
+    ranked: item.kept
+      ? item.candidates.map((candidate) => ({ candidate, total: 0, savings: 0 }))
+      : rankBySelectionPolicy(
+          queue.flatMap((queued, position) => {
+            const simulated = priced[position];
+            return queued.index === index && simulated ? [simulated] : [];
+          }),
+        ),
     chosen: 0,
     notes: [],
   }));
@@ -115,9 +122,9 @@ export async function simulateCart(
     async (pick): Promise<Bought> => {
       const best = pick.ranked[pick.chosen];
       if (!best) return { kind: "not-got", note: notGotNote(pick) };
-      const line = whole.lines.get(pick) ?? best.line;
+      const line = whole.lines.get(pick)!;
       const { candidate } = best;
-      const hint = await promotionHint(best, priceAlone);
+      const hint = pick.item.kept ? null : await promotionHint(best, priceAlone);
       return {
         kind: "bought",
         line: {

@@ -23,7 +23,7 @@ Code searches the catalog for the lines you write, keeps the products that fit a
 - `choice`: the Owner picks one of an asked Item's alternatives ("la 2", "la primera", "dale la Quilmes"). `alternative` is its number. Only for asked Items. This step is important.
 - `lines`: the Owner wants something else for that Item: another product, brand, variant or size ("dale, una Patagonia", "mejor de 1,5", "cambiá el carbón por uno de 5 kg"). `lines` are the new lines that replace it, usually one.
 - `drop`: the Owner removes the Item ("sacala", "dejá el queso", "no, nada").
-- `unanswered`: for an asked Item the reply does not answer, `question` is null. For an Item in the cart, only when the reply clearly wants to change something but you cannot tell which Item ("cambiá la coca" with two cocas in the cart): write one entry for one of those Items with a short `question` in Argentine Spanish to the Owner ("¿Cuál coca, la zero o la normal?").
+- `unanswered`: for an asked Item the reply does not answer, `question` is null. For an Item in the cart, only when the reply clearly wants to change something but you cannot tell which Item ("cambiá la coca" with two cocas in the cart): write one entry for one of those Items with a short `question` in Argentine Spanish to the Owner that names the change, so that its answer can be read alone ("¿Cuál coca querés de 1,5, la zero o la normal?").
 
 # Lines
 
@@ -39,6 +39,7 @@ Each line is one thing to buy, as code searches it:
 
 - One entry at most per Item.
 - Use only Item numbers of <items> and alternative numbers of that Item. Never invent a product or a brand.
+- An asked Item with no alternatives was asked which Item in the cart to change. When the answer picks another Item in the cart, write the entry for that Item and none for the asked one.
 - Never write `choice` for an Item in the cart. A product the Owner names that is not among the alternatives is `lines`, not `choice`.
 - A new thing the reply adds ("agregá un vino tinto", "y sumá pan") goes in `newLines`, never in an entry.
 - A payment card or a preference for the whole order is never a line: "pago con Visa", "priorizá promos", "nada de Marolio". Set `ignoredPreference` to true instead.

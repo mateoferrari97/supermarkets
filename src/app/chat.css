@@ -214,3 +214,14 @@ th.num {
   color: var(--accent);
   border: 1px solid var(--accent);
 }
+
+.mark {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-right: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+}

@@ -1,6 +1,6 @@
-import type { AskedQuestion, Cart } from "../core/order-conversation/take-turn.ts";
+import type { AskedQuestion, Cart, Mark } from "../core/order-conversation/take-turn.ts";
 
-export type { AskedQuestion, Cart };
+export type { AskedQuestion, Cart, Mark };
 
 export type TurnEvent =
   | { type: "session"; sessionId: string }

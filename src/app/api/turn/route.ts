@@ -91,8 +91,7 @@ export async function POST(request: Request): Promise<Response> {
             trackStep(event);
           }),
         );
-        if (turn.reply.kind === "cart") deleteSession(sessionId);
-        else releaseSession(sessionId, turn.state);
+        releaseSession(sessionId, turn.state);
         send(replyEvent(turn.reply));
       } catch (error) {
         if (signal.aborted) {

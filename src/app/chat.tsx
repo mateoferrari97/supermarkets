@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AskedQuestion, Cart, TurnEvent, TurnRequest } from "./turn-events.ts";
+import type { AskedQuestion, Cart, Mark, TurnEvent, TurnRequest } from "./turn-events.ts";
 
 type Step = { id: number; text: string; seconds: number | null };
 
@@ -96,9 +96,7 @@ export function Chat({ firstQuestion }: { firstQuestion: string }) {
       });
       for await (const event of readEvents(response)) {
         if (event.type === "session") setSessionId(event.sessionId);
-        if (event.type === "cart" || (event.type === "error" && response.status !== 409)) {
-          setFinished(true);
-        }
+        if (event.type === "error" && response.status !== 409) setFinished(true);
         setMessages((current) => withEvent(current, event));
       }
     } catch (error) {
@@ -254,6 +252,8 @@ function QuestionChips({
   );
 }
 
+const MARK_TEXT: Record<Mark, string> = { new: "Nuevo", changed: "Cambiado" };
+
 function CartView({ cart }: { cart: Cart }) {
   return (
     <>
@@ -271,7 +271,10 @@ function CartView({ cart }: { cart: Cart }) {
           {cart.lines.map((line, index) => (
             <tr key={index}>
               <td>
-                <div>{line.product.name}</div>
+                <div>
+                  {line.mark === null ? null : <span className="mark">{MARK_TEXT[line.mark]}</span>}
+                  {line.product.name}
+                </div>
                 <div className="muted small">
                   pediste &quot;{line.original}&quot; · {line.reason}
                 </div>
