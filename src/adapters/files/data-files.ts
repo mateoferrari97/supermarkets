@@ -14,43 +14,21 @@ import {
   catalogProductsFrom,
   type CatalogProduct,
 } from "../../core/order-matching/catalog-product.ts";
+import type { EvalRun } from "../../core/order-matching/eval-run.ts";
 import {
-  validateEvalSet,
   evalSetSchema,
+  exampleOrders,
+  validateEvalSet,
   type EvalSet,
-} from "../../core/order-resolution/eval-set.ts";
-import type { EvalRun } from "../../core/order-resolution/eval-run.ts";
-import {
-  tipoMappingSchema,
-  vocabularySchema,
-  type TipoMapping,
-  type Vocabulary,
-} from "../../core/product-types/schema.ts";
-import { validateProductTypes } from "../../core/product-types/validate.ts";
-
+} from "../../core/order-matching/eval-set.ts";
 export type Checked<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 
 export const CATALOG_DIR = ".data/carrefour";
 export const CATALOG_PATH = `${CATALOG_DIR}/products.json`;
-export const VOCABULARY_PATH = "vocabulary/product-types.json";
-export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
-export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
-export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
+export const ORDER_EVAL_SET_PATH = "evals/order-matching.json";
+export const ORDER_EVAL_RUNS_DIR = ".data/order-matching/eval-runs";
 export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
-
-const GROCERY_DEPARTMENTS = [
-  "Almacén",
-  "Desayuno y merienda",
-  "Bebidas",
-  "Lácteos y productos frescos",
-  "Carnes y pescados",
-  "Frutas y verduras",
-  "Panadería",
-  "Congelados",
-  "Limpieza",
-  "Perfumería y farmacia",
-];
 
 const catalogSchema = z.object({
   products: z.array(
@@ -76,16 +54,12 @@ const catalogSchema = z.object({
 
 const previousEvalRunSchema = z.object({
   startedAt: z.string(),
-  cases: z.array(z.object({ id: z.string(), outcome: z.enum(["hit", "miss", "error"]) })),
+  cases: z.array(z.object({ id: z.string(), passed: z.boolean() })),
 });
 
+const catalogMetaSchema = z.object({ fetchedAt: z.string() });
+
 export type CatalogRecord = z.infer<typeof catalogSchema>["products"][number];
-
-export type ProductTypes = { vocabulary: Vocabulary; mapping: TipoMapping };
-
-export type OrderFiles = ProductTypes & { catalog: CatalogRecord[] };
-
-export type CheckedEvalSet = { evalSet: EvalSet; vocabulary: Vocabulary };
 
 export type PreviousEvalRun = z.infer<typeof previousEvalRunSchema>;
 
@@ -147,39 +121,20 @@ export function createDataFiles(root = ".") {
     );
   };
 
-  const loadProductTypes = (): Checked<ProductTypes> => {
-    const vocabulary = readJson(VOCABULARY_PATH);
-    const mapping = readJson(CARREFOUR_MAPPING_PATH);
-    const errors = validateProductTypes(vocabulary, mapping);
-    if (errors.length > 0) return failed(errors);
-    return ok({
-      vocabulary: vocabularySchema.parse(vocabulary),
-      mapping: tipoMappingSchema.parse(mapping),
-    });
+  const loadSnapshotFetchedAt = (): string | null => {
+    if (!exists(CATALOG_PATH)) return null;
+    const meta = catalogMetaSchema.safeParse(readJson(CATALOG_PATH));
+    return meta.success ? meta.data.fetchedAt : null;
   };
 
-  const loadEvalSet = (): Checked<CheckedEvalSet> => {
-    const productTypes = loadProductTypes();
-    if (!productTypes.ok) return productTypes;
-    const { vocabulary } = productTypes.value;
+  const loadEvalSet = (): Checked<EvalSet> => {
+    const examples = readdirSync(at(PROMPTS_DIR), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".md"))
+      .sort()
+      .flatMap((file) => exampleOrders(readFileSync(at(join(PROMPTS_DIR, file)), "utf8")));
     const input = readJson(ORDER_EVAL_SET_PATH);
-    const errors = validateEvalSet(input, vocabulary);
-    return errors.length > 0
-      ? failed(errors)
-      : ok({ evalSet: evalSetSchema.parse(input), vocabulary });
-  };
-
-  const loadOrderFiles = (): Checked<OrderFiles> => {
-    const catalog = loadCatalog();
-    const productTypes = loadProductTypes();
-    if (!catalog.ok || !productTypes.ok) {
-      return failed([catalog, productTypes].flatMap((loaded) => (loaded.ok ? [] : loaded.errors)));
-    }
-    const grocery = new Set<string>(GROCERY_DEPARTMENTS);
-    return ok({
-      catalog: catalog.value.filter((product) => grocery.has(product.department)),
-      ...productTypes.value,
-    });
+    const errors = validateEvalSet(input, examples);
+    return errors.length > 0 ? failed(errors) : ok(evalSetSchema.parse(input));
   };
 
   const saveCatalog = ({ meta, products }: CatalogDownload, outputDir = CATALOG_DIR) => {
@@ -241,11 +196,9 @@ export function createDataFiles(root = ".") {
     promptsDir: at(PROMPTS_DIR),
     headCommit,
     openConversationLog,
-    loadCatalog,
     loadCatalogProducts,
-    loadProductTypes,
+    loadSnapshotFetchedAt,
     loadEvalSet,
-    loadOrderFiles,
     saveCatalog,
     saveEvalRun,
     loadLatestEvalRun,

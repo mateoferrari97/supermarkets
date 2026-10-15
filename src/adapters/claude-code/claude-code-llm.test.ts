@@ -15,17 +15,10 @@ import {
 } from "./claude-code-llm.ts";
 
 const promptsDir = mkdtempSync(join(tmpdir(), "prompts-"));
-mkdirSync(join(promptsDir, "order-resolution"));
 mkdirSync(join(promptsDir, "order-matching"));
-writeFileSync(join(promptsDir, "order-resolution", "split-order.md"), "Split the order.");
-writeFileSync(join(promptsDir, "order-resolution", "resolve-item.md"), "Resolve the Item.");
 writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
 writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
 writeFileSync(join(promptsDir, "order-matching", "read-reply.md"), "Read the reply.");
-
-const vocabulary = {
-  groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
-};
 
 const session = (fields: Record<string, unknown>): ProcessResult => ({
   exitCode: 0,
@@ -50,7 +43,6 @@ const llmWith = (
   inputsSeen: string[] = [],
 ) =>
   createClaudeCodeLlm({
-    vocabulary,
     promptsDir,
     run: (args, input, runSignal) => {
       argsSeen.push(args);
@@ -61,45 +53,46 @@ const llmWith = (
     onCall: (call) => calls.push(call),
   });
 
+const yerba = {
+  lines: [
+    { original: "yerba", product: "Yerba", brand: null, size: "common", quantity: "minimum" },
+  ],
+  ignoredPreference: false,
+};
+
 describe("createClaudeCodeLlm", () => {
   it("returns the validated structured output and reports the call with its raw output", async () => {
     const calls: LlmCall[] = [];
     const argsSeen: string[][] = [];
-    const result = session({ structured_output: { kind: "match", candidates: ["yerba"] } });
+    const result = session({ structured_output: yerba });
     const llm = llmWith(result, calls, argsSeen);
-    const input = {
-      item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
-      evidence: [],
-    };
-    const answer = await llm.resolveItem(input, signal);
-    assert.deepEqual(answer, { kind: "match", candidates: ["yerba"] });
+    const answer = await llm.parseOrder("yerba", signal);
+    assert.deepEqual(
+      answer.items.map(({ product }) => product),
+      ["Yerba"],
+    );
     const args = argsSeen[0]!;
     const systemPrompt = args[args.indexOf("--system-prompt") + 1]!;
     assert.deepEqual(calls, [
       {
-        task: "resolve-item",
-        model: "claude-haiku-5-5",
-        effort: null,
+        task: "parse-order",
+        model: "claude-sonnet-5-5",
+        effort: "low",
         systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
-        input,
+        input: "<order>\nyerba\n</order>",
         rawOutput: result.stdout,
         costUsd: 0.0137,
         durationMs: 3039,
       },
     ]);
-    assert.equal(args[args.indexOf("--model") + 1], "claude-haiku-5-5");
-    assert.equal(args.includes("--effort"), false);
     assert.equal(args[args.indexOf("--tools") + 1], "");
     assert.ok(args.includes("--no-session-persistence"));
     assert.equal("$schema" in JSON.parse(args[args.indexOf("--json-schema") + 1]!), false);
-    assert.ok(
-      args[args.indexOf("--system-prompt") + 1]!.includes("grupo-yerba (Yerba): yerba (Yerba)"),
-    );
   });
 
   it("fails on an answer that does not match the task's schema", async () => {
-    const llm = llmWith(session({ structured_output: { items: [{ phrase: "" }] } }));
-    await assert.rejects(llm.splitOrder("yerba", signal), /split-order returned an invalid answer/);
+    const llm = llmWith(session({ structured_output: { lines: [{ original: "" }] } }));
+    await assert.rejects(llm.parseOrder("yerba", signal), /parse-order returned an invalid answer/);
   });
 
   it("fails when the session reports an error such as an exhausted budget", async () => {
@@ -111,32 +104,21 @@ describe("createClaudeCodeLlm", () => {
       }),
     );
     await assert.rejects(
-      llm.splitOrder("yerba", signal),
-      /split-order failed \(error_max_budget_usd\): Reached maximum budget/,
+      llm.parseOrder("yerba", signal),
+      /parse-order failed \(error_max_budget_usd\): Reached maximum budget/,
     );
   });
 
   it("fails when the CLI exits with an error", async () => {
     const llm = llmWith({ exitCode: 1, stdout: "", stderr: "Not logged in\n" });
-    await assert.rejects(llm.splitOrder("yerba", signal), /exited with 1: Not logged in/);
+    await assert.rejects(llm.parseOrder("yerba", signal), /exited with 1: Not logged in/);
   });
 
   it("passes the signal of the call to the session it runs", async () => {
     const signalsSeen: AbortSignal[] = [];
     const controller = new AbortController();
-    const llm = llmWith(
-      session({ structured_output: { kind: "none", candidates: [] } }),
-      [],
-      [],
-      signalsSeen,
-    );
-    await llm.resolveItem(
-      {
-        item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
-        evidence: [],
-      },
-      controller.signal,
-    );
+    const llm = llmWith(session({ structured_output: yerba }), [], [], signalsSeen);
+    await llm.parseOrder("yerba", controller.signal);
     assert.deepEqual(signalsSeen, [controller.signal]);
   });
 
@@ -145,7 +127,7 @@ describe("createClaudeCodeLlm", () => {
     const controller = new AbortController();
     controller.abort();
     const llm = llmWith(session({ structured_output: {} }), [], argsSeen);
-    await assert.rejects(llm.splitOrder("yerba", controller.signal), { name: "AbortError" });
+    await assert.rejects(llm.parseOrder("yerba", controller.signal), { name: "AbortError" });
     assert.equal(argsSeen.length, 0);
   });
 });
@@ -189,7 +171,6 @@ describe("parseOrder", () => {
   it("runs the model and effort it is given for the task", async () => {
     const argsSeen: string[][] = [];
     const llm = createClaudeCodeLlm({
-      vocabulary,
       promptsDir,
       models: { "parse-order": { model: "claude-haiku-5-5", effort: null } },
       run: (args) => {

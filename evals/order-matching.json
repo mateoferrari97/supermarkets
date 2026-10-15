@@ -1,0 +1,776 @@
+{
+  "cases": [
+    {
+      "id": "nada-de-huevos",
+      "order": "yerba y nada de huevos",
+      "notItems": ["huevo"],
+      "items": [
+        {
+          "product": "Yerba",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": [
+            "183887",
+            "367573",
+            "367575",
+            "443163",
+            "443164",
+            "517286",
+            "544607",
+            "544972",
+            "544974",
+            "548163",
+            "575415",
+            "603490",
+            "603491",
+            "613804",
+            "664187",
+            "664188",
+            "664190",
+            "668361",
+            "668363",
+            "668365",
+            "668369",
+            "669429",
+            "672937",
+            "672938",
+            "672939",
+            "672940",
+            "672941",
+            "672942",
+            "672943",
+            "677785",
+            "677786",
+            "679242",
+            "679243",
+            "679311",
+            "681098",
+            "681099",
+            "682153",
+            "682155",
+            "694583",
+            "694893",
+            "695685",
+            "695941",
+            "696124",
+            "696125",
+            "697155",
+            "698618",
+            "708486",
+            "713945",
+            "713946",
+            "739298",
+            "739299",
+            "741493",
+            "741494",
+            "741495",
+            "744253",
+            "751045",
+            "759802",
+            "760169",
+            "761606",
+            "762254",
+            "762255",
+            "769558",
+            "770565",
+            "773096",
+            "773097",
+            "773098",
+            "773099",
+            "778732",
+            "778981",
+            "779053",
+            "779054",
+            "783204",
+            "783205"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "envio-a-codigo-postal",
+      "order": "yerba, envío a 1425",
+      "notItems": ["1425", "envío"],
+      "items": [
+        {
+          "product": "Yerba",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": [
+            "183887",
+            "367573",
+            "367575",
+            "443163",
+            "443164",
+            "517286",
+            "544607",
+            "544972",
+            "544974",
+            "548163",
+            "575415",
+            "603490",
+            "603491",
+            "613804",
+            "664187",
+            "664188",
+            "664190",
+            "668361",
+            "668363",
+            "668365",
+            "668369",
+            "669429",
+            "672937",
+            "672938",
+            "672939",
+            "672940",
+            "672941",
+            "672942",
+            "672943",
+            "677785",
+            "677786",
+            "679242",
+            "679243",
+            "679311",
+            "681098",
+            "681099",
+            "682153",
+            "682155",
+            "694583",
+            "694893",
+            "695685",
+            "695941",
+            "696124",
+            "696125",
+            "697155",
+            "698618",
+            "708486",
+            "713945",
+            "713946",
+            "739298",
+            "739299",
+            "741493",
+            "741494",
+            "741495",
+            "744253",
+            "751045",
+            "759802",
+            "760169",
+            "761606",
+            "762254",
+            "762255",
+            "769558",
+            "770565",
+            "773096",
+            "773097",
+            "773098",
+            "773099",
+            "778732",
+            "778981",
+            "779053",
+            "779054",
+            "783204",
+            "783205"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "marca-de-una-lista",
+      "order": "mayonesa ketchup y mostaza natura",
+      "items": [
+        {
+          "product": "Mayonesa Natura",
+          "brand": "Natura",
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["41845", "152816", "263810"]
+        },
+        {
+          "product": "Ketchup Natura",
+          "brand": "Natura",
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["548315", "648766"]
+        },
+        {
+          "product": "Mostaza Natura",
+          "brand": "Natura",
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["548328", "630676"]
+        }
+      ]
+    },
+    {
+      "id": "marca-con-tambien",
+      "order": "chorizo parrillero la diviza, morcilla tambien la divisa",
+      "items": [
+        {
+          "product": "Chorizo parrillero La Divisa",
+          "brand": ["La Divisa", "La Diviza"],
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["724398", "724399"]
+        },
+        {
+          "product": "Morcilla La Divisa",
+          "brand": "La Divisa",
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["724416", "724417"]
+        }
+      ]
+    },
+    {
+      "id": "coca-de-2-25",
+      "order": "dos cocas de 2,25",
+      "items": [
+        {
+          "product": "Coca-Cola sabor original 2,25 l",
+          "brand": "Coca Cola",
+          "size": "exact",
+          "quantity": "2 unit",
+          "fits": ["6225", "30138", "625279", "630677", "630679", "763994"],
+          "pick": ["30138"]
+        }
+      ]
+    },
+    {
+      "id": "leche-descremada-with-brand",
+      "order": "leche descremada La Serenísima",
+      "items": [
+        {
+          "product": "Leche descremada La Serenísima",
+          "brand": "La Serenísima",
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["653793", "661341", "663213", "679516", "720720", "720721"]
+        }
+      ]
+    },
+    {
+      "id": "un-par-de-yogures",
+      "order": "un par de yogures",
+      "items": [
+        {
+          "product": "Yogur entero",
+          "brand": null,
+          "size": "common",
+          "quantity": "2 unit",
+          "fits": [
+            "640506",
+            "658509",
+            "658511",
+            "660738",
+            "672742",
+            "672743",
+            "686542",
+            "686543",
+            "686544",
+            "704484",
+            "704486",
+            "704490",
+            "718162",
+            "718163",
+            "719268",
+            "721998",
+            "722426",
+            "722427",
+            "723148",
+            "726424",
+            "727803",
+            "727805",
+            "728266",
+            "728272",
+            "729327",
+            "730470",
+            "739099",
+            "739101",
+            "740536",
+            "741420",
+            "741421",
+            "743748",
+            "744851",
+            "744852",
+            "746240",
+            "746241",
+            "746242",
+            "746243",
+            "746403",
+            "746404",
+            "760571",
+            "760572",
+            "762115",
+            "762116",
+            "762117",
+            "767878",
+            "767879",
+            "771214",
+            "771428",
+            "772802",
+            "772803",
+            "772804",
+            "772807",
+            "772808",
+            "772809",
+            "772810",
+            "772811",
+            "773577",
+            "774675",
+            "774676",
+            "774685",
+            "774686",
+            "774689",
+            "775689",
+            "775693",
+            "783644",
+            "783645",
+            "783646",
+            "783647",
+            "783648",
+            "783649",
+            "783814",
+            "783815",
+            "784713",
+            "784714"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "medio-sachet-de-leche",
+      "order": "medio sachet de leche",
+      "items": [
+        {
+          "product": "Leche entera en sachet",
+          "brand": null,
+          "size": "common",
+          "quantity": "1 unit",
+          "fits": ["679521", "703955"]
+        }
+      ]
+    },
+    {
+      "id": "dos-cocas-grandes",
+      "order": "dos cocas grandes",
+      "items": [
+        {
+          "product": "Coca-Cola sabor original, la más grande",
+          "brand": "Coca Cola",
+          "size": "biggest",
+          "quantity": "2 unit",
+          "fits": ["6225", "30138", "625279", "630677", "630679", "763994"],
+          "pick": ["30138"]
+        }
+      ]
+    },
+    {
+      "id": "carbon-en-bolsa",
+      "order": "1 bolsa de carbon",
+      "items": [
+        {
+          "product": "Carbón para asado",
+          "brand": null,
+          "size": "common",
+          "quantity": "1 unit",
+          "fits": ["563893", "646684", "696133", "530309"]
+        }
+      ]
+    },
+    {
+      "id": "queso-porsalud-light",
+      "order": "Queso porsalud light",
+      "items": [
+        {
+          "product": "Queso Port Salut light",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["655910", "661208", "679419", "698827", "724282", "730673", "753365"]
+        }
+      ]
+    },
+    {
+      "id": "coca-zero-grande",
+      "order": "coca cola zero grande",
+      "items": [
+        {
+          "product": "Coca-Cola Zero, la más grande",
+          "brand": "Coca Cola",
+          "size": "biggest",
+          "quantity": "minimum",
+          "fits": ["393964", "530217", "636689", "649300", "763995"],
+          "pick": ["393964"]
+        }
+      ]
+    },
+    {
+      "id": "coca-normal-chica",
+      "order": "coca cola normal chica",
+      "items": [
+        {
+          "product": "Coca-Cola sabor original, la más chica",
+          "brand": "Coca Cola",
+          "size": "smallest",
+          "quantity": "minimum",
+          "fits": ["6225", "30138", "625279", "630677", "630679", "763994"],
+          "pick": ["625279"]
+        }
+      ]
+    },
+    {
+      "id": "pedido-de-diez-items",
+      "order": "leche descremada la serenisima 2, yerba playadito 1kg, fideos tirabuzon, aceite girasol grande, papel higienico, 3 manzanas, jamon cocido 300g, pan lactal, birra quilmes chica, mayo hellmans",
+      "items": [
+        {
+          "product": "Leche descremada La Serenísima",
+          "brand": "La Serenísima",
+          "size": "common",
+          "quantity": "2 unit",
+          "fits": ["653793", "661341", "663213", "679516", "720720", "720721"]
+        },
+        {
+          "product": "Yerba Playadito 1 kg",
+          "brand": "Playadito",
+          "size": "exact",
+          "quantity": "minimum",
+          "fits": ["517286", "669429"],
+          "pick": ["669429"]
+        },
+        {
+          "product": "Fideos tirabuzón",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["603465", "690039", "726310", "729391", "729402", "729411", "746349"]
+        },
+        {
+          "product": "Aceite de girasol, el más grande",
+          "brand": null,
+          "size": "biggest",
+          "quantity": "minimum",
+          "fits": [
+            "6307",
+            "6309",
+            "244757",
+            "253384",
+            "255169",
+            "332888",
+            "664054",
+            "664061",
+            "680457",
+            "699030",
+            "700951",
+            "700952",
+            "757629"
+          ],
+          "pick": ["6307", "6309", "244757", "664054", "680457", "700952"]
+        },
+        {
+          "product": "Papel higiénico",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": [
+            "349548",
+            "580700",
+            "597038",
+            "597039",
+            "621494",
+            "628279",
+            "628280",
+            "628282",
+            "628283",
+            "628284",
+            "629469",
+            "629470",
+            "629471",
+            "629499",
+            "629865",
+            "630109",
+            "636240",
+            "643946",
+            "643947",
+            "666787",
+            "682188",
+            "686555",
+            "694060",
+            "695755",
+            "695756",
+            "702836",
+            "702837",
+            "702838",
+            "711818",
+            "723830",
+            "726260",
+            "727547",
+            "736162",
+            "736164",
+            "736165",
+            "739418",
+            "739419",
+            "742467",
+            "743394",
+            "751386",
+            "751997",
+            "769298",
+            "769299",
+            "769864",
+            "770905",
+            "770906",
+            "778982",
+            "778983",
+            "783586",
+            "783587",
+            "783588",
+            "783589",
+            "783590"
+          ]
+        },
+        {
+          "product": "Manzana",
+          "brand": null,
+          "size": "common",
+          "quantity": "3 unit",
+          "fits": ["8342", "432782", "585684", "585685"]
+        },
+        {
+          "product": "Jamón cocido",
+          "brand": null,
+          "size": "common",
+          "quantity": "300 g",
+          "fits": [
+            "473310",
+            "473622",
+            "573523",
+            "595470",
+            "631021",
+            "646494",
+            "656746",
+            "685362",
+            "702144",
+            "708395",
+            "708397",
+            "720623",
+            "741096",
+            "741206",
+            "741209",
+            "741940",
+            "751835",
+            "762622"
+          ]
+        },
+        {
+          "product": "Pan lactal blanco",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": [
+            "716484",
+            "721690",
+            "749200",
+            "749201",
+            "752407",
+            "752408",
+            "771258",
+            "786866",
+            "776424",
+            "753237",
+            "776428"
+          ]
+        },
+        {
+          "product": "Cerveza Quilmes clásica, la más chica",
+          "brand": "Quilmes",
+          "size": "smallest",
+          "quantity": "minimum",
+          "fits": ["505983", "582751", "752719"],
+          "pick": ["582751"]
+        },
+        {
+          "product": "Mayonesa Hellmann's clásica",
+          "brand": ["Hellmanns", "Hellmans", "Hellmann's"],
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["694754", "694755", "694756", "780740"]
+        }
+      ]
+    },
+    {
+      "id": "pago-con-visa",
+      "order": "yerba playadito, pago con visa",
+      "ignoredPreference": true,
+      "notItems": ["visa"],
+      "items": [
+        {
+          "product": "Yerba Playadito",
+          "brand": "Playadito",
+          "size": "common",
+          "quantity": "minimum",
+          "fits": ["517286", "669429"]
+        }
+      ]
+    },
+    {
+      "id": "nada-de-marolio",
+      "order": "aceite de girasol, nada de Marolio",
+      "ignoredPreference": true,
+      "notItems": ["marolio"],
+      "items": [
+        {
+          "product": "Aceite de girasol",
+          "brand": null,
+          "size": "common",
+          "quantity": "minimum",
+          "fits": [
+            "6307",
+            "6309",
+            "244757",
+            "253384",
+            "255169",
+            "332888",
+            "664054",
+            "664061",
+            "680457",
+            "699030",
+            "700951",
+            "700952",
+            "757629"
+          ]
+        }
+      ]
+    }
+  ],
+  "answers": [
+    {
+      "id": "answer-by-number",
+      "items": [
+        {
+          "original": "1 bolsa de carbon de 10 kg",
+          "question": "No hay carbón en bolsa de 10 kg. ¿Te sirve alguno de estos?",
+          "alternatives": ["563893", "646684"]
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "la 2",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "choice",
+          "alternative": 2
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-with-another-brand",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "dale, una Patagonia",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "lines",
+          "lines": [
+            {
+              "product": "Cerveza",
+              "brand": "Patagonia"
+            }
+          ]
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-drop",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "carbón para el asado",
+          "bought": "563893"
+        }
+      ],
+      "reply": "sacala",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "drop"
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-ignored",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "un jugo de mburucuyá",
+          "question": "No encontré jugo de mburucuyá solo. ¿Te sirve este?",
+          "alternatives": ["723172"]
+        }
+      ],
+      "reply": "¿a qué hora llega el pedido?",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "unanswered"
+        },
+        {
+          "item": 2,
+          "kind": "unanswered"
+        }
+      ],
+      "newLines": []
+    },
+    {
+      "id": "answer-and-add",
+      "items": [
+        {
+          "original": "cerveza artesanal de tamarindo",
+          "question": "No encontré cerveza artesanal de tamarindo. ¿Te sirve alguna de estas?",
+          "alternatives": ["684384", "684385", "684386", "772398"]
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "la república, y agregá un vino tinto",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "choice",
+          "alternative": 4
+        }
+      ],
+      "newLines": [
+        {
+          "product": "Vino tinto",
+          "brand": null
+        }
+      ]
+    }
+  ]
+}

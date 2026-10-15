@@ -84,8 +84,6 @@ export function loggedStore(
   return {
     checkDelivery: (postalCode, signal) =>
       recorded("checkDelivery", { postalCode }, () => store.checkDelivery(postalCode, signal)),
-    findCandidates: (query, signal) =>
-      recorded("findCandidates", query, () => store.findCandidates(query, signal)),
     simulate: (request, signal) =>
       recorded("simulate", request, () => store.simulate(request, signal)),
     cartLink: (items) => {

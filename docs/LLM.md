@@ -2,12 +2,12 @@
 
 ## The LLM translates, code decides
 
-The LLM turns the Owner's words into fixed forms; plain code makes every choice that must be repeatable (ADR 0002, ADR 0011). It splits an order into Items, picks Product Types for an Item from the tree, rewords an Item nothing matched, and maps a free-text answer onto the options offered. Code builds the evidence and the options from the Catalog Snapshot, drops any Product Type id that is not in the tree, and picks the products from live search and checkout simulation with the fixed rules of the Selection Policy (ADR 0003, ADR 0004, ADR 0005). Never let the LLM choose a product, compute a price or invent an option.
+The LLM turns the Owner's words into fixed forms; plain code makes every choice that must be repeatable (ADR 0002, ADR 0011). It reads an order into Items, keeps the Fits of an Item among the Matches code found for it, and reads the Owner's reply to questions or a cart (ADR 0012). Code searches the Catalog Snapshot for the Matches, checks every number the LLM returns is among them, applies the size and quantity rule, and picks the products from checkout simulation with the fixed rules of the Selection Policy (ADR 0011). Never let the LLM choose a price, compute a quantity or invent a product.
 
 ## The port and its adapter
 
-- `Llm` in `src/core/order-resolution/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `readReply`, `splitOrder`, `resolveItem`, `rewordItem`, `mapAnswer`) with the input and output types of each call.
-- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` and `read-reply` run on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012); the other tasks run on `claude-haiku-5-5` at its default effort until they are deleted. Neither model takes a `temperature`, so the same text can resolve differently between runs.
+- `Llm` in `src/core/order-matching/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `readReply`) with the input and output types of each call.
+- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` and `read-reply` run on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012). The model takes no `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
 - The adapter's `onCall` reports every session that returns a result: task, model, effort, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
@@ -39,13 +39,33 @@ The LLM returns `entries`, one per Item the reply touches: `{ item, kind: "choic
 
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, `order-matching/fit-products.md`, `order-matching/read-reply.md`, and `order-resolution/split-order.md`, `resolve-item.md`, `reword-item.md`, `map-answer.md`. The adapter reads the file on each call; `resolve-item` and `reword-item` get the Product Type tree appended. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-matching/read-reply.md`. The adapter reads the file on each call. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 
 1. Edit the prompt. If the answer's shape changes, change the output type in the port and its schema in the adapter together.
-2. Run `pnpm order:eval` (or `pnpm order:eval <filter>` for the cases whose id or order text contains the filter). It resolves each case of the eval set in `evals/order-resolution.json` with real Claude Code sessions and scores it as hit, miss or error.
-3. Read the report: misses with what came back, the cases whose outcome changed since the previous run, and the sessions, time and cost. Each run is saved in `.data/order-resolution/eval-runs/`, so the next run compares against it. The command exits 1 when a case not marked `expectedToFail` misses or errors.
+2. Run `pnpm order:eval` (or `pnpm order:eval <filter>` for the cases whose id or order text contains the filter, and `--runs N` to change the 3 runs per case). It runs each case of the [eval set](#the-eval-set) with real Claude Code sessions and scores the product picked for each Item.
+3. Read the report: the totals, each failed case with every run's problems and what each Item came back as, stale ids, the cases that changed since the previous run, and the sessions, time and cost. Each run is saved in `.data/order-matching/eval-runs/` with the Catalog Snapshot's date, so the next run compares against it. The command exits 1 when a case not marked `expectedToFail` fails.
 4. When a change fixes a case marked `expectedToFail`, the report says so; clear the mark in the eval set.
 
-The eval set is edited by hand. `pnpm order:eval-set` validates it against the vocabulary and runs in `pnpm check`; `pnpm order:eval` does not, because it makes live calls and costs money.
+## The eval set
+
+`evals/order-matching.json` scores the product picked per Item, not how the order was read. A case runs the flow up to the pick: call 1 (`parse-order`), the search, call 2 (`fit-products`), the size and quantity rule and the Selection Policy on Catalog Snapshot prices, with no checkout simulation, because Branch stock and promotions change between runs. The Catalog Snapshot is not pinned: each run uses the current one and records its date.
+
+An order case has an `id`, the `order`, an optional `expectedToFail` with the reason, an optional `ignoredPreference`, optional `notItems` (words that must not become Items) and its `items`. Each expected Item has a `product` that names it for people and is never compared, its `brand` (null, a name, or the spellings accepted), its `size` kind, its `quantity` as call 1 writes it ("minimum", "2 unit", "300 g"), and either `fits`, every in-stock `productId` that fits, with an optional `pick` (the subset that is a right pick when the size matters), or `alternatives`, the acceptable Alternatives of an Item that must ask. Each expected Item is paired with the Item that came back whose Matches, Fits and Alternatives share most of its products, then the nearest in order.
+
+Metrics, per run and in total:
+
+- Wrong picks nobody sees, the headline: a pick that is not right, with no Note and no question.
+- Items read right: `brand`, `size` kind and `quantity` of each Item, plus the number of Items and the `notItems` per run. `product` is not compared.
+- Matches recall (expected Fits among the Matches), Fits precision and Fits recall, and pick right.
+- Questions asked when they should not, and not asked when they should; Alternatives among the expected ones.
+- `ignoredPreference` when the case expects it.
+- Stability: an Item is stable when its Fits and pick are the same in every run.
+- Sessions, time and cost.
+
+A case passes when, in every run, each expected Item gets a right pick or asks when it should. Recall, precision and stability have no threshold yet. An expected `productId` missing from the Catalog Snapshot or out of stock is reported as stale and left out of the scoring, not failed; an Item whose ids are all stale is not scored.
+
+An answer case, under `answers`, runs only `read-reply` (`src/core/order-matching/eval-answers.ts`). It has an `id`, an optional `expectedToFail`, the fixed `items` of the conversation (an asked Item with its `original`, `question` and `alternatives` by `productId`, or an Item in the cart with its `original` and the `productId` it `bought`), the Owner's `reply`, the expected `entries` (`choice` with its Alternative number, `lines` with `product` and `brand`, `drop`, `unanswered`, which for an Item in the cart stands for an ambiguous Correction asked back; every asked Item has one, Items in the cart only when the reply touches them), the expected `newLines` and an optional `ignoredPreference`. The products are read from the Catalog Snapshot to build the input. A line matches when every word of the expected `product` is in the line's `product` and the `brand` is the same, both ignoring case and accents. An answer case passes when every run gives exactly the expected entries, `newLines` and `ignoredPreference`; the report prints how many passed and the differences of each one that failed.
+
+Cases are labelled by hand: `pnpm order:label <words> [--brand <brand>]` lists the search's top 50 products from the Catalog Snapshot for a phrase, with `productId`, name, brand, size, price and stock. Every `productId` is checked in stock on the current snapshot when the set is written. `pnpm order:eval-set` validates the set with zod (unique ids, non-empty `productId`s with no repeats inside an Item, `pick` within `fits`, either `fits` or `alternatives`, no order equal to an example `<order>` of `prompts/`, and for answer cases one expected entry at most per Item, one for every asked Item, Item and Alternative numbers in range, and `choice` only for asked Items) and runs in `pnpm check`; it never reads the Catalog Snapshot. `pnpm order:eval` does not run in `pnpm check`, because it makes live calls and costs money.

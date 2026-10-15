@@ -11,8 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { validateEvalSet } from "../../core/order-resolution/eval-set.ts";
-import { validateProductTypes } from "../../core/product-types/validate.ts";
+import { summarize } from "../../core/order-matching/eval-score.ts";
 import { createDataFiles } from "./data-files.ts";
 
 const repoRoot = join(import.meta.dirname, "../../..");
@@ -26,8 +25,10 @@ const write = (path: string, value: unknown) => {
 
 const read = (path: string): unknown => JSON.parse(readFileSync(join(root, path), "utf8"));
 
-const vocabulary = {
-  groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
+const yerbaCase = {
+  id: "yerba",
+  order: "una yerba",
+  items: [{ product: "Yerba", brand: null, size: "common", quantity: "minimum", fits: ["1"] }],
 };
 
 const catalogProduct = (
@@ -55,11 +56,8 @@ const catalogProduct = (
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "data-files-"));
-  write("vocabulary/product-types.json", vocabulary);
-  write("vocabulary/carrefour-tipos.json", { Yerba: "yerba" });
-  write("evals/order-resolution.json", {
-    cases: [{ id: "yerba", order: "una yerba", items: [{ productType: "yerba" }] }],
-  });
+  write("evals/order-matching.json", { cases: [yerbaCase] });
+  write("prompts/order-matching/parse-order.md", "# Examples\n\n<order>\nyerba y sal\n</order>\n");
 });
 
 afterEach(() => {
@@ -69,90 +67,40 @@ afterEach(() => {
 describe("the committed data", () => {
   it("loads with no errors", () => {
     const files = createDataFiles(repoRoot);
-    assert.equal(files.loadProductTypes().ok, true);
     assert.equal(files.loadEvalSet().ok, true);
   });
 });
 
-describe("loadProductTypes", () => {
-  it("returns the vocabulary and the mapping when they are valid", () => {
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), {
-      ok: true,
-      value: { vocabulary, mapping: { Yerba: "yerba" } },
-    });
-  });
-
-  it("fails with the validator's errors for a broken schema or reference", () => {
-    const brokenVocabulary = { groups: [{ id: "Grupo Yerba", productTypes: [] }] };
-    const brokenMapping = { Yerba: "mate", Leche: "grupo-yerba" };
-    write("vocabulary/product-types.json", brokenVocabulary);
-    write("vocabulary/carrefour-tipos.json", brokenMapping);
-    const expected = validateProductTypes(brokenVocabulary, brokenMapping);
-    assert.ok(expected.length > 0);
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), { ok: false, errors: expected });
-
-    const validVocabulary = {
-      groups: [
-        ...vocabulary.groups,
-        { id: "grupo-leche", name: "Leche", productTypes: [{ id: "leche", name: "Leche" }] },
-      ],
-    };
-    write("vocabulary/product-types.json", validVocabulary);
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), {
-      ok: false,
-      errors: [
-        'Tipo "Yerba" maps to unknown Product Type "mate"',
-        'Tipo "Leche" maps to Product Type Group "grupo-yerba" instead of a Product Type',
-      ],
-    });
-  });
-});
-
 describe("loadEvalSet", () => {
-  it("returns the eval set with the vocabulary it was checked against", () => {
-    const loaded = createDataFiles(root).loadEvalSet();
-    assert.equal(loaded.ok && loaded.value.evalSet.cases[0]?.id, "yerba");
-    assert.deepEqual(loaded.ok && loaded.value.vocabulary, vocabulary);
-  });
-
-  it("fails on an unknown Product Type with the validator's errors", () => {
-    const evalSet = {
-      cases: [{ id: "mate", order: "un mate", items: [{ productType: "mate" }] }],
-    };
-    write("evals/order-resolution.json", evalSet);
+  it("returns the eval set when it is valid", () => {
     assert.deepEqual(createDataFiles(root).loadEvalSet(), {
-      ok: false,
-      errors: validateEvalSet(evalSet, vocabulary),
+      ok: true,
+      value: { cases: [yerbaCase] },
     });
   });
 
-  it("fails with the vocabulary's errors when the vocabulary is invalid", () => {
-    write("vocabulary/carrefour-tipos.json", { Yerba: "mate" });
+  it("fails with the validator's errors", () => {
+    write("evals/order-matching.json", { cases: [yerbaCase, yerbaCase] });
     assert.deepEqual(createDataFiles(root).loadEvalSet(), {
       ok: false,
-      errors: ['Tipo "Yerba" maps to unknown Product Type "mate"'],
+      errors: ['eval case "yerba" id is used more than once'],
+    });
+  });
+
+  it("rejects an order equal to an example order of any prompt", () => {
+    write("evals/order-matching.json", { cases: [{ ...yerbaCase, order: "Yerba y sal" }] });
+    assert.deepEqual(createDataFiles(root).loadEvalSet(), {
+      ok: false,
+      errors: ['eval case "yerba" order is an example order of the prompts'],
     });
   });
 });
 
-describe("loadOrderFiles", () => {
-  it("returns the grocery products of the Catalog Snapshot with the validated data", () => {
-    write(".data/carrefour/products.json", {
-      products: [catalogProduct("1", "Almacén"), catalogProduct("2", "Electro")],
-    });
-    const loaded = createDataFiles(root).loadOrderFiles();
-    assert.deepEqual(loaded.ok && loaded.value.catalog.map(({ productId }) => productId), ["1"]);
-  });
-
-  it("fails with every error when data is missing or invalid", () => {
-    write("vocabulary/carrefour-tipos.json", { Yerba: "mate" });
-    assert.deepEqual(createDataFiles(root).loadOrderFiles(), {
-      ok: false,
-      errors: [
-        "No Catalog Snapshot at .data/carrefour/products.json. Run pnpm carrefour:catalog first.",
-        'Tipo "Yerba" maps to unknown Product Type "mate"',
-      ],
-    });
+describe("loadSnapshotFetchedAt", () => {
+  it("reads the date of the Catalog Snapshot, or null without one", () => {
+    assert.equal(createDataFiles(root).loadSnapshotFetchedAt(), null);
+    write(".data/carrefour/products.json", { fetchedAt: "2026-10-15T20:44:49.211Z", products: [] });
+    assert.equal(createDataFiles(root).loadSnapshotFetchedAt(), "2026-10-15T20:44:49.211Z");
   });
 });
 
@@ -262,12 +210,17 @@ describe("loadCatalogProducts", () => {
 describe("the eval runs", () => {
   const run = (startedAt: string) => ({
     startedAt,
-    model: "claude-haiku-5-5",
+    snapshotFetchedAt: null,
+    models: ["claude-sonnet-5-5"],
+    runsPerCase: 3,
     filters: [],
     durationMs: 1,
     costUsd: 0,
     sessions: 0,
-    cases: [],
+    stale: [],
+    totals: summarize([]),
+    cases: [{ id: "yerba", order: "una yerba", expectedToFail: null, passed: true, runs: [] }],
+    answers: [],
   });
 
   it("has no latest run before the first one", () => {
@@ -278,10 +231,10 @@ describe("the eval runs", () => {
     const files = createDataFiles(root);
     const path = files.saveEvalRun(run("2026-10-13T10:00:00.000Z"));
     files.saveEvalRun(run("2026-10-14T10:00:00.000Z"));
-    assert.equal(path, ".data/order-resolution/eval-runs/2026-10-13T10-00-00.000Z.json");
+    assert.equal(path, ".data/order-matching/eval-runs/2026-10-13T10-00-00.000Z.json");
     assert.deepEqual(files.loadLatestEvalRun(), {
       startedAt: "2026-10-14T10:00:00.000Z",
-      cases: [],
+      cases: [{ id: "yerba", passed: true }],
     });
   });
 });
