@@ -771,6 +771,33 @@
           "brand": null
         }
       ]
+    },
+    {
+      "id": "correction-of-the-size",
+      "items": [
+        {
+          "original": "carbón para el asado",
+          "bought": "563893"
+        },
+        {
+          "original": "coca cola zero grande",
+          "bought": "393964"
+        }
+      ],
+      "reply": "cambiá el carbón por uno de 5 kg",
+      "entries": [
+        {
+          "item": 1,
+          "kind": "lines",
+          "lines": [
+            {
+              "product": "Carbón",
+              "brand": "Carbocor"
+            }
+          ]
+        }
+      ],
+      "newLines": []
     }
   ]
 }

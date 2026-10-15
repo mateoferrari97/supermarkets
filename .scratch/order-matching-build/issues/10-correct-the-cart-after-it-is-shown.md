@@ -4,7 +4,7 @@
 
 **Blocked by:** 09
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 ## Decisions (agreed with the Owner)
 
@@ -19,7 +19,7 @@
 - [x] `takeTurn` tests with fakes: a Correction of brand, size and quantity; a drop; an ambiguous reference asked; untouched Items keeping their product; "Nuevo" and "Cambiado" marks; Notes shown once; a Correction together with an answer.
 - [x] One real conversation in the chat with two Corrections after the first cart: Conversation Log path and both carts noted under Comments.
 - [x] `ARCHITECTURE.md` describes the open conversation and the session lifetime.
-- [ ] `pnpm check` exits 0.
+- [x] `pnpm check` exits 0.
 
 ## Comments
 
@@ -63,4 +63,8 @@ Block: "Saqué: un fernet branca". The coca line has "No hay de 1,5 l; llevo 1,7
 Then "agregá una coca cola normal de 2,25" (one `Nuevo` line) and the ambiguous "cambiá la coca por una chica": the reply was the question "¿Cuál coca querés cambiar por una chica, la zero de 1,75 o la normal de 2,25?" with no cart; "la normal" gave a cart with only that line `Cambiado` (Coca Cola sabor original 1,75 lts) and the zero kept as it was.
 
 Seen, not fixed here (outside this ticket): call 2 kept "Briquetas de carbón" as a Fit for carbón; `read-reply` copied "la coca mejor de 1,5" as `original`, which call 2 then read as a product word; "una chica" came back as size 1.5 l instead of `smallest`.
+
+### Eval answer case (2026-10-15)
+
+After merging tickets 09 and 11, `correction-of-the-size` joins the answer cases of `evals/order-matching.json`: carbón (Carbocor, `563893`) and coca zero in the cart, reply "cambiá el carbón por uno de 5 kg", expected `lines` on item 1 with product "Carbón" and brand Carbocor. `pnpm order:eval answer- correction-`: answer cases 6/6 passed, 0 errors in 18 runs, 91.4 s and US$ 0.0551 in total; the new case passed 3/3 alone (12.3 s, US$ 0.0100). The other five answer cases still pass with the changed `read-reply.md`.
 
