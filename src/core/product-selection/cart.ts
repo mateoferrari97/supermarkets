@@ -189,4 +189,4 @@ function reasonFor(product: CatalogProduct, line: SimulatedLine, alone: boolean)
   }
 }
 
-const money = (value: number) => `$${value.toFixed(2)}`;
+export const money = (value: number): string => `$${value.toFixed(2)}`;

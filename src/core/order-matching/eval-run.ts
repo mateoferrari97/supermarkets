@@ -3,10 +3,12 @@ import { rankBySelectionPolicy } from "../product-selection/selection-policy.ts"
 import type { Llm } from "./llm.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import type { CatalogSearch } from "./catalog-search.ts";
+import type { AnswerScore } from "./eval-answers.ts";
 import type { StaleId } from "./eval-set.ts";
 import type { ItemRun, OrderRun, RunScore, Totals } from "./eval-score.ts";
 import type { Item } from "./item.ts";
 import { matchItems, type ItemMatch } from "./match-items.ts";
+import type { ReadReplyOutput } from "./read-reply.ts";
 
 export type MatchedOrder = { items: ItemMatch[]; ignoredPreference: boolean };
 
@@ -32,6 +34,22 @@ export type EvalCaseRecord = {
   runs: EvalCaseRunRecord[];
 };
 
+export type AnswerCaseRunRecord = {
+  error: string | null;
+  output: ReadReplyOutput | null;
+  score: AnswerScore | null;
+  durationMs: number;
+  costUsd: number;
+};
+
+export type AnswerCaseRecord = {
+  id: string;
+  reply: string;
+  expectedToFail: string | null;
+  passed: boolean;
+  runs: AnswerCaseRunRecord[];
+};
+
 export type EvalRun = {
   startedAt: string;
   snapshotFetchedAt: string | null;
@@ -44,6 +62,7 @@ export type EvalRun = {
   stale: StaleId[];
   totals: Totals;
   cases: EvalCaseRecord[];
+  answers: AnswerCaseRecord[];
 };
 
 export function pickOnSnapshot(item: Item, fits: CatalogProduct[]): Candidate | null {

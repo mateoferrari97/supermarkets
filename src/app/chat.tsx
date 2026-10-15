@@ -245,9 +245,6 @@ function QuestionChips({
               {index + 1}) {option}
             </button>
           ))}
-          <button className="chip" type="button" onClick={() => onChip("cualquiera")}>
-            cualquiera
-          </button>
         </div>
       ))}
       <div className="muted small">

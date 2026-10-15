@@ -43,6 +43,15 @@ export function candidatesFor(item: Item, fits: CatalogProduct[]): Candidate[] {
     .slice(0, CANDIDATES_LIMIT);
 }
 
+export function candidateOf(item: Item, product: CatalogProduct): Candidate {
+  const option =
+    optionFor(item, product) ?? optionFor({ ...item, quantity: { kind: "minimum" } }, product)!;
+  return {
+    ...option,
+    notes: option.notes.filter((note): note is string => note !== null),
+  };
+}
+
 export function snapshotTotal({ product, quantity }: Candidate): number | null {
   if (product.price === null) return null;
   return product.sale.kind === "by-weight"

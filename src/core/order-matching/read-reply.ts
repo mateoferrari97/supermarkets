@@ -19,3 +19,7 @@ export type ReadReplyOutput = {
   newLines: Item[];
   ignoredPreference: boolean;
 };
+
+export type ReadReplyLlm = {
+  readReply(input: ReadReplyInput, signal: AbortSignal): Promise<ReadReplyOutput>;
+};

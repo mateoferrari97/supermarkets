@@ -220,6 +220,7 @@ describe("the eval runs", () => {
     stale: [],
     totals: summarize([]),
     cases: [{ id: "yerba", order: "una yerba", expectedToFail: null, passed: true, runs: [] }],
+    answers: [],
   });
 
   it("has no latest run before the first one", () => {

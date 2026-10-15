@@ -31,6 +31,7 @@ export function formatReport(
     `- ignoredPreference right: ${count(totals.ignoredPreference)}`,
     `- Stability, same Fits and pick in every run: ${percent(totals.stability)}`,
     `- Errors: ${String(totals.errors)} of ${String(totals.runs)} runs`,
+    ...answerTotals(run),
     "",
   ];
   for (const evalCase of run.cases.filter(({ passed }) => !passed)) {
@@ -47,7 +48,24 @@ export function formatReport(
     }
     lines.push("");
   }
-  const unexpectedPasses = expectedToFail.filter(({ passed }) => passed).map(({ id }) => id);
+  for (const answerCase of run.answers.filter(({ passed }) => !passed)) {
+    const expected = answerCase.expectedToFail
+      ? ` (expected to fail: ${answerCase.expectedToFail})`
+      : "";
+    lines.push(`## Failed: ${answerCase.id}${expected}`, "", `"${answerCase.reply}"`, "");
+    for (const [index, answerRun] of answerCase.runs.entries()) {
+      lines.push(`Run ${String(index + 1)}:`);
+      if (answerRun.error !== null) lines.push(`- error: ${answerRun.error}`);
+      for (const problem of answerRun.score?.problems ?? []) lines.push(`- ${problem}`);
+    }
+    lines.push("");
+  }
+  const unexpectedPasses = [
+    ...expectedToFail,
+    ...run.answers.filter(({ expectedToFail }) => expectedToFail !== null),
+  ]
+    .filter(({ passed }) => passed)
+    .map(({ id }) => id);
   if (unexpectedPasses.length > 0) {
     lines.push(
       `Expected to fail but passed: ${unexpectedPasses.join(", ")}; clear expectedToFail.`,
@@ -70,6 +88,16 @@ export function formatReport(
       `${(run.durationMs / 1000).toFixed(1)} s, US$ ${run.costUsd.toFixed(4)}`,
   );
   return lines.join("\n");
+}
+
+function answerTotals({ answers }: EvalRun): string[] {
+  if (answers.length === 0) return [];
+  const passed = answers.filter(({ passed }) => passed).length;
+  const runs = answers.flatMap(({ runs }) => runs);
+  const errors = runs.filter(({ error }) => error !== null).length;
+  return [
+    `- Answer cases passed: ${String(passed)}/${String(answers.length)}; errors: ${String(errors)} of ${String(runs.length)} runs`,
+  ];
 }
 
 function describeItem(run: ItemRun, nameOf: (productId: string) => string): string {
