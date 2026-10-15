@@ -130,11 +130,7 @@ export async function pickProducts(
     return { item, ranked: rank(fallback), chosen: 0, notices };
   };
 
-  const picks = await Promise.all(
-    resolution.items.map((item) =>
-      steps.run({ kind: "find-candidates", phrase: item.phrase }, () => pick(item)),
-    ),
-  );
+  const picks = await Promise.all(resolution.items.map((item) => pick(item)));
 
   const inCart = () => picks.filter(({ ranked, chosen }) => ranked[chosen] !== undefined);
 

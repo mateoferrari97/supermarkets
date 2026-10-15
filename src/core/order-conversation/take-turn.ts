@@ -1,43 +1,47 @@
-import type { Llm } from "../order-resolution/llm.ts";
+import type { CatalogSearch } from "../order-matching/catalog-search.ts";
+import type { Item, ParseOrderLlm } from "../order-matching/item.ts";
+import { matchItems, type FitProductsLlm, type ItemMatch } from "../order-matching/match-items.ts";
+import { candidatesFor } from "../product-selection/candidates.ts";
 import {
-  createOrderResolver,
-  type OrderDependencies,
-  type OrderItem,
-  type OrderResolution,
-} from "../order-resolution/resolve-order.ts";
+  CART_WARNING,
+  simulateCart,
+  type CartLine,
+  type ItemToBuy,
+} from "../product-selection/cart.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
-import {
-  pickProducts,
-  type PickDependencies,
-  type ProductSelection,
-} from "../product-selection/pick-products.ts";
 import { postalCodeFrom } from "../product-selection/postal-code.ts";
-import type { OnStep } from "./steps.ts";
+import { stepsFrom, type OnStep, type Steps } from "./steps.ts";
 
 export const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
 export const ORDER_QUESTION = "¿Qué necesitás del súper?";
+export const IGNORED_PREFERENCE_NOTE = "Por ahora no tengo en cuenta tarjetas ni preferencias.";
+
+export type Cart = {
+  postalCode: string;
+  lines: CartLine[];
+  total: number;
+  notes: string[];
+  warning: string;
+  cartLink: string | null;
+};
 
 export type ConversationState =
   | { stage: "postal-code" }
   | { stage: "order"; postalCode: string }
-  | { stage: "questions"; postalCode: string; resolution: OrderResolution }
-  | { stage: "done"; postalCode: string; selection: ProductSelection };
+  | { stage: "done"; postalCode: string; cart: Cart };
 
 export const NEW_CONVERSATION: ConversationState = { stage: "postal-code" };
 
-export type Reply =
-  | { kind: "ask"; text: string }
-  | { kind: "questions"; text: string; items: OrderItem[] }
-  | { kind: "selection"; selection: ProductSelection };
+export type Reply = { kind: "ask"; text: string } | { kind: "cart"; cart: Cart };
 
 export type Turn = { state: ConversationState; reply: Reply };
 
-export type ConversationDependencies = Omit<OrderDependencies, "llm"> &
-  Omit<PickDependencies, "store"> & {
-    llm: Llm;
-    store: OnlineStore;
-    signal?: AbortSignal;
-  };
+export type ConversationDependencies = {
+  llm: ParseOrderLlm & FitProductsLlm;
+  search: CatalogSearch;
+  store: OnlineStore;
+  signal?: AbortSignal;
+};
 
 export async function takeTurn(
   state: ConversationState,
@@ -48,38 +52,31 @@ export async function takeTurn(
   const signal = deps.signal ?? new AbortController().signal;
   signal.throwIfAborted();
   const reply = replyText.trim();
-  const turn = await turnFor(state, reply, deps, { signal, onStep });
+  const turn = await turnFor(state, reply, deps, stepsFrom({ signal, onStep }), onStep);
   signal.throwIfAborted();
   return turn;
 }
-
-type TurnOptions = { signal: AbortSignal; onStep: OnStep | undefined };
 
 async function turnFor(
   state: ConversationState,
   reply: string,
   deps: ConversationDependencies,
-  options: TurnOptions,
+  steps: Steps,
+  onStep: OnStep | undefined,
 ): Promise<Turn> {
   switch (state.stage) {
     case "postal-code":
-      return postalCodeTurn(reply, deps.store, options.signal);
+      return postalCodeTurn(reply, deps.store, steps.signal);
     case "order": {
       if (!reply) return ask(state, ORDER_QUESTION);
-      const resolution = await createOrderResolver(deps).resolveOrder(reply, options);
-      return resolved(state.postalCode, resolution, deps, options);
-    }
-    case "questions": {
-      if (!reply) return questions(state, state.resolution);
-      const resolution = await createOrderResolver(deps).answerQuestions(
-        state.resolution,
-        reply,
-        options,
-      );
-      return resolved(state.postalCode, resolution, deps, options);
+      const cart = await orderTurn(state.postalCode, reply, deps, steps, onStep);
+      return {
+        state: { stage: "done", postalCode: state.postalCode, cart },
+        reply: { kind: "cart", cart },
+      };
     }
     case "done":
-      throw new Error("The conversation already delivered its Product Selection");
+      throw new Error("The conversation already delivered its cart");
   }
 }
 
@@ -99,29 +96,55 @@ async function postalCodeTurn(reply: string, store: OnlineStore, signal: AbortSi
   return ask(state, `${refusal} ${POSTAL_CODE_QUESTION}`);
 }
 
-async function resolved(
+type Wanted = { kind: "buy"; item: ItemToBuy } | { kind: "not-got"; note: string };
+
+async function orderTurn(
   postalCode: string,
-  resolution: OrderResolution,
-  deps: ConversationDependencies,
-  options: TurnOptions,
-): Promise<Turn> {
-  if (resolution.message !== null) {
-    return questions({ stage: "questions", postalCode, resolution }, resolution);
+  reply: string,
+  { llm, search, store }: ConversationDependencies,
+  steps: Steps,
+  onStep: OnStep | undefined,
+): Promise<Cart> {
+  const { signal } = steps;
+  const { items, ignoredPreference } = await steps.run({ kind: "understand-order" }, () =>
+    llm.parseOrder(reply, signal),
+  );
+  const matched = await matchItems(items, { search, llm }, { signal, onStep });
+  const wanted = matched.map(wantedOf);
+  const toBuy = wanted.flatMap((entry) => (entry.kind === "buy" ? [entry.item] : []));
+  const simulated = await steps.run({ kind: "simulate-cart" }, () =>
+    simulateCart(toBuy, postalCode, store, signal),
+  );
+  const bought = [...simulated.bought];
+  const lines: CartLine[] = [];
+  const notGot: string[] = [];
+  for (const entry of wanted) {
+    const result = entry.kind === "buy" ? bought.shift()! : entry;
+    if (result.kind === "bought") lines.push(result.line);
+    else notGot.push(result.note);
   }
-  const selection = await pickProducts(resolution, postalCode, deps, options);
   return {
-    state: { stage: "done", postalCode, selection },
-    reply: { kind: "selection", selection },
+    postalCode,
+    lines,
+    total: simulated.total,
+    notes: [...notGot, ...(ignoredPreference ? [IGNORED_PREFERENCE_NOTE] : [])],
+    warning: CART_WARNING,
+    cartLink: simulated.cartLink,
   };
+}
+
+function wantedOf({ item, fits, note, question }: ItemMatch): Wanted {
+  if (question !== null) return { kind: "not-got", note: noFitNote(item, question.text) };
+  return {
+    kind: "buy",
+    item: { original: item.original, note, candidates: candidatesFor(item, fits) },
+  };
+}
+
+function noFitNote(item: Item, question: string): string {
+  return `No conseguí "${item.original}": ${question}`;
 }
 
 function ask(state: ConversationState, text: string): Turn {
   return { state, reply: { kind: "ask", text } };
-}
-
-function questions(state: ConversationState, resolution: OrderResolution): Turn {
-  return {
-    state,
-    reply: { kind: "questions", text: resolution.message ?? "", items: resolution.items },
-  };
 }

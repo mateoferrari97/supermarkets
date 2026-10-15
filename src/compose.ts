@@ -35,7 +35,9 @@ export type OrderData = {
   mapping: TipoMapping;
 };
 
-export type ConversationDependenciesWithoutSignal = Omit<ConversationDependencies, "signal">;
+export type ConversationDependenciesWithoutSignal = Omit<ConversationDependencies, "signal"> & {
+  vocabulary: Vocabulary;
+};
 
 export type ConversationLog = {
   path: string;
@@ -108,16 +110,20 @@ export function createOrderResolver({ onCall }: OrderResolverOptions = {}): Chec
 }
 
 export function createConversationDependencies(): Checked<ConversationDependenciesWithoutSignal> {
-  const data = loadOrderData();
-  if (!data.ok) return data;
-  const { products, snapshot, vocabulary, mapping } = data.value;
+  const search = createCatalogSearch();
+  const productTypes = files.loadProductTypes();
+  if (!search.ok || !productTypes.ok) {
+    return {
+      ok: false,
+      errors: [search, productTypes].flatMap((loaded) => (loaded.ok ? [] : loaded.errors)),
+    };
+  }
+  const { vocabulary } = productTypes.value;
   return {
     ok: true,
     value: {
-      products,
-      snapshot,
       vocabulary,
-      mapping,
+      search: search.value,
       llm: createLlm({ vocabulary }),
       store: createOnlineStore(),
     },

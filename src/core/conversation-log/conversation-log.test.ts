@@ -109,14 +109,14 @@ describe("loggedSteps", () => {
     const onStep = loggedSteps((event) => events.push(event), ticking());
 
     onStep({ status: "started", step: { kind: "understand-order" } });
-    onStep({ status: "started", step: { kind: "search-item", phrase: "yerba" } });
-    onStep({ status: "done", step: { kind: "search-item", phrase: "yerba" } });
+    onStep({ status: "started", step: { kind: "choose-products", original: "yerba" } });
+    onStep({ status: "done", step: { kind: "choose-products", original: "yerba" } });
     onStep({ status: "done", step: { kind: "understand-order" } });
 
     assert.deepEqual(events, [
       { type: "step-started", step: { kind: "understand-order" } },
-      { type: "step-started", step: { kind: "search-item", phrase: "yerba" } },
-      { type: "step-done", step: { kind: "search-item", phrase: "yerba" }, durationMs: 10 },
+      { type: "step-started", step: { kind: "choose-products", original: "yerba" } },
+      { type: "step-done", step: { kind: "choose-products", original: "yerba" }, durationMs: 10 },
       { type: "step-done", step: { kind: "understand-order" }, durationMs: 30 },
     ]);
   });
