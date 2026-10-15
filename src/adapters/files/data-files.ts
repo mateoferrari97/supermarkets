@@ -12,6 +12,10 @@ import { join, resolve } from "node:path";
 import { z } from "zod";
 import type { ConversationEvent } from "../../core/conversation-log/conversation-log.ts";
 import {
+  catalogProductsFrom,
+  type CatalogProduct,
+} from "../../core/order-matching/catalog-product.ts";
+import {
   validateEvalSet,
   evalSetSchema,
   type EvalSet,
@@ -67,8 +71,12 @@ const catalogSchema = z.object({
       seccion: z.string().nullable(),
       familia: z.string().nullable(),
       tipo: z.string().nullable(),
+      price: z.number().nullable(),
       measureUnit: z.string().nullable(),
       consumptionQuantity: z.string().nullable(),
+      measurementUnit: z.string().nullable(),
+      unitMultiplier: z.number().positive().nullable(),
+      teasers: z.array(z.object({ name: z.string(), minimumQuantity: z.number() })),
     }),
   ),
 });
@@ -122,10 +130,29 @@ export function createDataFiles(root = ".") {
     writeFileSync(at(path), text);
   };
 
-  const loadCatalog = (): Checked<CatalogRecord[]> =>
-    exists(CATALOG_PATH)
-      ? ok(catalogSchema.parse(readJson(CATALOG_PATH)).products)
-      : failed([`No Catalog Snapshot at ${CATALOG_PATH}. Run pnpm carrefour:catalog first.`]);
+  const loadCatalog = (): Checked<CatalogRecord[]> => {
+    if (!exists(CATALOG_PATH)) {
+      return failed([`No Catalog Snapshot at ${CATALOG_PATH}. Run pnpm carrefour:catalog first.`]);
+    }
+    const catalog = catalogSchema.safeParse(readJson(CATALOG_PATH));
+    if (catalog.success) return ok(catalog.data.products);
+    const [issue] = catalog.error.issues;
+    return failed([
+      `The Catalog Snapshot at ${CATALOG_PATH} does not have what this version reads ` +
+        `(at "${issue?.path.join(".") ?? ""}": ${issue?.message ?? ""}). ` +
+        "Run pnpm carrefour:catalog again.",
+    ]);
+  };
+
+  const loadCatalogProducts = (): Checked<CatalogProduct[]> => {
+    const catalog = loadCatalog();
+    if (!catalog.ok) return catalog;
+    return ok(
+      catalogProductsFrom(
+        catalog.value.map((record) => ({ ...record, brand: record.brand ?? null })),
+      ),
+    );
+  };
 
   const loadProductTypes = (): Checked<ProductTypes> => {
     const vocabulary = readJson(VOCABULARY_PATH);
@@ -278,6 +305,7 @@ export function createDataFiles(root = ".") {
     headCommit,
     openConversationLog,
     loadCatalog,
+    loadCatalogProducts,
     loadProductTypes,
     loadEvalSet,
     loadOrderFiles,
