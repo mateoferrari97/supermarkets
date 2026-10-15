@@ -23,7 +23,7 @@ Tests never call Carrefour or start a Claude Code session.
 
 ## The eval set is not a test
 
-`evals/order-resolution.json` measures order resolution against the real LLM. `pnpm order:eval` runs it on demand and costs money; it is not part of `pnpm test` or `pnpm check`. `pnpm check` only validates the eval set's shape and references (`pnpm order:eval-set`). See [LLM](LLM.md#changing-a-prompt).
+`evals/order-matching.json` measures the product picked per Item against the real LLM and the current Catalog Snapshot: Items read right, Matches recall, Fits precision and recall, pick right, wrong picks nobody sees, questions, stability, time and cost. `pnpm order:eval` runs it on demand, 3 times per case, and costs money; it is not part of `pnpm test` or `pnpm check`. `pnpm check` only validates the eval set's shape (`pnpm order:eval-set`). The scoring itself is pure code in `src/core/order-matching/` with tests over fixed inputs. See [LLM](LLM.md#the-eval-set).
 
 ## Data validators
 
