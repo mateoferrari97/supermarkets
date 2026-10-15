@@ -115,6 +115,14 @@ const writeJsonText = (value: unknown): string => `${JSON.stringify(value, null,
 const ok = <T>(value: T): Checked<T> => ({ ok: true, value });
 const failed = <T>(errors: string[]): Checked<T> => ({ ok: false, errors });
 
+function environmentWithoutGit(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const name of Object.keys(environment)) {
+    if (name.startsWith("GIT_")) delete environment[name];
+  }
+  return environment;
+}
+
 export function createDataFiles(root = ".") {
   const at = (path: string) => join(root, path);
   const exists = (path: string) => existsSync(at(path));
@@ -258,6 +266,7 @@ export function createDataFiles(root = ".") {
     try {
       return execFileSync("git", ["rev-parse", "HEAD"], {
         cwd: root,
+        env: environmentWithoutGit(),
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
       }).trim();
