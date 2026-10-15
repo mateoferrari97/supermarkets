@@ -33,3 +33,9 @@ _Avoid_: Option, hit, result
 **Payment Card**:
 The card the Owner says they will pay with, such as "Tarjeta Carrefour Mastercard". It is passed to the checkout simulation so that card promotions count when picking products; the Owner names it, never its number.
 _Avoid_: Payment method, BIN, tarjeta
+
+## Conversation
+
+**Conversation Log**:
+The record of one conversation between the Owner and the Assistant, from the postal code to the cart or to its abandonment, including what the LLM and the Online Store were asked and answered along the way. It exists to review mistakes after the fact; it is never shown to the Owner in the chat.
+_Avoid_: Transcript, chat history, order log
