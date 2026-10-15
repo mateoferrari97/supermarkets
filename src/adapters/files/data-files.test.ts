@@ -339,3 +339,55 @@ describe("promptsDir", () => {
     assert.ok(readdirSync(createDataFiles(root).promptsDir).length > 0);
   });
 });
+
+describe("openConversationLog", () => {
+  const startedAt = new Date(2026, 9, 15, 9, 5, 7);
+
+  it("names the file after the local start time and the session id", () => {
+    const log = createDataFiles(root).openConversationLog("abc-123", startedAt);
+    assert.equal(log.path, join(".data/conversations", "2026-10-15-090507-abc-123.jsonl"));
+  });
+
+  it("appends one JSON line per event, each with an ISO timestamp", () => {
+    const log = createDataFiles(root).openConversationLog("abc-123", startedAt);
+
+    log.write({ type: "conversation-started", sessionId: "abc-123", commit: null });
+    log.write({ type: "owner-message", text: "1425" });
+
+    const lines = readFileSync(join(root, log.path), "utf8")
+      .trimEnd()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    assert.equal(lines.length, 2);
+    assert.match(String(lines[0]!.at), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    assert.deepEqual(
+      lines.map((line) => Object.fromEntries(Object.entries(line).filter(([key]) => key !== "at"))),
+      [
+        { type: "conversation-started", sessionId: "abc-123", commit: null },
+        { type: "owner-message", text: "1425" },
+      ],
+    );
+  });
+
+  it("reports a failed write instead of throwing", () => {
+    write(".data/conversations", "not a folder");
+    const reported: string[] = [];
+    const log = createDataFiles(root).openConversationLog("abc-123", startedAt, (message) =>
+      reported.push(message),
+    );
+
+    log.write({ type: "owner-message", text: "1425" });
+
+    assert.deepEqual(reported, [`Could not write the Conversation Log ${log.path}`]);
+  });
+});
+
+describe("headCommit", () => {
+  it("returns the commit checked out in the repo", () => {
+    assert.match(createDataFiles(repoRoot).headCommit() ?? "", /^[0-9a-f]{40}$/);
+  });
+
+  it("returns null outside a git repository", () => {
+    assert.equal(createDataFiles(root).headCommit(), null);
+  });
+});

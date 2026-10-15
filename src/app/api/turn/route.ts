@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { loggedSteps, loggedTurn } from "../../../core/conversation-log/conversation-log.ts";
 import type { StepEvent } from "../../../core/order-conversation/steps.ts";
 import { takeTurn, type Reply } from "../../../core/order-conversation/take-turn.ts";
 import { optionNames } from "../../../core/order-resolution/resolve-order.ts";
@@ -64,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!dependencies.ok) {
     return answer(500, [{ type: "error", message: dependencies.errors.join("\n") }]);
   }
-  const claim = claimSession(parsed.data.sessionId);
+  const claim = claimSession(parsed.data.sessionId, dependencies.value);
   if (claim.kind === "missing") {
     return answer(404, [
       { type: "error", message: "La conversación ya no existe. Recargá la página para empezar." },
@@ -73,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
   if (claim.kind === "working") {
     return answer(409, [{ type: "error", message: "Todavía estoy trabajando en tu mensaje." }]);
   }
-  const { sessionId, state, created } = claim;
+  const { sessionId, state, log, created } = claim;
   const { signal } = request;
   const encoder = new TextEncoder();
 
@@ -89,11 +90,13 @@ export async function POST(request: Request): Promise<Response> {
       };
       if (created) send({ type: "session", sessionId });
       try {
-        const turn = await takeTurn(
-          state,
-          parsed.data.text,
-          { ...dependencies.value, signal },
-          stepTracker(send),
+        const trackStep = stepTracker(send);
+        const logStep = loggedSteps(log.write);
+        const turn = await loggedTurn(log.write, parsed.data.text, signal, () =>
+          takeTurn(state, parsed.data.text, { ...log.dependencies, signal }, (event) => {
+            logStep(event);
+            trackStep(event);
+          }),
         );
         if (turn.reply.kind === "selection") deleteSession(sessionId);
         else releaseSession(sessionId, turn.state);

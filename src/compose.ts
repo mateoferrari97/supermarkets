@@ -7,6 +7,10 @@ import {
   type LlmCall,
 } from "./adapters/claude-code/claude-code-llm.ts";
 import { createDataFiles, type Checked } from "./adapters/files/data-files.ts";
+import {
+  loggedStore,
+  type WriteConversationEvent,
+} from "./core/conversation-log/conversation-log.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
 import type { Llm } from "./core/order-resolution/llm.ts";
 import {
@@ -29,6 +33,14 @@ export type OrderData = {
   vocabulary: Vocabulary;
   mapping: TipoMapping;
   paymentCards: PaymentCardTable;
+};
+
+export type ConversationDependenciesWithoutSignal = Omit<ConversationDependencies, "signal">;
+
+export type ConversationLog = {
+  path: string;
+  write: WriteConversationEvent;
+  dependencies: ConversationDependenciesWithoutSignal;
 };
 
 export type OrderResolverOptions = { model?: string; onCall?: (call: LlmCall) => void };
@@ -96,9 +108,7 @@ export function createOrderResolver({
   return { ok: true, value: { ...createResolver({ products, vocabulary, mapping, llm }), model } };
 }
 
-export function createConversationDependencies(): Checked<
-  Omit<ConversationDependencies, "signal">
-> {
+export function createConversationDependencies(): Checked<ConversationDependenciesWithoutSignal> {
   const data = loadOrderData();
   if (!data.ok) return data;
   const { products, snapshot, vocabulary, mapping, paymentCards } = data.value;
@@ -112,6 +122,27 @@ export function createConversationDependencies(): Checked<
       paymentCards,
       llm: createLlm({ vocabulary }),
       store: createOnlineStore(),
+    },
+  };
+}
+
+export function openConversationLog(
+  sessionId: string,
+  dependencies: ConversationDependenciesWithoutSignal,
+  startedAt = new Date(),
+): ConversationLog {
+  const { path, write } = files.openConversationLog(sessionId, startedAt);
+  write({ type: "conversation-started", sessionId, commit: files.headCommit() });
+  return {
+    path,
+    write,
+    dependencies: {
+      ...dependencies,
+      llm: createLlm({
+        vocabulary: dependencies.vocabulary,
+        onCall: (call) => write({ type: "llm-call", ...call }),
+      }),
+      store: loggedStore(dependencies.store, write),
     },
   };
 }

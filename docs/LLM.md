@@ -10,6 +10,7 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 - `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. The default model is `claude-haiku-5-5`, which takes no `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
+- The adapter's `onCall` reports every session that returns a result: task, model, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
 
 ## Prompts
 

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,7 +24,15 @@ export type ProcessRunner = (
   signal: AbortSignal,
 ) => Promise<ProcessResult>;
 
-export type LlmCall = { task: string; costUsd: number; durationMs: number };
+export type LlmCall = {
+  task: string;
+  model: string;
+  systemPromptSha256: string;
+  input: unknown;
+  rawOutput: string;
+  costUsd: number;
+  durationMs: number;
+};
 
 export type ClaudeCodeLlmOptions = {
   vocabulary: Vocabulary;
@@ -87,7 +96,15 @@ export function createClaudeCodeLlm({
       );
     }
     const session = sessionResultSchema.parse(JSON.parse(result.stdout));
-    onCall?.({ task, costUsd: session.total_cost_usd, durationMs: session.duration_ms });
+    onCall?.({
+      task,
+      model,
+      systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
+      input,
+      rawOutput: result.stdout,
+      costUsd: session.total_cost_usd,
+      durationMs: session.duration_ms,
+    });
     if (session.is_error || session.subtype !== "success") {
       throw new Error(
         `Claude Code session for ${task} failed (${session.subtype}): ${(session.errors ?? []).join("; ")}`,

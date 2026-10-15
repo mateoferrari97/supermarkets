@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -52,24 +53,30 @@ const llmWith = (
   });
 
 describe("createClaudeCodeLlm", () => {
-  it("returns the validated structured output and reports the cost of the call", async () => {
+  it("returns the validated structured output and reports the call with its raw output", async () => {
     const calls: LlmCall[] = [];
     const argsSeen: string[][] = [];
-    const llm = llmWith(
-      session({ structured_output: { kind: "match", candidates: ["yerba"] } }),
-      calls,
-      argsSeen,
-    );
-    const answer = await llm.resolveItem(
-      {
-        item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
-        evidence: [],
-      },
-      signal,
-    );
+    const result = session({ structured_output: { kind: "match", candidates: ["yerba"] } });
+    const llm = llmWith(result, calls, argsSeen);
+    const input = {
+      item: { phrase: "yerba", quantity: null, brand: null, terms: [], vagueWords: [] },
+      evidence: [],
+    };
+    const answer = await llm.resolveItem(input, signal);
     assert.deepEqual(answer, { kind: "match", candidates: ["yerba"] });
-    assert.deepEqual(calls, [{ task: "resolve-item", costUsd: 0.0137, durationMs: 3039 }]);
     const args = argsSeen[0]!;
+    const systemPrompt = args[args.indexOf("--system-prompt") + 1]!;
+    assert.deepEqual(calls, [
+      {
+        task: "resolve-item",
+        model: "claude-haiku-5-5",
+        systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
+        input,
+        rawOutput: result.stdout,
+        costUsd: 0.0137,
+        durationMs: 3039,
+      },
+    ]);
     assert.equal(args[args.indexOf("--model") + 1], "claude-haiku-5-5");
     assert.equal(args[args.indexOf("--tools") + 1], "");
     assert.ok(args.includes("--no-session-persistence"));

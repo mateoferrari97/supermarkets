@@ -1,16 +1,22 @@
 import "server-only";
-import { createConversationDependencies } from "../compose.ts";
 import {
-  NEW_CONVERSATION,
-  type ConversationDependencies,
-  type ConversationState,
-} from "../core/order-conversation/take-turn.ts";
+  createConversationDependencies,
+  openConversationLog,
+  type ConversationDependenciesWithoutSignal,
+  type ConversationLog,
+} from "../compose.ts";
+import { NEW_CONVERSATION, type ConversationState } from "../core/order-conversation/take-turn.ts";
 
 export const SESSION_IDLE_MS = 60 * 60 * 1000;
 
-type Dependencies = Omit<ConversationDependencies, "signal">;
+type Dependencies = ConversationDependenciesWithoutSignal;
 
-type Session = { state: ConversationState; working: boolean; expiry: NodeJS.Timeout | null };
+type Session = {
+  state: ConversationState;
+  log: ConversationLog;
+  working: boolean;
+  expiry: NodeJS.Timeout | null;
+};
 
 type Held = { sessions: Map<string, Session>; dependencies: Dependencies | null };
 
@@ -28,15 +34,22 @@ export function loadDependencies(): LoadedDependencies {
 }
 
 export type Claim =
-  | { kind: "claimed"; sessionId: string; state: ConversationState; created: boolean }
+  | {
+      kind: "claimed";
+      sessionId: string;
+      state: ConversationState;
+      log: ConversationLog;
+      created: boolean;
+    }
   | { kind: "missing" }
   | { kind: "working" };
 
-export function claimSession(sessionId: string | null): Claim {
+export function claimSession(sessionId: string | null, dependencies: Dependencies): Claim {
   if (sessionId === null) {
     const id = crypto.randomUUID();
-    store.sessions.set(id, { state: NEW_CONVERSATION, working: true, expiry: null });
-    return { kind: "claimed", sessionId: id, state: NEW_CONVERSATION, created: true };
+    const log = openConversationLog(id, dependencies);
+    store.sessions.set(id, { state: NEW_CONVERSATION, log, working: true, expiry: null });
+    return { kind: "claimed", sessionId: id, state: NEW_CONVERSATION, log, created: true };
   }
   const session = store.sessions.get(sessionId);
   if (!session) return { kind: "missing" };
@@ -44,7 +57,7 @@ export function claimSession(sessionId: string | null): Claim {
   session.working = true;
   if (session.expiry) clearTimeout(session.expiry);
   session.expiry = null;
-  return { kind: "claimed", sessionId, state: session.state, created: false };
+  return { kind: "claimed", sessionId, state: session.state, log: session.log, created: false };
 }
 
 export function releaseSession(sessionId: string, state: ConversationState): void {

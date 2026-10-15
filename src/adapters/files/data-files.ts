@@ -1,6 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
+import type { ConversationEvent } from "../../core/conversation-log/conversation-log.ts";
 import {
   validateEvalSet,
   evalSetSchema,
@@ -49,6 +59,7 @@ export const PAYMENT_CARDS_PATH = "vocabulary/carrefour-payment-cards.json";
 export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
 export const PROMPTS_DIR = "prompts/order-resolution";
+export const CONVERSATIONS_DIR = ".data/conversations";
 
 const catalogSchema = z.object({
   products: z.array(
@@ -85,6 +96,17 @@ export type OrderFiles = ProductTypes & {
 export type CheckedEvalSet = { evalSet: EvalSet; vocabulary: Vocabulary };
 
 export type PreviousEvalRun = z.infer<typeof previousEvalRunSchema>;
+
+export type ConversationLogFile = { path: string; write: (event: ConversationEvent) => void };
+
+export type ReportLogError = (message: string, error: unknown) => void;
+
+const two = (value: number) => String(value).padStart(2, "0");
+
+export const conversationFileName = (sessionId: string, startedAt: Date): string =>
+  `${startedAt.getFullYear()}-${two(startedAt.getMonth() + 1)}-${two(startedAt.getDate())}-` +
+  `${two(startedAt.getHours())}${two(startedAt.getMinutes())}${two(startedAt.getSeconds())}-` +
+  `${sessionId}.jsonl`;
 
 export type CatalogDownload = { meta: object; products: unknown[]; tipos: unknown[] };
 
@@ -232,8 +254,39 @@ export function createDataFiles(root = ".") {
       : null;
   };
 
+  const headCommit = (): string | null => {
+    try {
+      return execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return null;
+    }
+  };
+
+  const openConversationLog = (
+    sessionId: string,
+    startedAt: Date,
+    reportError: ReportLogError = (message, error) => console.error(message, error),
+  ): ConversationLogFile => {
+    const path = join(CONVERSATIONS_DIR, conversationFileName(sessionId, startedAt));
+    const write = (event: ConversationEvent) => {
+      try {
+        mkdirSync(at(CONVERSATIONS_DIR), { recursive: true });
+        appendFileSync(at(path), `${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`);
+      } catch (error) {
+        reportError(`Could not write the Conversation Log ${path}`, error);
+      }
+    };
+    return { path, write };
+  };
+
   return {
     promptsDir: at(PROMPTS_DIR),
+    headCommit,
+    openConversationLog,
     loadCatalog,
     loadProductTypes,
     loadPaymentCards,
