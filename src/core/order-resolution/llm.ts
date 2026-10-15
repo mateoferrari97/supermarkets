@@ -1,3 +1,4 @@
+import type { ParseOrderOutput } from "../order-matching/item.ts";
 import type { Evidence, Item } from "./concepts.ts";
 
 export type SplitOrderOutput = {
@@ -34,6 +35,7 @@ export type QuestionInput = {
 export type MapAnswerInput = { questions: QuestionInput[]; answer: string };
 
 export type Llm = {
+  parseOrder(orderText: string, signal: AbortSignal): Promise<ParseOrderOutput>;
   splitOrder(orderText: string, signal: AbortSignal): Promise<SplitOrderOutput>;
   resolveItem(input: ResolveItemInput, signal: AbortSignal): Promise<ResolveItemOutput>;
   rewordItem(input: ResolveItemInput, signal: AbortSignal): Promise<RewordItemOutput>;

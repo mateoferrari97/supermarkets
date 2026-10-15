@@ -5,6 +5,7 @@ import type { OnlineStore } from "../product-selection/online-store.ts";
 export type LlmCallRecord = {
   task: string;
   model: string;
+  effort: string | null;
   systemPromptSha256: string;
   input: unknown;
   rawOutput: string;

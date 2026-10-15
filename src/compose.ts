@@ -41,7 +41,7 @@ export type ConversationLog = {
   dependencies: ConversationDependenciesWithoutSignal;
 };
 
-export type OrderResolverOptions = { model?: string; onCall?: (call: LlmCall) => void };
+export type OrderResolverOptions = { onCall?: (call: LlmCall) => void };
 
 const files = createDataFiles();
 
@@ -79,15 +79,17 @@ export function loadOrderData(): Checked<OrderData> {
   };
 }
 
-export function createOrderResolver({
-  model = DEFAULT_MODEL,
-  onCall,
-}: OrderResolverOptions = {}): Checked<OrderResolver & { model: string }> {
+export function createOrderResolver({ onCall }: OrderResolverOptions = {}): Checked<
+  OrderResolver & { model: string }
+> {
   const data = loadOrderData();
   if (!data.ok) return data;
   const { products, vocabulary, mapping } = data.value;
-  const llm = createLlm({ vocabulary, model, onCall });
-  return { ok: true, value: { ...createResolver({ products, vocabulary, mapping, llm }), model } };
+  const llm = createLlm({ vocabulary, onCall });
+  return {
+    ok: true,
+    value: { ...createResolver({ products, vocabulary, mapping, llm }), model: DEFAULT_MODEL },
+  };
 }
 
 export function createConversationDependencies(): Checked<ConversationDependenciesWithoutSignal> {

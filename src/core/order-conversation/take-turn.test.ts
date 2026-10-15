@@ -85,6 +85,7 @@ const conversation = ({
     signals.push(signal);
   };
   const llm: Llm = {
+    parseOrder: () => Promise.reject(new Error("no parse")),
     splitOrder: (_text, signal) => {
       seen("splitOrder", signal);
       return Promise.resolve({ items, ignoredPreference });

@@ -4,9 +4,16 @@ import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import {
+  parseQuantity,
+  parseSize,
+  type Item,
+  type ParseOrderOutput,
+} from "../../core/order-matching/item.ts";
 import type { Vocabulary } from "../../core/product-types/schema.ts";
 import {
   mapAnswerOutputSchema,
+  parseOrderOutputSchema,
   resolveItemOutputSchema,
   rewordItemOutputSchema,
   splitOrderOutputSchema,
@@ -15,6 +22,26 @@ import type { Llm, ResolveItemInput } from "../../core/order-resolution/llm.ts";
 
 export const DEFAULT_MODEL = "claude-haiku-5-5";
 export const DEFAULT_BUDGET_USD = 0.25;
+
+export type LlmTask = "parse-order" | "split-order" | "resolve-item" | "reword-item" | "map-answer";
+export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+export type TaskModel = { model: string; effort: Effort | null };
+
+export const TASK_MODELS: Record<LlmTask, TaskModel> = {
+  "parse-order": { model: "claude-sonnet-5-5", effort: "low" },
+  "split-order": { model: DEFAULT_MODEL, effort: null },
+  "resolve-item": { model: DEFAULT_MODEL, effort: null },
+  "reword-item": { model: DEFAULT_MODEL, effort: null },
+  "map-answer": { model: DEFAULT_MODEL, effort: null },
+};
+
+const PROMPT_FILES: Record<LlmTask, string> = {
+  "parse-order": "order-matching/parse-order.md",
+  "split-order": "order-resolution/split-order.md",
+  "resolve-item": "order-resolution/resolve-item.md",
+  "reword-item": "order-resolution/reword-item.md",
+  "map-answer": "order-resolution/map-answer.md",
+};
 
 export type ProcessResult = { exitCode: number; stdout: string; stderr: string };
 export type ProcessRunner = (
@@ -26,6 +53,7 @@ export type ProcessRunner = (
 export type LlmCall = {
   task: string;
   model: string;
+  effort: Effort | null;
   systemPromptSha256: string;
   input: unknown;
   rawOutput: string;
@@ -36,7 +64,7 @@ export type LlmCall = {
 export type ClaudeCodeLlmOptions = {
   vocabulary: Vocabulary;
   promptsDir: string;
-  model?: string;
+  models?: Partial<Record<LlmTask, TaskModel>>;
   budgetUsd?: number;
   run?: ProcessRunner;
   onCall?: (call: LlmCall) => void;
@@ -54,21 +82,22 @@ const sessionResultSchema = z.object({
 export function createClaudeCodeLlm({
   vocabulary,
   promptsDir,
-  model = DEFAULT_MODEL,
+  models = {},
   budgetUsd = DEFAULT_BUDGET_USD,
   run = createProcessRunner("claude"),
   onCall,
 }: ClaudeCodeLlmOptions): Llm {
-  const prompt = (task: string) => readFileSync(join(promptsDir, `${task}.md`), "utf8");
+  const prompt = (task: LlmTask) => readFileSync(join(promptsDir, PROMPT_FILES[task]), "utf8");
   const tree = renderTree(vocabulary);
 
   const ask = async <T>(
-    task: string,
+    task: LlmTask,
     systemPrompt: string,
     schema: z.ZodType<T>,
     input: unknown,
     signal: AbortSignal,
   ): Promise<T> => {
+    const { model, effort } = models[task] ?? TASK_MODELS[task];
     const args = [
       "-p",
       "--model",
@@ -86,9 +115,11 @@ export function createClaudeCodeLlm({
       String(budgetUsd),
       "--output-format",
       "json",
+      ...(effort === null ? [] : ["--effort", effort]),
     ];
     signal.throwIfAborted();
-    const result = await run(args, JSON.stringify(input), signal);
+    const message = typeof input === "string" ? input : JSON.stringify(input);
+    const result = await run(args, message, signal);
     if (result.exitCode !== 0) {
       throw new Error(
         `Claude Code session for ${task} exited with ${result.exitCode}: ${result.stderr.trim()}`,
@@ -98,6 +129,7 @@ export function createClaudeCodeLlm({
     onCall?.({
       task,
       model,
+      effort,
       systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
       input,
       rawOutput: result.stdout,
@@ -119,6 +151,16 @@ export function createClaudeCodeLlm({
   };
 
   return {
+    parseOrder: async (orderText, signal) =>
+      readParseOrder(
+        await ask(
+          "parse-order",
+          prompt("parse-order"),
+          parseOrderOutputSchema,
+          `<order>\n${orderText}\n</order>`,
+          signal,
+        ),
+      ),
     splitOrder: (orderText, signal) =>
       ask(
         "split-order",
@@ -146,6 +188,23 @@ export function createClaudeCodeLlm({
     mapAnswer: (input, signal) =>
       ask("map-answer", prompt("map-answer"), mapAnswerOutputSchema, input, signal),
   };
+}
+
+function readParseOrder({
+  lines,
+  ignoredPreference,
+}: z.infer<typeof parseOrderOutputSchema>): ParseOrderOutput {
+  const items = lines.map((line): Item => {
+    const size = parseSize(line.size);
+    const quantity = parseQuantity(line.quantity);
+    if (!size || !quantity) {
+      throw new Error(
+        `Claude Code session for parse-order returned an invalid answer: "${line.original}" has size "${line.size}" and quantity "${line.quantity}"`,
+      );
+    }
+    return { original: line.original, product: line.product, brand: line.brand, size, quantity };
+  });
+  return { items, ignoredPreference };
 }
 
 function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
