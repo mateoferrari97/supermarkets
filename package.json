@@ -18,7 +18,8 @@
     "test": "vitest run",
     "product-types": "tsx src/cli/product-types.ts",
     "order:eval": "tsx src/cli/order-eval.ts",
-    "order:eval-set": "tsx src/cli/order-eval-set.ts"
+    "order:eval-set": "tsx src/cli/order-eval-set.ts",
+    "order:label": "tsx src/cli/order-label.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

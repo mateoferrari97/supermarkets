@@ -51,7 +51,8 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - `pnpm docs:check`: checks the knowledge base (ADR 0010) and prints file, line and rule for each finding.
 - `pnpm typecheck`, `pnpm lint`, `pnpm format` (`--check` to only check), `pnpm no-comments`.
 - The operator commands below run one file each in `src/cli/` and read and write data only through the loaders and savers of `src/compose.ts`.
-- `pnpm order:eval [filter...]`: runs the order resolution eval set with real Claude Code sessions ([LLM](docs/LLM.md#changing-a-prompt)).
+- `pnpm order:eval [filter...] [--runs N]`: runs the order matching eval set with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-eval-set)).
+- `pnpm order:label <words> [--brand <brand>]`: lists likely products from the Catalog Snapshot to label an eval case.
 - `pnpm order:eval-set`, `pnpm product-types`: validate the committed data in `evals/` and `vocabulary/` with the same loaders every command uses.
 - `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `products.json` in `.data/carrefour/`, or in the directory given as its argument. `.data/` is not committed.
 

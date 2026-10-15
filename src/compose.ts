@@ -50,6 +50,7 @@ const files = createDataFiles();
 export const {
   loadCatalog,
   loadCatalogProducts,
+  loadSnapshotFetchedAt,
   loadProductTypes,
   loadEvalSet,
   saveEvalRun,

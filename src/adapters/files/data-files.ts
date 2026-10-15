@@ -14,12 +14,13 @@ import {
   catalogProductsFrom,
   type CatalogProduct,
 } from "../../core/order-matching/catalog-product.ts";
+import type { EvalRun } from "../../core/order-matching/eval-run.ts";
 import {
-  validateEvalSet,
   evalSetSchema,
+  exampleOrders,
+  validateEvalSet,
   type EvalSet,
-} from "../../core/order-resolution/eval-set.ts";
-import type { EvalRun } from "../../core/order-resolution/eval-run.ts";
+} from "../../core/order-matching/eval-set.ts";
 import {
   tipoMappingSchema,
   vocabularySchema,
@@ -34,8 +35,8 @@ export const CATALOG_DIR = ".data/carrefour";
 export const CATALOG_PATH = `${CATALOG_DIR}/products.json`;
 export const VOCABULARY_PATH = "vocabulary/product-types.json";
 export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
-export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
-export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
+export const ORDER_EVAL_SET_PATH = "evals/order-matching.json";
+export const ORDER_EVAL_RUNS_DIR = ".data/order-matching/eval-runs";
 export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
 
@@ -76,16 +77,16 @@ const catalogSchema = z.object({
 
 const previousEvalRunSchema = z.object({
   startedAt: z.string(),
-  cases: z.array(z.object({ id: z.string(), outcome: z.enum(["hit", "miss", "error"]) })),
+  cases: z.array(z.object({ id: z.string(), passed: z.boolean() })),
 });
+
+const catalogMetaSchema = z.object({ fetchedAt: z.string() });
 
 export type CatalogRecord = z.infer<typeof catalogSchema>["products"][number];
 
 export type ProductTypes = { vocabulary: Vocabulary; mapping: TipoMapping };
 
 export type OrderFiles = ProductTypes & { catalog: CatalogRecord[] };
-
-export type CheckedEvalSet = { evalSet: EvalSet; vocabulary: Vocabulary };
 
 export type PreviousEvalRun = z.infer<typeof previousEvalRunSchema>;
 
@@ -158,15 +159,20 @@ export function createDataFiles(root = ".") {
     });
   };
 
-  const loadEvalSet = (): Checked<CheckedEvalSet> => {
-    const productTypes = loadProductTypes();
-    if (!productTypes.ok) return productTypes;
-    const { vocabulary } = productTypes.value;
+  const loadSnapshotFetchedAt = (): string | null => {
+    if (!exists(CATALOG_PATH)) return null;
+    const meta = catalogMetaSchema.safeParse(readJson(CATALOG_PATH));
+    return meta.success ? meta.data.fetchedAt : null;
+  };
+
+  const loadEvalSet = (): Checked<EvalSet> => {
+    const examples = readdirSync(at(PROMPTS_DIR), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".md"))
+      .sort()
+      .flatMap((file) => exampleOrders(readFileSync(at(join(PROMPTS_DIR, file)), "utf8")));
     const input = readJson(ORDER_EVAL_SET_PATH);
-    const errors = validateEvalSet(input, vocabulary);
-    return errors.length > 0
-      ? failed(errors)
-      : ok({ evalSet: evalSetSchema.parse(input), vocabulary });
+    const errors = validateEvalSet(input, examples);
+    return errors.length > 0 ? failed(errors) : ok(evalSetSchema.parse(input));
   };
 
   const loadOrderFiles = (): Checked<OrderFiles> => {
@@ -243,6 +249,7 @@ export function createDataFiles(root = ".") {
     openConversationLog,
     loadCatalog,
     loadCatalogProducts,
+    loadSnapshotFetchedAt,
     loadProductTypes,
     loadEvalSet,
     loadOrderFiles,
