@@ -23,6 +23,8 @@ function replyEvent(reply: Reply): TurnEvent {
       return { type: "questions", text: reply.text, questions: [] };
     case "questions":
       return { type: "questions", text: reply.text, questions: reply.questions };
+    case "plan":
+      return { type: "plan", message: reply.message, plan: reply.plan };
     case "cart":
       return { type: "cart", cart: reply.cart };
   }

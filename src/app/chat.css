@@ -225,3 +225,8 @@ th.num {
   color: #fff;
   background: var(--accent);
 }
+
+.plan-title {
+  font-size: 17px;
+  margin: 12px 0 4px;
+}
