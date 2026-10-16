@@ -675,3 +675,61 @@ describe("a message with a round and an Order that waits for a choice", () => {
     assert.equal(loaded.ok, false);
   });
 });
+
+describe("a Plan proposal and an Order that holds its products seen", () => {
+  it("are saved and read back", () => {
+    const line = {
+      description: "para la salsa",
+      productId: "12",
+      itemId: "120",
+      name: "Carne picada especial x kg",
+      brand: null,
+      quantity: 2,
+      unitPrice: 4500,
+      total: 9000,
+      reason: "Carne común",
+      notes: [],
+    };
+    const proposal = {
+      id: "order-1-1",
+      lines: [line],
+      notes: [],
+      total: 9000,
+      idea: { title: "Lasaña para 4", sections: [{ heading: "Pasos", text: "Armá las capas." }] },
+      overBudget: { budget: 8000, total: 9000, over: 1000 },
+    };
+    const message = {
+      role: "assistant" as const,
+      at: "2026-10-16T12:00:00.000Z",
+      text: "Lasaña para 4",
+      parts: [{ type: "proposal" as const, proposal }],
+    };
+    const order = {
+      id: "order-1",
+      status: "proposed" as const,
+      openedAt: "2026-10-16T12:00:00.000Z",
+      items: [],
+      proposals: 1,
+      proposal,
+      seen: [
+        {
+          productId: "12",
+          itemId: "120",
+          name: "Carne picada especial x kg",
+          brand: null,
+          department: "Carnes",
+          tipo: "Carne picada",
+          price: 9000,
+          inStock: true,
+          sale: { kind: "by-weight" as const, saleStepKg: 0.5 },
+          teasers: [],
+        },
+      ],
+    };
+    const files = createDataFiles(root);
+    files.appendChatMessage(message);
+    files.saveOrders([order]);
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [message] });
+    assert.deepEqual(createDataFiles(root).loadOrders(), { ok: true, value: [order] });
+  });
+});

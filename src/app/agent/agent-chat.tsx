@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage } from "../../core/agent-chat/chat.ts";
-import type { Cart, Proposal } from "../../core/agent-chat/order.ts";
+import type { Cart, Idea, OrderLine, Proposal } from "../../core/agent-chat/order.ts";
 import { optionLetter, type Round } from "../../core/agent-chat/round.ts";
 
 const money = new Intl.NumberFormat("es-AR", {
@@ -11,6 +11,30 @@ const money = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+
+function IdeaBlock({ idea }: { idea: Idea }) {
+  return (
+    <div className="block">
+      <strong>{idea.title}</strong>
+      {idea.sections.map((section) => (
+        <div key={section.heading} className="block">
+          <div>
+            <strong>{section.heading}</strong>
+          </div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{section.text}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LineSource({ line, plan }: { line: OrderLine; plan: boolean }) {
+  return (
+    <div className="muted small">
+      {plan ? line.description : `pediste "${line.description}"`} · {line.reason}
+    </div>
+  );
+}
 
 function ProposalCard({
   proposal,
@@ -21,7 +45,8 @@ function ProposalCard({
 }) {
   return (
     <div className="msg bot wide">
-      <div className="lead block">Armé este pedido:</div>
+      {proposal.idea ? <IdeaBlock idea={proposal.idea} /> : null}
+      <div className="lead block">{proposal.idea ? "Armé este plan:" : "Armé este pedido:"}</div>
       <table>
         <thead>
           <tr>
@@ -36,9 +61,7 @@ function ProposalCard({
             <tr key={line.itemId}>
               <td>
                 <div>{line.name}</div>
-                <div className="muted small">
-                  pediste &quot;{line.description}&quot; · {line.reason}
-                </div>
+                <LineSource line={line} plan={proposal.idea !== undefined} />
                 {line.notes.map((note) => (
                   <div key={note} className="notice">
                     {note}
@@ -60,6 +83,11 @@ function ProposalCard({
           </tr>
         </tbody>
       </table>
+      {proposal.overBudget ? (
+        <div className="notice block">
+          Este plan se pasa de tu presupuesto por {money.format(proposal.overBudget.over)}.
+        </div>
+      ) : null}
       {proposal.notes.map((note) => (
         <div key={note} className="notice block">
           {note}
@@ -143,6 +171,7 @@ function RoundCard({ round, onSend }: { round: Round; onSend: ((text: string) =>
 function CartCard({ cart }: { cart: Cart }) {
   return (
     <div className="msg bot wide">
+      {cart.idea ? <IdeaBlock idea={cart.idea} /> : null}
       <div className="lead block">Listo, este es tu carrito en Carrefour:</div>
       <table>
         <thead>
@@ -158,9 +187,7 @@ function CartCard({ cart }: { cart: Cart }) {
             <tr key={line.itemId}>
               <td>
                 <div>{line.name}</div>
-                <div className="muted small">
-                  pediste &quot;{line.description}&quot; · {line.reason}
-                </div>
+                <LineSource line={line} plan={cart.idea !== undefined} />
                 {line.notes.map((note) => (
                   <div key={note} className="notice">
                     {note}

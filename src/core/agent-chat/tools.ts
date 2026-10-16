@@ -9,8 +9,11 @@ import { buildCart, buildCartInput } from "./build-cart.ts";
 import { chooseAlternative, chooseAlternativeInput } from "./choose-alternative.ts";
 import { reopenLastOrder, reopenLastOrderInput } from "./reopen-last-order.ts";
 import { repeatOrder, repeatOrderInput } from "./repeat-order.ts";
+import { newPlanTurn } from "./plan-turn.ts";
 import { proposeOrder, proposeOrderInput } from "./propose-order.ts";
+import { proposePlan, proposePlanInput } from "./propose-plan.ts";
 import { resolveItem, resolveItemInput } from "./resolve-item.ts";
+import { searchCatalog, searchCatalogInput } from "./search-catalog.ts";
 import { defineTool, type ToolsForTurn } from "./tool.ts";
 
 export { defineTool, type AgentTool, type AgentTools, type ToolsForTurn } from "./tool.ts";
@@ -53,51 +56,65 @@ export type AgentToolsDependencies = ProfileDependencies & {
 
 export const agentTools =
   (dependencies: AgentToolsDependencies): ToolsForTurn =>
-  (outcome, messages = []) => ({
-    updateProfile: defineTool(
-      "Saves the Owner's postal code in the Profile after checking that the Online Store delivers there. Call it whenever the Owner states or changes their postal code. Returns saved, or refused with the reason.",
-      updateProfileInput,
-      (input, signal) => updateProfile(input, dependencies, signal),
-    ),
-    resolveItem: defineTool(
-      "Finds the product to buy for one Item the Owner asked for, with the Branch's prices. Call it once per Item, in parallel for several Items, after the postal code is known. Returns picked with the product, quantity and price; choose with up to 3 options when nothing fits, which you put to the Owner with askQuestions; none when nothing fits and there are no options; or refused with the reason. The product is already chosen by code: never name any other. When the Owner asks for more options, call it again for the same Item with excludeProductIds.",
-      resolveItemInput,
-      (input, signal) => resolveItem(input, dependencies, signal),
-    ),
-    chooseAlternative: defineTool(
-      "Records the option the Owner chose for an Item that resolveItem answered choose, and prices it in the Branch. Pass the ref and the productId of the option, or recommended true when the Owner accepts the recommended answers. Returns picked, unavailable when the Branch cannot sell it now, or refused with the reason.",
-      chooseAlternativeInput,
-      (input, signal) => chooseAlternative(input, { ...dependencies, messages }, signal),
-    ),
-    reopenLastOrder: defineTool(
-      "Reopens the last closed Order so the Owner's Correction (replace, remove or add an Item after the cart link) goes into a new cart. Call it only when the Owner clearly corrects the Order whose link was just given. Then resolveItem for what is new, proposeOrder with the refs the Order should have now and buildCart with that proposal in the same turn, with no question. Returns reopened, or refused with the reason.",
-      reopenLastOrderInput,
-      () => reopenLastOrder({ orders: dependencies.orders }),
-    ),
-    repeatOrder: defineTool(
-      "Starts a new Order from one of the past Orders in the <past-orders> block, with the same products and quantities priced in today's Branch. Call it when the Owner asks for the same as a past Order, or chooses to repeat it with an addition, and no Order is open. Returns repeated with each product picked or none when it is no longer available, or refused with the reason. Then resolveItem for anything new and proposeOrder with every ref.",
-      repeatOrderInput,
-      (input, signal) => repeatOrder(input, dependencies, signal),
-    ),
-    askQuestions: defineTool(
-      "Asks the Owner every open question of this turn in a single round and ends the turn. Each question has its options and the one you recommend. Call it at most once per turn, after every resolveItem of the turn has answered. Write nothing after calling it.",
-      askQuestionsInput,
-      (input) => askQuestions(input, { orders: dependencies.orders, outcome }),
-      true,
-    ),
-    proposeOrder: defineTool(
-      "Shows the Owner the Order for confirmation and ends the turn, except for a reopened Order (a Correction), where the turn goes on so you call buildCart right after. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",
-      proposeOrderInput,
-      (input) => proposeOrder(input, { orders: dependencies.orders, outcome }),
-      true,
-    ),
-    buildCart: defineTool(
-      "Builds the Carrefour cart for the latest proposal after the Owner answered it, closes the Order and ends the turn with the cart and its link. Pass the proposal id from the <order> block. Refused when the proposal is not the latest or the Owner has not answered it: never call it in the same turn as proposeOrder. Write nothing after calling it.",
-      buildCartInput,
-      (input, signal) => buildCart(input, { ...dependencies, outcome, messages }, signal),
-      true,
-    ),
-  });
+  (outcome, messages = []) => {
+    const turn = newPlanTurn();
+    return {
+      updateProfile: defineTool(
+        "Saves the Owner's postal code in the Profile after checking that the Online Store delivers there. Call it whenever the Owner states or changes their postal code. Returns saved, or refused with the reason.",
+        updateProfileInput,
+        (input, signal) => updateProfile(input, dependencies, signal),
+      ),
+      resolveItem: defineTool(
+        "Finds the product to buy for one Item the Owner asked for, with the Branch's prices. Call it once per Item, in parallel for several Items, after the postal code is known. Returns picked with the product, quantity and price; choose with up to 3 options when nothing fits, which you put to the Owner with askQuestions; none when nothing fits and there are no options; or refused with the reason. The product is already chosen by code: never name any other. When the Owner asks for more options, call it again for the same Item with excludeProductIds.",
+        resolveItemInput,
+        (input, signal) => resolveItem(input, dependencies, signal),
+      ),
+      chooseAlternative: defineTool(
+        "Records the option the Owner chose for an Item that resolveItem answered choose, and prices it in the Branch. Pass the ref and the productId of the option, or recommended true when the Owner accepts the recommended answers. Returns picked, unavailable when the Branch cannot sell it now, or refused with the reason.",
+        chooseAlternativeInput,
+        (input, signal) => chooseAlternative(input, { ...dependencies, messages }, signal),
+      ),
+      reopenLastOrder: defineTool(
+        "Reopens the last closed Order so the Owner's Correction (replace, remove or add an Item after the cart link) goes into a new cart. Call it only when the Owner clearly corrects the Order whose link was just given. Then resolveItem for what is new, proposeOrder with the refs the Order should have now and buildCart with that proposal in the same turn, with no question. Returns reopened, or refused with the reason.",
+        reopenLastOrderInput,
+        () => reopenLastOrder({ orders: dependencies.orders }),
+      ),
+      repeatOrder: defineTool(
+        "Starts a new Order from one of the past Orders in the <past-orders> block, with the same products and quantities priced in today's Branch. Call it when the Owner asks for the same as a past Order, or chooses to repeat it with an addition, and no Order is open. Returns repeated with each product picked or none when it is no longer available, or refused with the reason. Then resolveItem for anything new and proposeOrder with every ref.",
+        repeatOrderInput,
+        (input, signal) => repeatOrder(input, dependencies, signal),
+      ),
+      searchCatalog: defineTool(
+        "Searches the whole catalog, every department, for the products of a Plan: a recipe, an event, a weekly menu, a gift or advice that ends in a purchase. Pass up to 8 queries in catalog words (the plain product name, as a shelf calls it). Returns the products found per query, one row each as productId | name | brand | department | type | snapshot price | sale. Call it at most 3 times per turn. You may only use in a Plan the productIds it returned. Not for an Item the Owner names: use resolveItem for those. Returns found, or refused with the reason.",
+        searchCatalogInput,
+        (input) => searchCatalog(input, { ...dependencies, turn }),
+      ),
+      askQuestions: defineTool(
+        "Asks the Owner every open question of this turn in a single round and ends the turn. Each question has its options and the one you recommend. Call it at most once per turn, after every resolveItem of the turn has answered. Write nothing after calling it.",
+        askQuestionsInput,
+        (input) => askQuestions(input, { orders: dependencies.orders, outcome }),
+        true,
+      ),
+      proposeOrder: defineTool(
+        "Shows the Owner the Order for confirmation and ends the turn, except for a reopened Order (a Correction), where the turn goes on so you call buildCart right after. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",
+        proposeOrderInput,
+        (input) => proposeOrder(input, { orders: dependencies.orders, outcome }),
+        true,
+      ),
+      proposePlan: defineTool(
+        "Shows the Owner a Plan for confirmation and ends the turn: the Idea (sections) and the Plan Lines (productId from searchCatalog, quantity, purpose, reason). Code checks that every product was returned by searchCatalog, that quantities are whole units (packaged) or whole grams (by weight), merges lines of the same product, rounds weights up to the Sale Step and computes prices and the total: never state a price. Pass the Owner's budget when they gave one: a Plan over it is sent back once with the amount to cut. To revise a Plan, call it again with the whole revised Plan. Write nothing after calling it. Returns proposed, or refused with the reason and what to fix.",
+        proposePlanInput,
+        (input) => proposePlan(input, { orders: dependencies.orders, outcome, turn }),
+        true,
+      ),
+      buildCart: defineTool(
+        "Builds the Carrefour cart for the latest proposal after the Owner answered it, closes the Order and ends the turn with the cart and its link. Pass the proposal id from the <order> block. Refused when the proposal is not the latest or the Owner has not answered it: never call it in the same turn as proposeOrder. Write nothing after calling it.",
+        buildCartInput,
+        (input, signal) => buildCart(input, { ...dependencies, outcome, messages }, signal),
+        true,
+      ),
+    };
+  };
 
 export function renderProfile(profile: Profile | null): string {
   return profile === null

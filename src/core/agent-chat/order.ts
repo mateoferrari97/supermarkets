@@ -63,11 +63,20 @@ export const resolvedItemSchema = z.discriminatedUnion("kind", [
 
 export type ResolvedItem = z.infer<typeof resolvedItemSchema>;
 
+export const ideaSchema = z.object({
+  title: z.string(),
+  sections: z.array(z.object({ heading: z.string(), text: z.string() })),
+});
+
+export type Idea = z.infer<typeof ideaSchema>;
+
 export const proposalSchema = z.object({
   id: z.string(),
   lines: z.array(orderLineSchema).min(1),
   notes: z.array(z.string()),
   total: z.number(),
+  idea: ideaSchema.optional(),
+  overBudget: z.object({ budget: z.number(), total: z.number(), over: z.number() }).optional(),
 });
 
 export type Proposal = z.infer<typeof proposalSchema>;
@@ -79,6 +88,7 @@ export const cartSchema = z.object({
   total: z.number(),
   warning: z.string(),
   cartLink: z.string(),
+  idea: ideaSchema.optional(),
 });
 
 export type Cart = z.infer<typeof cartSchema>;
@@ -92,6 +102,7 @@ export const chatOrderSchema = z.object({
   proposal: proposalSchema.nullable(),
   cart: cartSchema.optional(),
   reopened: z.boolean().optional(),
+  seen: z.array(catalogProductSchema).optional(),
 });
 
 export type ChatOrder = z.infer<typeof chatOrderSchema>;
@@ -156,21 +167,28 @@ export function proposalOf(
   };
 }
 
-export function renderProposal({ lines, notes, total }: Proposal): string {
+export function renderIdea({ title, sections }: Idea): string[] {
+  return [title, ...sections.map(({ heading, text }) => `${heading}: ${text}`)];
+}
+
+export function renderProposal({ lines, notes, total, idea, overBudget }: Proposal): string {
   return [
-    "Armé este pedido:",
+    ...(idea ? renderIdea(idea) : []),
+    idea ? "Armé este plan:" : "Armé este pedido:",
     ...lines.map(
       (line, index) =>
         `${String(index + 1)}. ${line.name} × ${String(line.quantity)}: ${money(line.total)}`,
     ),
     `Total: ${money(total)}`,
+    ...(overBudget ? [`Este plan se pasa de tu presupuesto por ${money(overBudget.over)}.`] : []),
     ...notes,
     "Decime si está bien así.",
   ].join("\n");
 }
 
-export function renderCart({ lines, notes, total, warning, cartLink }: Cart): string {
+export function renderCart({ lines, notes, total, warning, cartLink, idea }: Cart): string {
   return [
+    ...(idea ? renderIdea(idea) : []),
     "Listo, este es tu carrito en Carrefour:",
     ...lines.map(
       (line, index) =>
@@ -198,7 +216,8 @@ export function renderOrder(order: ChatOrder | null): string {
   const proposal =
     order.proposal === null
       ? "proposal: none yet"
-      : `proposal ${order.proposal.id}: ${order.proposal.lines.map((line) => line.productId).join(", ")}${order.status === "proposed" ? " (waiting for the Owner's answer)" : " (out of date: an Item changed after it)"}`;
+      : `proposal ${order.proposal.id}${order.proposal.idea ? ` (a Plan, "${order.proposal.idea.title}")` : ""}: ${order.proposal.lines.map((line) => (order.proposal?.idea ? `${line.productId} × ${String(line.quantity)}` : line.productId)).join(", ")}${order.status === "proposed" ? " (waiting for the Owner's answer)" : " (out of date: an Item changed after it)"}`;
+  const seen = order.seen ?? [];
   return [
     "<order>",
     `id: ${order.id}`,
@@ -209,9 +228,38 @@ export function renderOrder(order: ChatOrder | null): string {
     "items:",
     ...(items.length > 0 ? items : ["- none yet"]),
     proposal,
+    ...(seen.length > 0
+      ? [
+          "products seen by searchCatalog (productId | name | brand | department | type | snapshot price | sale):",
+          ...seen.map(seenRow),
+        ]
+      : []),
     "</order>",
   ].join("\n");
 }
+
+export function saleOf(product: CatalogProduct): string {
+  if (product.sale.kind === "by-weight") {
+    return `by weight, Sale Step ${String(Math.round(product.sale.saleStepKg * 1000))} g`;
+  }
+  const { size } = product.sale;
+  if (size === null) return "packaged, size unknown";
+  const units = { volume: "ml", weight: "g", units: "u", length: "m" } as const;
+  return `packaged, ${String(size.amount)} ${units[size.dimension]}`;
+}
+
+export const seenRow = (product: CatalogProduct): string =>
+  [
+    product.productId,
+    product.name,
+    product.brand ?? "no brand",
+    product.department,
+    product.tipo ?? "no type",
+    product.price === null
+      ? "no price"
+      : `${money(product.price)}${product.sale.kind === "by-weight" ? " per kg" : ""}`,
+    saleOf(product),
+  ].join(" | ");
 
 export function renderPastOrders(orders: ChatOrder[]): string {
   if (orders.length === 0) return "<past-orders>\nThere are no closed Orders yet.\n</past-orders>";

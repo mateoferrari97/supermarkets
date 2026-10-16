@@ -5,6 +5,7 @@ import { chatMessageSchema } from "./chat.ts";
 import {
   chatOrderSchema,
   lastClosedOrders,
+  ordersSchema,
   openOrder,
   openOrderOf,
   renderOrder,
@@ -173,5 +174,55 @@ describe("the past Orders", () => {
 
   it("say there are none yet", () => {
     assert.match(renderPastOrders([]), /There are no closed Orders yet/);
+  });
+});
+
+describe("a Plan in the Order", () => {
+  const meat = product("12", "Carne picada especial x kg", 9000, {
+    sale: { kind: "by-weight", saleStepKg: 0.5 },
+  });
+  const plan: ChatOrder = {
+    id: "order-1",
+    status: "proposed",
+    openedAt: "2026-10-16T12:00:00.000Z",
+    items: [],
+    proposals: 1,
+    proposal: {
+      id: "order-1-1",
+      lines: [
+        {
+          description: "para la salsa",
+          productId: "12",
+          itemId: "120",
+          name: "Carne picada especial x kg",
+          brand: null,
+          quantity: 2,
+          unitPrice: 4500,
+          total: 9000,
+          reason: "Carne común",
+          notes: [],
+        },
+      ],
+      notes: [],
+      total: 9000,
+      idea: { title: "Lasaña para 4", sections: [{ heading: "Pasos", text: "Armá las capas." }] },
+    },
+    seen: [meat],
+  };
+
+  it("keeps the products seen and the Idea through the schema", () => {
+    assert.deepEqual(ordersSchema.parse([plan]), [plan]);
+  });
+
+  it("shows the agent the Plan's lines and the products seen, one row each", () => {
+    const text = renderOrder(plan);
+    assert.match(
+      text,
+      /proposal order-1-1 \(a Plan, "Lasaña para 4"\): 12 × 2 \(waiting for the Owner's answer\)/,
+    );
+    assert.match(
+      text,
+      /12 \| Carne picada especial x kg \| no brand \| Lácteos \| no type \| \$9000\.00 per kg \| by weight, Sale Step 500 g/,
+    );
   });
 });

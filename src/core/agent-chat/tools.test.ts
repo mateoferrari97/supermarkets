@@ -86,7 +86,7 @@ describe("updateProfile", () => {
 });
 
 describe("agentTools", () => {
-  it("exposes the tools, and only askQuestions, proposeOrder and buildCart end the turn", () => {
+  it("exposes the tools, and only askQuestions, proposeOrder, proposePlan and buildCart end the turn", () => {
     const { store } = fakeStore({});
     const { search } = searchOf(catalog);
     const tools = agentTools({
@@ -104,13 +104,15 @@ describe("agentTools", () => {
       "chooseAlternative",
       "reopenLastOrder",
       "repeatOrder",
+      "searchCatalog",
       "askQuestions",
       "proposeOrder",
+      "proposePlan",
       "buildCart",
     ]);
     assert.deepEqual(
       Object.values(tools).map((tool) => tool.endsTurn),
-      [false, false, false, false, false, true, true, true],
+      [false, false, false, false, false, false, true, true, true, true],
     );
   });
 
@@ -425,5 +427,85 @@ describe("repeating a past Order through the tools", () => {
     ]);
     assert.equal(memory.current()[0]?.status, "closed");
     assert.equal(memory.current()[1]?.id, "order-2");
+  });
+});
+
+describe("a Plan through the tools", () => {
+  it("searches, proposes the Plan, waits for the Owner and builds its cart with the Idea", async () => {
+    const pasta = product("11", "Tapas para lasaña 500 g", 2500, {
+      department: "Almacén",
+      sale: { kind: "packaged", size: { dimension: "weight", amount: 500 } },
+    });
+    const meat = product("12", "Carne picada especial x kg", 9000, {
+      department: "Carnes",
+      sale: { kind: "by-weight", saleStepKg: 0.5 },
+    });
+    const { store, simulated } = storeOf([pasta, meat]);
+    const { search } = searchOf([pasta, meat]);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const first: TurnOutcome = { ended: null };
+    const tools = agentTools(dependencies)(first, []);
+    const found = await tools.searchCatalog?.execute({ queries: ["tapas", "carne"] }, signal);
+    assert.equal((found as { kind: string }).kind, "found");
+    const proposed = await tools.proposePlan?.execute(
+      {
+        title: "Lasaña para 4",
+        idea: [{ heading: "Pasos", text: "Armá las capas." }],
+        lines: [
+          { productId: "11", quantity: 1, purpose: "para la lasaña", reason: "Tapas listas" },
+          { productId: "12", quantity: 600, purpose: "para la salsa", reason: "Carne común" },
+        ],
+      },
+      signal,
+    );
+    assert.deepEqual(proposed, {
+      kind: "proposed",
+      proposalId: "order-1-1",
+      total: 11500,
+      overBudget: null,
+    });
+    const proposal = first.ended?.parts[0];
+    assert.equal(proposal?.type, "proposal");
+    const proposalMessage: ChatMessage = {
+      role: "assistant",
+      at: "2026-10-16T12:00:01.000Z",
+      text: first.ended?.text ?? "",
+      parts: first.ended?.parts,
+    };
+    const unanswered = agentTools(dependencies)({ ended: null }, [proposalMessage]);
+    assert.deepEqual(await unanswered.buildCart?.execute({ proposalId: "order-1-1" }, signal), {
+      kind: "refused",
+      reason: "unanswered",
+    });
+    const second: TurnOutcome = { ended: null };
+    const answered = agentTools(dependencies)(second, [
+      proposalMessage,
+      { role: "owner", at: "2026-10-16T12:00:02.000Z", text: "Confirmo" },
+    ]);
+    const built = await answered.buildCart?.execute({ proposalId: "order-1-1" }, signal);
+    assert.deepEqual(built, { kind: "built", cartLink: "https://example.test/cart", total: 20500 });
+    assert.deepEqual(simulated.at(-1)?.items, [
+      { itemId: "110", quantity: 1 },
+      { itemId: "120", quantity: 2 },
+    ]);
+    const [order] = memory.current();
+    assert.equal(order?.status, "closed");
+    assert.deepEqual(order?.cart?.idea, {
+      title: "Lasaña para 4",
+      sections: [{ heading: "Pasos", text: "Armá las capas." }],
+    });
+    assert.match(
+      second.ended?.text ?? "",
+      /^Lasaña para 4\nPasos: Armá las capas\.\nListo, este es tu carrito/,
+    );
   });
 });

@@ -87,6 +87,7 @@ export async function buildCart(
     total: final.total,
     warning: CART_WARNING,
     cartLink: store.cartLink(lines.map(({ itemId, quantity }) => ({ itemId, quantity }))),
+    ...(proposal.idea ? { idea: proposal.idea } : {}),
   };
   order.status = "closed";
   order.cart = cart;
