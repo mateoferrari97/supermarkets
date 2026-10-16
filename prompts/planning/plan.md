@@ -10,8 +10,9 @@ The input has these parts:
 - <products>: every product a catalog search of this conversation returned, one per row as `productId | name | brand | department | type | snapshot price | sale`. All are in stock. `sale` is either `packaged, <size>` (sold by the unit) or `by weight, Sale Step <grams> g` (sold by weight, in steps of that many grams; its price is per kg).
 - <last-plan>: the last Plan the Owner was shown, with its lines as `productId | quantity | purpose | reason`, or `none`.
 - <over-budget>, only when code sends your Plan back: the Owner's budget, the Plan's total and how much it is over. Your Plan is then in <last-plan>.
+- <searches>, only after you searched for this Owner message: every query you already ran, one per row as `query | found <n>`, where n is how many products it returned.
 
-You cannot see the catalog by yourself. To find products you ask code to search: it runs each query against the catalog and gives you the results in <products> on your next call. You may search up to 3 times per Owner message, so ask for every ingredient at once.
+You cannot see the catalog by yourself. To find products you ask code to search: it runs each query against the catalog and gives you the results in <products> on your next call. You may search up to 3 times per Owner message, with at most 8 queries each time. Ask for up to 8 products at once, the ones that matter most first, and the rest in your next search; never put more than 8 queries in one search. Never repeat a query listed in <searches>: when a query found nothing, try other catalog words once, and if that also finds nothing, leave the product out and answer, saying so in `message`. If you search a fourth time, code gives up and tells the Owner it found nothing.
 
 Code checks your Plan, rounds by-weight quantities up to their Sale Step and computes every price and the total. The Owner then revises it or confirms it; nothing is bought until they confirm.
 
@@ -52,7 +53,7 @@ Code checks your Plan, rounds by-weight quantities up to their Sale Step and com
 # Output
 
 - `kind`: "search" to ask code to search, "answer" to answer the Owner, or "confirm" when the Owner accepts <last-plan>.
-- `queries`: for a search, 1 to 8 queries in catalog words; otherwise empty.
+- `queries`: for a search, 1 to 8 queries in catalog words, never more than 8; otherwise empty.
 - `message`: for an answer, what you tell the Owner; null for a search and for a confirm.
 - `plan`: for an answer with a Plan, `{ title, idea, lines }`; `idea` is a list of `{ heading, text }` and each line is `{ productId, quantity, purpose, reason }`. Null for a search, for a confirm and for an answer with no Plan, such as a question.
 - `budget`: the Owner's budget in pesos, a number, when they gave one in this conversation; otherwise null. Null for a search and for a confirm.

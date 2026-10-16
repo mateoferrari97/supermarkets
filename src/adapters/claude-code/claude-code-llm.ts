@@ -18,6 +18,7 @@ import {
   type Plan,
   type PlanInput,
   type PlanOutput,
+  type PlanSearch,
 } from "../../core/planning/plan.ts";
 import type { IdeaJudge, IdeaToJudge } from "../../core/planning/eval-run.ts";
 import {
@@ -263,7 +264,13 @@ function readPlan({
   return kind === "search" ? { kind, queries } : { kind, message: message!, plan, budget };
 }
 
-export function renderPlan({ messages, products, lastPlan, overBudget }: PlanInput): string {
+export function renderPlan({
+  messages,
+  products,
+  lastPlan,
+  overBudget,
+  searches,
+}: PlanInput): string {
   return [
     "<conversation>",
     ...messages.map(({ role, text }) => `<${role}>${text}</${role}>`),
@@ -276,7 +283,16 @@ export function renderPlan({ messages, products, lastPlan, overBudget }: PlanInp
     "</products>",
     ...(lastPlan === null ? ["<last-plan>none</last-plan>"] : renderLastPlan(lastPlan)),
     ...(overBudget === undefined ? [] : renderOverBudget(overBudget)),
+    ...(searches === undefined ? [] : renderSearches(searches)),
   ].join("\n");
+}
+
+function renderSearches(searches: PlanSearch[]): string[] {
+  return [
+    "<searches>",
+    ...searches.map(({ query, found }) => `${query} | found ${String(found)}`),
+    "</searches>",
+  ];
 }
 
 function renderOverBudget(overBudget: OverBudget): string[] {

@@ -4,7 +4,7 @@ import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import type { CatalogSearch, SearchItem, SearchScope } from "../order-matching/catalog-search.ts";
 import { stepsFrom, type StepEvent } from "../order-conversation/steps.ts";
 import type { PlanInput, PlanOutput } from "./plan.ts";
-import { planWithSearches } from "./plan-searches.ts";
+import { planWithSearches, SEARCH_GAVE_UP_TEXT } from "./plan-searches.ts";
 
 const product = (productId: string, name: string): CatalogProduct => ({
   productId,
@@ -126,16 +126,41 @@ describe("planWithSearches", () => {
     assert.equal(inputs.length, 4);
   });
 
-  it("fails the turn on a fourth search", async () => {
+  it("answers the Owner with a fixed text instead of running a fourth search", async () => {
     const { result } = run([
       { kind: "search", queries: ["lasaña"] },
       { kind: "search", queries: ["tomate"] },
       { kind: "search", queries: ["mozzarella"] },
       { kind: "search", queries: ["queso"] },
     ]);
-    await assert.rejects(result, {
-      message: "plan answer breaks a rule: a fourth search in one turn, more than 3",
+    const { output, products } = await result;
+    assert.deepEqual(output, {
+      kind: "answer",
+      message: SEARCH_GAVE_UP_TEXT,
+      plan: null,
+      budget: null,
     });
+    assert.deepEqual(ids(products), ["p1", "p2", "p3"]);
+    assert.equal(searched.length, 3);
+  });
+
+  it("gives each call the searches of this turn with how many products each found", async () => {
+    const { result, inputs } = run([
+      { kind: "search", queries: ["lasaña", "vacío"] },
+      { kind: "search", queries: ["tomate"] },
+      answer,
+    ]);
+    await result;
+    assert.equal(inputs[0]!.searches, undefined);
+    assert.deepEqual(inputs[1]!.searches, [
+      { query: "lasaña", found: 1 },
+      { query: "vacío", found: 0 },
+    ]);
+    assert.deepEqual(inputs[2]!.searches, [
+      { query: "lasaña", found: 1 },
+      { query: "vacío", found: 0 },
+      { query: "tomate", found: 1 },
+    ]);
   });
 
   it("checks every answer of the planner", async () => {

@@ -5,6 +5,7 @@ import {
   QUANTITY_PATTERN,
   SIZE_PATTERN,
 } from "../../core/order-matching/item.ts";
+import { PLAN_QUERIES_LIMIT } from "../../core/planning/plan.ts";
 import { TOPICS } from "../../core/planning/route-message.ts";
 
 export const lineSchema = z.strictObject({
@@ -50,7 +51,7 @@ const planSchema = z.strictObject({
 export const planOutputSchema = z
   .strictObject({
     kind: z.enum(["search", "answer", "confirm"]),
-    queries: z.array(z.string().min(1)),
+    queries: z.array(z.string().min(1)).max(PLAN_QUERIES_LIMIT),
     message: z.string().min(1).nullable(),
     plan: planSchema.nullable(),
     budget: z.number().nullable(),
