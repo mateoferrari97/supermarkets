@@ -21,6 +21,8 @@ It amends ADR 0004: the planner it left out now exists. A plain order still star
 
 It amends ADR 0012: an order is still matched with two calls around a search. A Plan is built by one planning call that may run several searches, with every department in stock searchable, and enters the cart without the matching flow.
 
+ADR 0014 amends this decision: the agent builds a Plan with a search tool instead of a search loop in core, under the same checks.
+
 ## Considered Options
 
 - **Expand the intent into an order and run it through matching.** The Conversation Log of 2026-10-16 shows the result: vague Items that searches cannot place ("Carne para asado" finds dog snacks and knives first), and the headcount and budget lost.

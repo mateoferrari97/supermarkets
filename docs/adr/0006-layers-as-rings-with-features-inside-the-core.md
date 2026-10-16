@@ -12,6 +12,8 @@ Only `Llm` and `OnlineStore` are ports, because only they have an adapter that r
 
 ADR 0012 adds a third port, `CatalogSearch`, so the search over the Catalog Snapshot can move to Postgres later; its one adapter today is in memory.
 
+ADR 0014 amends this decision: the agent is reached through a port, and the `ai` package stays out of `src/core/`.
+
 ## Considered Options
 
 - **Classic separate layers (`domain/`, `application/`, `ports/`, ...).** Rejected: order resolution is domain and use case at once, and splitting it yields shallow pass-through modules.

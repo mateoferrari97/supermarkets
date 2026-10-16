@@ -12,6 +12,8 @@ ADR 0012 amends this decision: the Owner is asked only when no Match fits an Ite
 
 ADR 0013 amends this decision: the planner left out below now exists. A message labelled `plan` starts a Plan that the Owner revises and confirms before it becomes a cart; an order is read as here.
 
+ADR 0014 amends this decision: the Chat, the Profile and past Orders are kept, and an agent with tools replaces the fixed steps. The Owner still writes free text and is asked only when in doubt.
+
 ## Considered Options
 
 - **Remember answers and preferences per Owner.** Fewer questions after a few orders, but it needs storage, a way to forget or change a default, and rules for when a stored preference applies. Left out to keep the first version small.
