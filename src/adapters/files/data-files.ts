@@ -21,12 +21,21 @@ import {
   validateEvalSet,
   type EvalSet,
 } from "../../core/order-matching/eval-set.ts";
+import type { PlanningEvalRun } from "../../core/planning/eval-run.ts";
+import {
+  examplePlanningMessages,
+  planningEvalSetSchema,
+  validatePlanningEvalSet,
+  type PlanningEvalSet,
+} from "../../core/planning/eval-set.ts";
 export type Checked<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 
 export const CATALOG_DIR = ".data/carrefour";
 export const CATALOG_PATH = `${CATALOG_DIR}/products.json`;
 export const ORDER_EVAL_SET_PATH = "evals/order-matching.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-matching/eval-runs";
+export const PLANNING_EVAL_SET_PATH = "evals/planning.json";
+export const PLANNING_EVAL_RUNS_DIR = ".data/planning/eval-runs";
 export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
 
@@ -127,14 +136,31 @@ export function createDataFiles(root = ".") {
     return meta.success ? meta.data.fetchedAt : null;
   };
 
-  const loadEvalSet = (): Checked<EvalSet> => {
-    const examples = readdirSync(at(PROMPTS_DIR), { recursive: true, encoding: "utf8" })
+  const promptTexts = (): string[] =>
+    readdirSync(at(PROMPTS_DIR), { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".md"))
       .sort()
-      .flatMap((file) => exampleOrders(readFileSync(at(join(PROMPTS_DIR, file)), "utf8")));
+      .map((file) => readFileSync(at(join(PROMPTS_DIR, file)), "utf8"));
+
+  const loadEvalSet = (): Checked<EvalSet> => {
+    const examples = promptTexts().flatMap(exampleOrders);
     const input = readJson(ORDER_EVAL_SET_PATH);
     const errors = validateEvalSet(input, examples);
     return errors.length > 0 ? failed(errors) : ok(evalSetSchema.parse(input));
+  };
+
+  const loadPlanningEvalSet = (): Checked<PlanningEvalSet> => {
+    const examples = promptTexts().flatMap(examplePlanningMessages);
+    const input = readJson(PLANNING_EVAL_SET_PATH);
+    const errors = validatePlanningEvalSet(input, examples);
+    return errors.length > 0 ? failed(errors) : ok(planningEvalSetSchema.parse(input));
+  };
+
+  const savePlanningEvalRun = (run: PlanningEvalRun): string => {
+    mkdirSync(at(PLANNING_EVAL_RUNS_DIR), { recursive: true });
+    const path = join(PLANNING_EVAL_RUNS_DIR, `${run.startedAt.replaceAll(":", "-")}.json`);
+    writeText(path, writeJsonText(run));
+    return path;
   };
 
   const saveCatalog = ({ meta, products }: CatalogDownload, outputDir = CATALOG_DIR) => {
@@ -199,6 +225,8 @@ export function createDataFiles(root = ".") {
     loadCatalogProducts,
     loadSnapshotFetchedAt,
     loadEvalSet,
+    loadPlanningEvalSet,
+    savePlanningEvalRun,
     saveCatalog,
     saveEvalRun,
     loadLatestEvalRun,

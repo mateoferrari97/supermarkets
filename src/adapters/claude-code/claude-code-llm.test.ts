@@ -9,6 +9,7 @@ import type { FitProductsInput } from "../../core/order-matching/match-items.ts"
 import type { PlanInput } from "../../core/planning/plan.ts";
 import type { ReadReplyInput } from "../../core/order-matching/read-reply.ts";
 import {
+  createClaudeCodeIdeaJudge,
   createClaudeCodeLlm,
   createProcessRunner,
   TASK_BUDGETS_USD,
@@ -22,6 +23,7 @@ mkdirSync(join(promptsDir, "order-matching"));
 mkdirSync(join(promptsDir, "planning"));
 writeFileSync(join(promptsDir, "planning", "route-message.md"), "Route the message.");
 writeFileSync(join(promptsDir, "planning", "plan.md"), "Plan with the catalog.");
+writeFileSync(join(promptsDir, "planning", "judge-idea.md"), "Judge the Idea.");
 writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
 writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
 writeFileSync(join(promptsDir, "order-matching", "read-reply.md"), "Read the reply.");
@@ -790,6 +792,110 @@ describe("readReply", () => {
   it("fails on a new line with a quantity it cannot read", async () => {
     const llm = llmWith(answer([], [line({ quantity: "0 unit" })]));
     await assert.rejects(llm.readReply(input, signal), /read-reply returned an invalid answer/);
+  });
+});
+
+describe("judgeIdea", () => {
+  const judgeWith = (
+    result: ProcessResult,
+    calls: LlmCall[],
+    argsSeen: string[][],
+    inputsSeen: string[],
+  ) =>
+    createClaudeCodeIdeaJudge({
+      promptsDir,
+      run: (args, input) => {
+        argsSeen.push(args);
+        inputsSeen.push(input);
+        return Promise.resolve(result);
+      },
+      onCall: (call) => calls.push(call),
+    });
+
+  it("renders the request, the message and the Plan and returns the judgment", async () => {
+    const calls: LlmCall[] = [];
+    const argsSeen: string[][] = [];
+    const inputsSeen: string[] = [];
+    const judge = judgeWith(
+      session({ structured_output: { sensible: true, reason: "Cantidades razonables" } }),
+      calls,
+      argsSeen,
+      inputsSeen,
+    );
+    const judgment = await judge.judgeIdea(
+      {
+        request: "un asado para 10",
+        message: "Te armé un asado.",
+        plan: {
+          title: "Asado para 10",
+          idea: [{ heading: "Pasos", text: "Prendé el fuego." }],
+          lines: [
+            {
+              productId: "p1",
+              name: "Asado x kg",
+              sale: { kind: "by-weight", saleStepKg: 1.2 },
+              quantity: 2400,
+              purpose: "para el asado",
+              total: 28800,
+            },
+            {
+              productId: "p2",
+              name: "Carbón 4 kg",
+              sale: { kind: "packaged", size: null },
+              quantity: 2,
+              purpose: "para la parrilla",
+              total: null,
+            },
+          ],
+          total: 28800,
+        },
+      },
+      signal,
+    );
+    assert.deepEqual(judgment, { sensible: true, reason: "Cantidades razonables" });
+    const [args] = argsSeen;
+    assert.equal(args![args!.indexOf("--system-prompt") + 1], "Judge the Idea.");
+    assert.equal(
+      inputsSeen[0],
+      [
+        "<request>un asado para 10</request>",
+        "<message>Te armé un asado.</message>",
+        "<plan>",
+        "<title>Asado para 10</title>",
+        "<idea>",
+        "## Pasos",
+        "Prendé el fuego.",
+        "</idea>",
+        "<lines>",
+        "Asado x kg | 2400 g | para el asado | $28800",
+        "Carbón 4 kg | 2 u | para la parrilla | no price",
+        "</lines>",
+        "<total>$28800</total>",
+        "</plan>",
+      ].join("\n"),
+    );
+    assert.deepEqual(
+      calls.map(({ task, model, effort }) => ({ task, model, effort })),
+      [{ task: "judge-idea", model: "claude-sonnet-5-5", effort: null }],
+    );
+  });
+
+  it("says when no Plan was shown", async () => {
+    const inputsSeen: string[] = [];
+    const judge = judgeWith(
+      session({ structured_output: { sensible: false, reason: "No responde" } }),
+      [],
+      [],
+      inputsSeen,
+    );
+    await judge.judgeIdea(
+      { request: "¿qué vino va con pescado?", message: null, plan: null },
+      signal,
+    );
+    assert.equal(
+      inputsSeen[0],
+      "<request>¿qué vino va con pescado?</request>\n<message>none</message>\n<plan>none</plan>",
+    );
   });
 });
 

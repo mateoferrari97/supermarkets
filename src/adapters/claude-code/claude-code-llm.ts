@@ -19,8 +19,10 @@ import {
   type PlanInput,
   type PlanOutput,
 } from "../../core/planning/plan.ts";
+import type { IdeaJudge, IdeaToJudge } from "../../core/planning/eval-run.ts";
 import {
   fitProductsOutputSchema,
+  judgeIdeaOutputSchema,
   parseOrderOutputSchema,
   planOutputSchema,
   readReplyOutputSchema,
@@ -29,7 +31,8 @@ import {
 } from "./llm-output-schemas.ts";
 import type { Llm } from "../../core/order-matching/llm.ts";
 
-export type LlmTask = "route-message" | "parse-order" | "fit-products" | "read-reply" | "plan";
+export type LlmTask =
+  "route-message" | "parse-order" | "fit-products" | "read-reply" | "plan" | "judge-idea";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type TaskModel = { model: string; effort: Effort | null };
 
@@ -39,6 +42,7 @@ export const TASK_MODELS: Record<LlmTask, TaskModel> = {
   "fit-products": { model: "claude-sonnet-5-5", effort: null },
   "read-reply": { model: "claude-sonnet-5-5", effort: "low" },
   plan: { model: "claude-sonnet-5-5", effort: null },
+  "judge-idea": { model: "claude-sonnet-5-5", effort: null },
 };
 
 export const TASK_BUDGETS_USD: Record<LlmTask, number> = {
@@ -47,6 +51,7 @@ export const TASK_BUDGETS_USD: Record<LlmTask, number> = {
   "fit-products": 0.25,
   "read-reply": 0.25,
   plan: 1,
+  "judge-idea": 0.25,
 };
 
 const PROMPT_FILES: Record<LlmTask, string> = {
@@ -55,6 +60,7 @@ const PROMPT_FILES: Record<LlmTask, string> = {
   "fit-products": "order-matching/fit-products.md",
   "read-reply": "order-matching/read-reply.md",
   plan: "planning/plan.md",
+  "judge-idea": "planning/judge-idea.md",
 };
 
 export type ProcessResult = { exitCode: number; stdout: string; stderr: string };
@@ -92,13 +98,13 @@ const sessionResultSchema = z.object({
   structured_output: z.unknown().optional(),
 });
 
-export function createClaudeCodeLlm({
+function createSessions({
   promptsDir,
   models = {},
   budgetsUsd = {},
   run = createProcessRunner("claude"),
   onCall,
-}: ClaudeCodeLlmOptions): Llm {
+}: ClaudeCodeLlmOptions) {
   const prompt = (task: LlmTask) => readFileSync(join(promptsDir, PROMPT_FILES[task]), "utf8");
 
   const ask = async <T>(
@@ -161,6 +167,25 @@ export function createClaudeCodeLlm({
     return output.data;
   };
 
+  return { prompt, ask };
+}
+
+export function createClaudeCodeIdeaJudge(options: ClaudeCodeLlmOptions): IdeaJudge {
+  const { prompt, ask } = createSessions(options);
+  return {
+    judgeIdea: (input, signal) =>
+      ask(
+        "judge-idea",
+        prompt("judge-idea"),
+        judgeIdeaOutputSchema,
+        renderIdeaToJudge(input),
+        signal,
+      ),
+  };
+}
+
+export function createClaudeCodeLlm(options: ClaudeCodeLlmOptions): Llm {
+  const { prompt, ask } = createSessions(options);
   return {
     routeMessage: (text, signal) =>
       ask(
@@ -201,6 +226,30 @@ export function createClaudeCodeLlm({
     plan: async (input, signal) =>
       readPlan(await ask("plan", prompt("plan"), planOutputSchema, renderPlan(input), signal)),
   };
+}
+
+export function renderIdeaToJudge({ request, message, plan }: IdeaToJudge): string {
+  return [
+    `<request>${request}</request>`,
+    `<message>${message ?? "none"}</message>`,
+    ...(plan === null
+      ? ["<plan>none</plan>"]
+      : [
+          "<plan>",
+          `<title>${plan.title}</title>`,
+          "<idea>",
+          ...plan.idea.flatMap(({ heading, text }) => [`## ${heading}`, text]),
+          "</idea>",
+          "<lines>",
+          ...plan.lines.map(
+            ({ name, sale, quantity, purpose, total }) =>
+              `${name} | ${String(quantity)} ${sale.kind === "by-weight" ? "g" : "u"} | ${purpose} | ${total === null ? "no price" : `$${String(total)}`}`,
+          ),
+          "</lines>",
+          `<total>$${String(plan.total)}</total>`,
+          "</plan>",
+        ]),
+  ].join("\n");
 }
 
 function readPlan({
