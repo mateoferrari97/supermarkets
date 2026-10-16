@@ -11,9 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { validateEvalSet } from "../../core/order-resolution/eval-set.ts";
-import { validatePaymentCards } from "../../core/product-selection/payment-cards.ts";
-import { validateProductTypes } from "../../core/product-types/validate.ts";
+import { summarize } from "../../core/order-matching/eval-score.ts";
 import { createDataFiles } from "./data-files.ts";
 
 const repoRoot = join(import.meta.dirname, "../../..");
@@ -27,11 +25,17 @@ const write = (path: string, value: unknown) => {
 
 const read = (path: string): unknown => JSON.parse(readFileSync(join(root, path), "utf8"));
 
-const vocabulary = {
-  groups: [{ id: "grupo-yerba", name: "Yerba", productTypes: [{ id: "yerba", name: "Yerba" }] }],
+const yerbaCase = {
+  id: "yerba",
+  order: "una yerba",
+  items: [{ product: "Yerba", brand: null, size: "common", quantity: "minimum", fits: ["1"] }],
 };
 
-const catalogProduct = (productId: string, department: string) => ({
+const catalogProduct = (
+  productId: string,
+  department: string,
+  fields: Record<string, unknown> = {},
+) => ({
   productId,
   skuIds: [`${productId}0`],
   name: `Yerba ${productId}`,
@@ -41,20 +45,19 @@ const catalogProduct = (productId: string, department: string) => ({
   seccion: null,
   familia: null,
   tipo: "Yerba",
+  price: 1000,
   measureUnit: null,
   consumptionQuantity: null,
+  measurementUnit: "un",
+  unitMultiplier: 1,
+  teasers: [],
+  ...fields,
 });
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "data-files-"));
-  write("vocabulary/product-types.json", vocabulary);
-  write("vocabulary/carrefour-tipos.json", { Yerba: "yerba" });
-  write("vocabulary/carrefour-payment-cards.json", {
-    cards: [{ names: ["Visa"], paymentSystem: "2", bin: null }],
-  });
-  write("evals/order-resolution.json", {
-    cases: [{ id: "yerba", order: "una yerba", items: [{ productType: "yerba" }] }],
-  });
+  write("evals/order-matching.json", { cases: [yerbaCase] });
+  write("prompts/order-matching/parse-order.md", "# Examples\n\n<order>\nyerba y sal\n</order>\n");
 });
 
 afterEach(() => {
@@ -64,230 +67,160 @@ afterEach(() => {
 describe("the committed data", () => {
   it("loads with no errors", () => {
     const files = createDataFiles(repoRoot);
-    assert.equal(files.loadProductTypes().ok, true);
-    assert.equal(files.loadPaymentCards().ok, true);
     assert.equal(files.loadEvalSet().ok, true);
   });
 });
 
-describe("loadProductTypes", () => {
-  it("returns the vocabulary and the mapping when they are valid", () => {
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), {
-      ok: true,
-      value: { vocabulary, mapping: { Yerba: "yerba" } },
-    });
-  });
-
-  it("fails with the validator's errors for a broken schema or reference", () => {
-    const brokenVocabulary = { groups: [{ id: "Grupo Yerba", productTypes: [] }] };
-    const brokenMapping = { Yerba: "mate", Leche: "grupo-yerba" };
-    write("vocabulary/product-types.json", brokenVocabulary);
-    write("vocabulary/carrefour-tipos.json", brokenMapping);
-    const expected = validateProductTypes(brokenVocabulary, brokenMapping);
-    assert.ok(expected.length > 0);
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), { ok: false, errors: expected });
-
-    const validVocabulary = {
-      groups: [
-        ...vocabulary.groups,
-        { id: "grupo-leche", name: "Leche", productTypes: [{ id: "leche", name: "Leche" }] },
-      ],
-    };
-    write("vocabulary/product-types.json", validVocabulary);
-    assert.deepEqual(createDataFiles(root).loadProductTypes(), {
-      ok: false,
-      errors: [
-        'Tipo "Yerba" maps to unknown Product Type "mate"',
-        'Tipo "Leche" maps to Product Type Group "grupo-yerba" instead of a Product Type',
-      ],
-    });
-  });
-});
-
-describe("loadPaymentCards", () => {
-  it("fails with the validator's errors", () => {
-    const table = {
-      cards: [
-        { names: ["Visa"], paymentSystem: "2", bin: null },
-        { names: ["visa"], paymentSystem: "x", bin: null },
-      ],
-    };
-    write("vocabulary/carrefour-payment-cards.json", table);
-    assert.deepEqual(createDataFiles(root).loadPaymentCards(), {
-      ok: false,
-      errors: validatePaymentCards(table),
-    });
-  });
-
-  it("fails on a name used twice", () => {
-    write("vocabulary/carrefour-payment-cards.json", {
-      cards: [
-        { names: ["Visa"], paymentSystem: "2", bin: null },
-        { names: ["visa"], paymentSystem: "4", bin: null },
-      ],
-    });
-    assert.deepEqual(createDataFiles(root).loadPaymentCards(), {
-      ok: false,
-      errors: ['payment card name "visa" is used more than once'],
-    });
-  });
-});
-
 describe("loadEvalSet", () => {
-  it("returns the eval set with the vocabulary it was checked against", () => {
-    const loaded = createDataFiles(root).loadEvalSet();
-    assert.equal(loaded.ok && loaded.value.evalSet.cases[0]?.id, "yerba");
-    assert.deepEqual(loaded.ok && loaded.value.vocabulary, vocabulary);
-  });
-
-  it("fails on an unknown Product Type with the validator's errors", () => {
-    const evalSet = {
-      cases: [{ id: "mate", order: "un mate", items: [{ productType: "mate" }] }],
-    };
-    write("evals/order-resolution.json", evalSet);
+  it("returns the eval set when it is valid", () => {
     assert.deepEqual(createDataFiles(root).loadEvalSet(), {
-      ok: false,
-      errors: validateEvalSet(evalSet, vocabulary),
+      ok: true,
+      value: { cases: [yerbaCase] },
     });
   });
 
-  it("fails with the vocabulary's errors when the vocabulary is invalid", () => {
-    write("vocabulary/carrefour-tipos.json", { Yerba: "mate" });
+  it("fails with the validator's errors", () => {
+    write("evals/order-matching.json", { cases: [yerbaCase, yerbaCase] });
     assert.deepEqual(createDataFiles(root).loadEvalSet(), {
       ok: false,
-      errors: ['Tipo "Yerba" maps to unknown Product Type "mate"'],
+      errors: ['eval case "yerba" id is used more than once'],
+    });
+  });
+
+  it("rejects an order equal to an example order of any prompt", () => {
+    write("evals/order-matching.json", { cases: [{ ...yerbaCase, order: "Yerba y sal" }] });
+    assert.deepEqual(createDataFiles(root).loadEvalSet(), {
+      ok: false,
+      errors: ['eval case "yerba" order is an example order of the prompts'],
     });
   });
 });
 
-describe("loadOrderFiles", () => {
-  it("returns the grocery products of the Catalog Snapshot with the validated data", () => {
-    write(".data/carrefour/products.json", {
-      products: [catalogProduct("1", "Almacén"), catalogProduct("2", "Electro")],
-    });
-    const loaded = createDataFiles(root).loadOrderFiles();
-    assert.deepEqual(loaded.ok && loaded.value.catalog.map(({ productId }) => productId), ["1"]);
-  });
-
-  it("fails with every error when data is missing or invalid", () => {
-    write("vocabulary/carrefour-tipos.json", { Yerba: "mate" });
-    write("vocabulary/carrefour-payment-cards.json", { cards: "none" });
-    assert.deepEqual(createDataFiles(root).loadOrderFiles(), {
-      ok: false,
-      errors: [
-        "No Catalog Snapshot at .data/carrefour/products.json. Run pnpm carrefour:catalog first.",
-        'Tipo "Yerba" maps to unknown Product Type "mate"',
-        "payment cards cards: Invalid input: expected array, received string",
-      ],
-    });
+describe("loadSnapshotFetchedAt", () => {
+  it("reads the date of the Catalog Snapshot, or null without one", () => {
+    assert.equal(createDataFiles(root).loadSnapshotFetchedAt(), null);
+    write(".data/carrefour/products.json", { fetchedAt: "2026-10-15T20:44:49.211Z", products: [] });
+    assert.equal(createDataFiles(root).loadSnapshotFetchedAt(), "2026-10-15T20:44:49.211Z");
   });
 });
 
-describe("the seed files", () => {
-  const part = {
-    id: "almacen",
-    department: "Almacén",
-    tipos: [
-      {
-        tipo: "Yerba",
-        products: 1,
-        availableProducts: 1,
-        familias: [],
-        measureUnits: [],
-        examples: ["Yerba 1"],
-      },
-    ],
+describe("loadCatalogProducts", () => {
+  const load = (...products: unknown[]) => {
+    write(".data/carrefour/products.json", { products });
+    return createDataFiles(root).loadCatalogProducts();
   };
 
-  it("saves parts, replacing the previous ones, and loads them back", () => {
-    const files = createDataFiles(root);
-    files.saveParts([{ ...part, id: "old" }]);
-    files.saveParts([part]);
-    assert.deepEqual(readdirSync(join(root, ".data/carrefour/seed/parts")), ["almacen.json"]);
-    assert.deepEqual(files.loadParts(), [part]);
-    assert.deepEqual(files.loadPart("almacen"), { ok: true, value: part });
-    assert.deepEqual(files.loadPart("bebidas"), {
-      ok: false,
-      errors: ["Missing .data/carrefour/seed/parts/bebidas.json"],
-    });
-  });
-
-  it("checks a proposal against its part", () => {
-    const files = createDataFiles(root);
-    assert.equal(files.hasProposal("almacen"), false);
-    assert.deepEqual(files.loadProposal(part), {
-      ok: false,
-      errors: ["Missing .data/carrefour/seed/proposals/almacen.json"],
-    });
-    write(".data/carrefour/seed/proposals/almacen.json", { part: "almacen" });
-    assert.equal(files.hasProposal("almacen"), true);
-    const loaded = files.loadProposal(part);
-    assert.equal(loaded.ok, false);
-    const proposal = {
-      part: "almacen",
-      groups: [
+  it("reads a product sold by weight with its Sale Step and no size", () => {
+    const loaded = load(
+      catalogProduct("719074", "Frutas y verduras", {
+        name: "Banana selección x kg.",
+        tipo: "Banana",
+        price: 1999,
+        measureUnit: "GRM",
+        consumptionQuantity: "1000.00",
+        measurementUnit: "kg",
+        unitMultiplier: 0.5,
+      }),
+    );
+    assert.deepEqual(loaded, {
+      ok: true,
+      value: [
         {
-          id: "grupo-yerba",
-          name: "Yerba",
-          productTypes: [{ id: "yerba", name: "Yerba", tipos: ["Yerba"] }],
+          productId: "719074",
+          itemId: "7190740",
+          name: "Banana selección x kg.",
+          brand: null,
+          department: "Frutas y verduras",
+          tipo: "Banana",
+          price: 1999,
+          inStock: true,
+          sale: { kind: "by-weight", saleStepKg: 0.5 },
+          teasers: [],
         },
       ],
-      excluded: [],
-      doubts: [],
-    };
-    write(".data/carrefour/seed/proposals/almacen.json", proposal);
-    assert.deepEqual(files.loadProposal(part), { ok: true, value: proposal });
+    });
   });
 
-  it("reads no decisions as an empty list and reports invalid ones with the path", () => {
-    const files = createDataFiles(root);
-    assert.deepEqual(files.loadDecisions(), { ok: true, value: [] });
-    write(".data/carrefour/seed/decisions.json", { op: "merge" });
-    assert.deepEqual(files.loadDecisions(), {
+  it("reads a packaged product's size from its measure, normalized, with its teasers", () => {
+    const teasers = [{ name: "PROMO-2do al 50%", minimumQuantity: 2 }];
+    const loaded = load(
+      catalogProduct("30138", "Bebidas", {
+        name: "Gaseosa cola Coca Cola sabor original 1,5 lts",
+        brand: "Coca Cola",
+        availableQuantity: 0,
+        measureUnit: "CM3",
+        consumptionQuantity: "1500",
+        teasers,
+      }),
+    );
+    assert.deepEqual(
+      loaded.ok &&
+        loaded.value.map(({ brand, inStock, sale, teasers }) => ({
+          brand,
+          inStock,
+          sale,
+          teasers,
+        })),
+      [
+        {
+          brand: "Coca Cola",
+          inStock: false,
+          sale: { kind: "packaged", size: { dimension: "volume", amount: 1500 } },
+          teasers,
+        },
+      ],
+    );
+  });
+
+  it("gives no size to a product without a measure, whatever its name says", () => {
+    const loaded = load(
+      catalogProduct("1", "Bebidas", { name: "Gaseosa cola Pepsi en lata 354 ml" }),
+    );
+    assert.deepEqual(loaded.ok && loaded.value.map(({ sale }) => sale), [
+      { kind: "packaged", size: null },
+    ]);
+  });
+
+  it("keeps a product without tipo", () => {
+    const loaded = load(catalogProduct("1", "Almacén", { tipo: null }));
+    assert.deepEqual(
+      loaded.ok && loaded.value.map(({ productId, tipo }) => ({ productId, tipo })),
+      [{ productId: "1", tipo: null }],
+    );
+  });
+
+  it("fails on a record of an older download and tells to download it again", () => {
+    const {
+      measurementUnit: _measurementUnit,
+      unitMultiplier: _unitMultiplier,
+      teasers: _teasers,
+      ...old
+    } = catalogProduct("1", "Almacén");
+    assert.deepEqual(load(old), {
       ok: false,
       errors: [
-        '.data/carrefour/seed/decisions.json at "": Invalid input: expected array, received object',
+        "The Catalog Snapshot at .data/carrefour/products.json does not have what this version " +
+          'reads (at "products.0.measurementUnit": Invalid input: expected string, received undefined). ' +
+          "Run pnpm carrefour:catalog again.",
       ],
     });
-  });
-
-  it("fails to load doubts before a consolidation wrote them", () => {
-    assert.deepEqual(createDataFiles(root).loadDoubts(), {
-      ok: false,
-      errors: ["No .data/carrefour/seed/doubts.json. Run pnpm seed:consolidate first."],
-    });
-  });
-
-  it("writes a consolidation and reads its doubts back", () => {
-    mkdirSync(join(root, ".data/carrefour/seed"), { recursive: true });
-    const files = createDataFiles(root);
-    const written = files.saveConsolidation({
-      vocabulary,
-      mapping: { Yerba: "yerba" },
-      doubts: [],
-      tree: [],
-      excluded: [],
-    });
-    assert.deepEqual(written, [
-      "vocabulary/product-types.json",
-      "vocabulary/carrefour-tipos.json",
-      ".data/carrefour/seed/doubts.json",
-      ".data/carrefour/seed/summary.md",
-    ]);
-    assert.deepEqual(read("vocabulary/carrefour-tipos.json"), { Yerba: "yerba" });
-    assert.deepEqual(files.loadDoubts(), { ok: true, value: [] });
   });
 });
 
 describe("the eval runs", () => {
   const run = (startedAt: string) => ({
     startedAt,
-    model: "claude-haiku-5-5",
+    snapshotFetchedAt: null,
+    models: ["claude-sonnet-5-5"],
+    runsPerCase: 3,
     filters: [],
     durationMs: 1,
     costUsd: 0,
     sessions: 0,
-    cases: [],
+    stale: [],
+    totals: summarize([]),
+    cases: [{ id: "yerba", order: "una yerba", expectedToFail: null, passed: true, runs: [] }],
+    answers: [],
   });
 
   it("has no latest run before the first one", () => {
@@ -298,19 +231,19 @@ describe("the eval runs", () => {
     const files = createDataFiles(root);
     const path = files.saveEvalRun(run("2026-10-13T10:00:00.000Z"));
     files.saveEvalRun(run("2026-10-14T10:00:00.000Z"));
-    assert.equal(path, ".data/order-resolution/eval-runs/2026-10-13T10-00-00.000Z.json");
+    assert.equal(path, ".data/order-matching/eval-runs/2026-10-13T10-00-00.000Z.json");
     assert.deepEqual(files.loadLatestEvalRun(), {
       startedAt: "2026-10-14T10:00:00.000Z",
-      cases: [],
+      cases: [{ id: "yerba", passed: true }],
     });
   });
 });
 
 describe("saveCatalog", () => {
-  it("writes the products and the Tipos with the metadata into the output directory", () => {
+  it("writes the products with the metadata into the output directory", () => {
     const files = createDataFiles(root);
     const outputDir = files.saveCatalog(
-      { meta: { source: "carrefour" }, products: [{ productId: "1" }], tipos: [{ tipo: "Yerba" }] },
+      { meta: { source: "carrefour" }, products: [{ productId: "1" }] },
       "catalog",
     );
     assert.equal(outputDir, "catalog");
@@ -318,17 +251,11 @@ describe("saveCatalog", () => {
       source: "carrefour",
       products: [{ productId: "1" }],
     });
-    assert.deepEqual(read("catalog/tipos.json"), {
-      source: "carrefour",
-      tipos: [{ tipo: "Yerba" }],
-    });
+    assert.deepEqual(readdirSync(join(root, "catalog")), ["products.json"]);
   });
 
   it("writes into the Catalog Snapshot folder by default", () => {
-    assert.equal(
-      createDataFiles(root).saveCatalog({ meta: {}, products: [], tipos: [] }),
-      ".data/carrefour",
-    );
+    assert.equal(createDataFiles(root).saveCatalog({ meta: {}, products: [] }), ".data/carrefour");
     assert.deepEqual(read(".data/carrefour/products.json"), { products: [] });
   });
 });

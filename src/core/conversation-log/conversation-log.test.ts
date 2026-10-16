@@ -20,7 +20,6 @@ const ticking = () => {
 const store: OnlineStore = {
   checkDelivery: (postalCode) =>
     Promise.resolve(postalCode === "1425" ? "delivers" : "does-not-deliver"),
-  findCandidates: () => Promise.reject(new Error("Carrefour answered 500")),
   simulate: (request) =>
     Promise.resolve({
       lines: request.items.map((item) => ({
@@ -42,7 +41,7 @@ describe("loggedStore", () => {
 
     assert.equal(await logged.checkDelivery("1425", signal), "delivers");
     const simulation = await logged.simulate(
-      { postalCode: "1425", card: null, items: [{ itemId: "7", quantity: 2 }] },
+      { postalCode: "1425", items: [{ itemId: "7", quantity: 2 }] },
       signal,
     );
     const link = logged.cartLink([{ itemId: "7", quantity: 2 }]);
@@ -61,7 +60,7 @@ describe("loggedStore", () => {
       {
         type: "store-call",
         method: "simulate",
-        input: { postalCode: "1425", card: null, items: [{ itemId: "7", quantity: 2 }] },
+        input: { postalCode: "1425", items: [{ itemId: "7", quantity: 2 }] },
         output: simulation,
         error: null,
         durationMs: 10,
@@ -79,22 +78,19 @@ describe("loggedStore", () => {
 
   it("records a failed call with its error and rethrows it", async () => {
     const events: ConversationEvent[] = [];
-    const logged = loggedStore(store, (event) => events.push(event), ticking());
-    const query = {
-      postalCode: "1425",
-      tipos: ["Yerba"],
-      brands: [],
-      sort: "price:asc" as const,
-      limit: 5,
+    const failing: OnlineStore = {
+      ...store,
+      checkDelivery: () => Promise.reject(new Error("Carrefour answered 500")),
     };
+    const logged = loggedStore(failing, (event) => events.push(event), ticking());
 
-    await assert.rejects(logged.findCandidates(query, signal), /Carrefour answered 500/);
+    await assert.rejects(logged.checkDelivery("1425", signal), /Carrefour answered 500/);
 
     assert.deepEqual(events, [
       {
         type: "store-call",
-        method: "findCandidates",
-        input: query,
+        method: "checkDelivery",
+        input: { postalCode: "1425" },
         output: null,
         error: "Carrefour answered 500",
         durationMs: 10,
@@ -109,14 +105,14 @@ describe("loggedSteps", () => {
     const onStep = loggedSteps((event) => events.push(event), ticking());
 
     onStep({ status: "started", step: { kind: "understand-order" } });
-    onStep({ status: "started", step: { kind: "search-item", phrase: "yerba" } });
-    onStep({ status: "done", step: { kind: "search-item", phrase: "yerba" } });
+    onStep({ status: "started", step: { kind: "choose-products", original: "yerba" } });
+    onStep({ status: "done", step: { kind: "choose-products", original: "yerba" } });
     onStep({ status: "done", step: { kind: "understand-order" } });
 
     assert.deepEqual(events, [
       { type: "step-started", step: { kind: "understand-order" } },
-      { type: "step-started", step: { kind: "search-item", phrase: "yerba" } },
-      { type: "step-done", step: { kind: "search-item", phrase: "yerba" }, durationMs: 10 },
+      { type: "step-started", step: { kind: "choose-products", original: "yerba" } },
+      { type: "step-done", step: { kind: "choose-products", original: "yerba" }, durationMs: 10 },
       { type: "step-done", step: { kind: "understand-order" }, durationMs: 30 },
     ]);
   });
@@ -155,7 +151,7 @@ describe("loggedTurn", () => {
         (event) => events.push(event),
         "leche",
         signal,
-        () => Promise.reject(new Error("Claude Code session for split-order exited with 1")),
+        () => Promise.reject(new Error("Claude Code session for parse-order exited with 1")),
         ticking(),
       ),
       /exited with 1/,
@@ -165,12 +161,12 @@ describe("loggedTurn", () => {
       { type: "owner-message", text: "leche" },
       {
         type: "assistant-reply",
-        reply: { kind: "error", message: "Claude Code session for split-order exited with 1" },
+        reply: { kind: "error", message: "Claude Code session for parse-order exited with 1" },
       },
       {
         type: "turn-ended",
         outcome: "failed",
-        error: "Claude Code session for split-order exited with 1",
+        error: "Claude Code session for parse-order exited with 1",
         durationMs: 10,
       },
     ]);

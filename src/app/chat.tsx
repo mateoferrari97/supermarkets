@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AskedQuestion, Cart, TurnEvent, TurnRequest } from "./turn-events.ts";
+import type { AskedQuestion, Cart, Mark, TurnEvent, TurnRequest } from "./turn-events.ts";
 
 type Step = { id: number; text: string; seconds: number | null };
 
@@ -96,9 +96,7 @@ export function Chat({ firstQuestion }: { firstQuestion: string }) {
       });
       for await (const event of readEvents(response)) {
         if (event.type === "session") setSessionId(event.sessionId);
-        if (event.type === "cart" || (event.type === "error" && response.status !== 409)) {
-          setFinished(true);
-        }
+        if (event.type === "error" && response.status !== 409) setFinished(true);
         setMessages((current) => withEvent(current, event));
       }
     } catch (error) {
@@ -245,9 +243,6 @@ function QuestionChips({
               {index + 1}) {option}
             </button>
           ))}
-          <button className="chip" type="button" onClick={() => onChip("cualquiera")}>
-            cualquiera
-          </button>
         </div>
       ))}
       <div className="muted small">
@@ -256,6 +251,8 @@ function QuestionChips({
     </div>
   );
 }
+
+const MARK_TEXT: Record<Mark, string> = { new: "Nuevo", changed: "Cambiado" };
 
 function CartView({ cart }: { cart: Cart }) {
   return (
@@ -274,30 +271,27 @@ function CartView({ cart }: { cart: Cart }) {
           {cart.lines.map((line, index) => (
             <tr key={index}>
               <td>
-                <div>{line.product?.name ?? "Sin producto"}</div>
-                <div className="muted small">
-                  pediste &quot;{line.phrase}&quot; · {line.reason}
+                <div>
+                  {line.mark === null ? null : <span className="mark">{MARK_TEXT[line.mark]}</span>}
+                  {line.product.name}
                 </div>
-                {line.notices.map((notice) => (
-                  <div key={notice} className="notice">
-                    {notice}
+                <div className="muted small">
+                  pediste &quot;{line.original}&quot; · {line.reason}
+                </div>
+                {line.notes.map((note) => (
+                  <div key={note} className="notice">
+                    {note}
                   </div>
                 ))}
               </td>
               <td className="num">{line.quantity}</td>
-              <td className="num">
-                {line.unitPrice === null ? "—" : money.format(line.unitPrice)}
-              </td>
+              <td className="num">{money.format(line.unitPrice)}</td>
               <td className="num">{money.format(line.total)}</td>
             </tr>
           ))}
           <tr>
             <td colSpan={3}>
-              <strong>Total</strong>{" "}
-              <span className="muted small">
-                CP {cart.postalCode}
-                {cart.paymentCard ? `, ${cart.paymentCard}` : ""}
-              </span>
+              <strong>Total</strong> <span className="muted small">CP {cart.postalCode}</span>
             </td>
             <td className="num">
               <strong>{money.format(cart.total)}</strong>
@@ -305,14 +299,12 @@ function CartView({ cart }: { cart: Cart }) {
           </tr>
         </tbody>
       </table>
-      {cart.notices.map((notice) => (
-        <div key={notice} className="notice block">
-          {notice}
+      {cart.notes.map((note) => (
+        <div key={note} className="notice block">
+          {note}
         </div>
       ))}
-      {cart.unexpressed.length > 0 ? (
-        <div className="block">No pude aplicar: {cart.unexpressed.join("; ")}.</div>
-      ) : null}
+      <div className="block">{cart.warning}</div>
       {cart.cartLink ? (
         <div className="block">
           <a className="btn" href={cart.cartLink} target="_blank" rel="noreferrer">

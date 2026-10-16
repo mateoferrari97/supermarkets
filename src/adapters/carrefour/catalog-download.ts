@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Teaser } from "../../core/order-matching/catalog-product.ts";
 
 const BASE_URL = "https://www.carrefour.com.ar";
 const SELLER_ID = "1";
@@ -7,7 +8,6 @@ const MAX_FROM = 2500;
 const WINDOW = MAX_FROM + PAGE_SIZE;
 const CONCURRENCY = 8;
 const MAX_ATTEMPTS = 4;
-const EXAMPLES_PER_TIPO = 5;
 
 type Category = { id: number; name: string; children: Category[] };
 
@@ -19,10 +19,16 @@ const categorySchema: z.ZodType<Category> = z.object({
   },
 });
 
+const teaserSchema = z.object({
+  Name: z.string(),
+  Conditions: z.object({ MinimumQuantity: z.number().nullish() }),
+});
+
 const offerSchema = z.object({
   Price: z.number(),
   ListPrice: z.number(),
   AvailableQuantity: z.number(),
+  PromotionTeasers: z.array(teaserSchema).nullish(),
 });
 
 const productSchema = z.looseObject({
@@ -34,6 +40,8 @@ const productSchema = z.looseObject({
     z.object({
       itemId: z.string(),
       ean: z.string().nullish(),
+      measurementUnit: z.string().nullish(),
+      unitMultiplier: z.number().nullish(),
       sellers: z.array(z.object({ sellerId: z.string(), commertialOffer: offerSchema })),
     }),
   ),
@@ -64,16 +72,9 @@ export type CatalogProduct = {
   consumptionQuantity: string | null;
   conversionFactor: string | null;
   unitPrice: string | null;
-};
-
-export type TipoSummary = {
-  tipo: string;
-  products: number;
-  availableProducts: number;
-  secciones: Record<string, number>;
-  familias: Record<string, number>;
-  measureUnits: Record<string, number>;
-  examples: string[];
+  measurementUnit: string | null;
+  unitMultiplier: number | null;
+  teasers: Teaser[];
 };
 
 type Page = { products: RawProduct[]; total: number };
@@ -95,6 +96,8 @@ export type CatalogMeta = {
   uniqueProducts: number;
   availableProducts: number;
   productsWithoutTipo: number;
+  productsSoldByWeight: number;
+  productsWithTeasers: number;
   distinctTipos: number;
   productsByDepartment: Record<string, number>;
   incompleteCategories: { path: string; name: string; total: number; fetched: number }[];
@@ -109,7 +112,6 @@ export type CatalogMeta = {
 export type DownloadedCatalog = {
   meta: CatalogMeta;
   products: CatalogProduct[];
-  tipos: TipoSummary[];
 };
 
 let activeRequests = 0;
@@ -230,7 +232,21 @@ function toProduct(raw: RawProduct, department: string): CatalogProduct {
     consumptionQuantity: specification(raw, "Gramaje de unidad de consumo"),
     conversionFactor: specification(raw, "Gramaje factor de conversión"),
     unitPrice: specification(raw, "Precio x unidad"),
+    measurementUnit: item?.measurementUnit ?? null,
+    unitMultiplier: item?.unitMultiplier ?? null,
+    teasers: (offer?.PromotionTeasers ?? []).flatMap((teaser) =>
+      typeof teaser.Conditions.MinimumQuantity === "number"
+        ? [{ name: teaser.Name, minimumQuantity: teaser.Conditions.MinimumQuantity }]
+        : [],
+    ),
   };
+}
+
+export function catalogProductsFrom(page: unknown, department: string): CatalogProduct[] {
+  return z
+    .array(productSchema)
+    .parse(page)
+    .map((raw) => toProduct(raw, department));
 }
 
 function increment(counts: Record<string, number>, key: string | null) {
@@ -240,41 +256,6 @@ function increment(counts: Record<string, number>, key: string | null) {
 
 function sortedCounts(counts: Record<string, number>): Record<string, number> {
   return Object.fromEntries(Object.entries(counts).sort(([, a], [, b]) => b - a));
-}
-
-export function summarizeTipos(products: CatalogProduct[]): TipoSummary[] {
-  const byTipo = new Map<string, CatalogProduct[]>();
-  for (const product of products) {
-    if (product.tipo === null) continue;
-    const group = byTipo.get(product.tipo) ?? [];
-    group.push(product);
-    byTipo.set(product.tipo, group);
-  }
-  return [...byTipo.entries()]
-    .map(([tipo, group]) => {
-      const secciones: Record<string, number> = {};
-      const familias: Record<string, number> = {};
-      const measureUnits: Record<string, number> = {};
-      for (const product of group) {
-        increment(secciones, product.seccion);
-        increment(familias, product.familia);
-        increment(measureUnits, product.measureUnit);
-      }
-      const available = group.filter((product) => product.availableQuantity > 0);
-      const examples = [...available, ...group.filter((product) => !available.includes(product))]
-        .slice(0, EXAMPLES_PER_TIPO)
-        .map((product) => product.name);
-      return {
-        tipo,
-        products: group.length,
-        availableProducts: available.length,
-        secciones: sortedCounts(secciones),
-        familias: sortedCounts(familias),
-        measureUnits: sortedCounts(measureUnits),
-        examples,
-      };
-    })
-    .sort((a, b) => b.products - a.products || a.tipo.localeCompare(b.tipo, "es"));
 }
 
 export async function downloadCatalog(
@@ -330,7 +311,6 @@ export async function downloadCatalog(
       childrenTotal: result.children.reduce((sum, child) => sum + (totals.get(child.path) ?? 0), 0),
     }))
     .filter((category) => category.total > category.childrenTotal);
-  const tipos = summarizeTipos(productList);
 
   const meta: CatalogMeta = {
     fetchedAt,
@@ -342,7 +322,9 @@ export async function downloadCatalog(
     uniqueProducts: productList.length,
     availableProducts: productList.filter((product) => product.availableQuantity > 0).length,
     productsWithoutTipo: productList.filter((product) => product.tipo === null).length,
-    distinctTipos: tipos.length,
+    productsSoldByWeight: productList.filter((product) => product.measurementUnit === "kg").length,
+    productsWithTeasers: productList.filter((product) => product.teasers.length > 0).length,
+    distinctTipos: new Set(productList.flatMap((product) => product.tipo ?? [])).size,
     productsByDepartment: sortedCounts(
       productList.reduce<Record<string, number>>((counts, product) => {
         increment(counts, product.department);
@@ -353,5 +335,5 @@ export async function downloadCatalog(
     productsOnlyInSplitCategories,
   };
 
-  return { meta, products: productList, tipos };
+  return { meta, products: productList };
 }

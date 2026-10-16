@@ -5,60 +5,29 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import type { ConversationEvent } from "../../core/conversation-log/conversation-log.ts";
 import {
-  validateEvalSet,
+  catalogProductsFrom,
+  type CatalogProduct,
+} from "../../core/order-matching/catalog-product.ts";
+import type { EvalRun } from "../../core/order-matching/eval-run.ts";
+import {
   evalSetSchema,
+  exampleOrders,
+  validateEvalSet,
   type EvalSet,
-} from "../../core/order-resolution/eval-set.ts";
-import type { EvalRun } from "../../core/order-resolution/eval-run.ts";
-import {
-  paymentCardTableSchema,
-  validatePaymentCards,
-  type PaymentCardTable,
-} from "../../core/product-selection/payment-cards.ts";
-import {
-  decisionsSchema,
-  renderSummary,
-  type Consolidation,
-  type Decision,
-  type RemainingDoubt,
-} from "../../core/product-type-seed/consolidate.ts";
-import {
-  proposalSchema,
-  validateProposal,
-  type Proposal,
-} from "../../core/product-type-seed/proposal.ts";
-import { GROCERY_DEPARTMENTS, type Part } from "../../core/product-type-seed/split.ts";
-import {
-  tipoMappingSchema,
-  vocabularySchema,
-  type TipoMapping,
-  type Vocabulary,
-} from "../../core/product-types/schema.ts";
-import { validateProductTypes } from "../../core/product-types/validate.ts";
-
+} from "../../core/order-matching/eval-set.ts";
 export type Checked<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 
 export const CATALOG_DIR = ".data/carrefour";
 export const CATALOG_PATH = `${CATALOG_DIR}/products.json`;
-export const SEED_DIR = `${CATALOG_DIR}/seed`;
-export const PARTS_DIR = `${SEED_DIR}/parts`;
-export const PROPOSALS_DIR = `${SEED_DIR}/proposals`;
-export const DECISIONS_PATH = `${SEED_DIR}/decisions.json`;
-export const DOUBTS_PATH = `${SEED_DIR}/doubts.json`;
-export const SUMMARY_PATH = `${SEED_DIR}/summary.md`;
-export const VOCABULARY_PATH = "vocabulary/product-types.json";
-export const CARREFOUR_MAPPING_PATH = "vocabulary/carrefour-tipos.json";
-export const PAYMENT_CARDS_PATH = "vocabulary/carrefour-payment-cards.json";
-export const ORDER_EVAL_SET_PATH = "evals/order-resolution.json";
-export const ORDER_EVAL_RUNS_DIR = ".data/order-resolution/eval-runs";
-export const PROMPTS_DIR = "prompts/order-resolution";
+export const ORDER_EVAL_SET_PATH = "evals/order-matching.json";
+export const ORDER_EVAL_RUNS_DIR = ".data/order-matching/eval-runs";
+export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
 
 const catalogSchema = z.object({
@@ -73,27 +42,24 @@ const catalogSchema = z.object({
       seccion: z.string().nullable(),
       familia: z.string().nullable(),
       tipo: z.string().nullable(),
+      price: z.number().nullable(),
       measureUnit: z.string().nullable(),
       consumptionQuantity: z.string().nullable(),
+      measurementUnit: z.string().nullable(),
+      unitMultiplier: z.number().positive().nullable(),
+      teasers: z.array(z.object({ name: z.string(), minimumQuantity: z.number() })),
     }),
   ),
 });
 
 const previousEvalRunSchema = z.object({
   startedAt: z.string(),
-  cases: z.array(z.object({ id: z.string(), outcome: z.enum(["hit", "miss", "error"]) })),
+  cases: z.array(z.object({ id: z.string(), passed: z.boolean() })),
 });
 
+const catalogMetaSchema = z.object({ fetchedAt: z.string() });
+
 export type CatalogRecord = z.infer<typeof catalogSchema>["products"][number];
-
-export type ProductTypes = { vocabulary: Vocabulary; mapping: TipoMapping };
-
-export type OrderFiles = ProductTypes & {
-  catalog: CatalogRecord[];
-  paymentCards: PaymentCardTable;
-};
-
-export type CheckedEvalSet = { evalSet: EvalSet; vocabulary: Vocabulary };
 
 export type PreviousEvalRun = z.infer<typeof previousEvalRunSchema>;
 
@@ -108,7 +74,7 @@ export const conversationFileName = (sessionId: string, startedAt: Date): string
   `${two(startedAt.getHours())}${two(startedAt.getMinutes())}${two(startedAt.getSeconds())}-` +
   `${sessionId}.jsonl`;
 
-export type CatalogDownload = { meta: object; products: unknown[]; tipos: unknown[] };
+export type CatalogDownload = { meta: object; products: unknown[] };
 
 const writeJsonText = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -131,116 +97,50 @@ export function createDataFiles(root = ".") {
     writeFileSync(at(path), text);
   };
 
-  const loadCatalog = (): Checked<CatalogRecord[]> =>
-    exists(CATALOG_PATH)
-      ? ok(catalogSchema.parse(readJson(CATALOG_PATH)).products)
-      : failed([`No Catalog Snapshot at ${CATALOG_PATH}. Run pnpm carrefour:catalog first.`]);
-
-  const loadProductTypes = (): Checked<ProductTypes> => {
-    const vocabulary = readJson(VOCABULARY_PATH);
-    const mapping = readJson(CARREFOUR_MAPPING_PATH);
-    const errors = validateProductTypes(vocabulary, mapping);
-    if (errors.length > 0) return failed(errors);
-    return ok({
-      vocabulary: vocabularySchema.parse(vocabulary),
-      mapping: tipoMappingSchema.parse(mapping),
-    });
-  };
-
-  const loadPaymentCards = (): Checked<PaymentCardTable> => {
-    const input = readJson(PAYMENT_CARDS_PATH);
-    const errors = validatePaymentCards(input);
-    return errors.length > 0 ? failed(errors) : ok(paymentCardTableSchema.parse(input));
-  };
-
-  const loadEvalSet = (): Checked<CheckedEvalSet> => {
-    const productTypes = loadProductTypes();
-    if (!productTypes.ok) return productTypes;
-    const { vocabulary } = productTypes.value;
-    const input = readJson(ORDER_EVAL_SET_PATH);
-    const errors = validateEvalSet(input, vocabulary);
-    return errors.length > 0
-      ? failed(errors)
-      : ok({ evalSet: evalSetSchema.parse(input), vocabulary });
-  };
-
-  const loadOrderFiles = (): Checked<OrderFiles> => {
-    const catalog = loadCatalog();
-    const productTypes = loadProductTypes();
-    const paymentCards = loadPaymentCards();
-    if (!catalog.ok || !productTypes.ok || !paymentCards.ok) {
-      return failed(
-        [catalog, productTypes, paymentCards].flatMap((loaded) => (loaded.ok ? [] : loaded.errors)),
-      );
+  const loadCatalog = (): Checked<CatalogRecord[]> => {
+    if (!exists(CATALOG_PATH)) {
+      return failed([`No Catalog Snapshot at ${CATALOG_PATH}. Run pnpm carrefour:catalog first.`]);
     }
-    const grocery = new Set<string>(GROCERY_DEPARTMENTS);
-    return ok({
-      catalog: catalog.value.filter((product) => grocery.has(product.department)),
-      ...productTypes.value,
-      paymentCards: paymentCards.value,
-    });
+    const catalog = catalogSchema.safeParse(readJson(CATALOG_PATH));
+    if (catalog.success) return ok(catalog.data.products);
+    const [issue] = catalog.error.issues;
+    return failed([
+      `The Catalog Snapshot at ${CATALOG_PATH} does not have what this version reads ` +
+        `(at "${issue?.path.join(".") ?? ""}": ${issue?.message ?? ""}). ` +
+        "Run pnpm carrefour:catalog again.",
+    ]);
   };
 
-  const saveParts = (parts: Part[]) => {
-    rmSync(at(PARTS_DIR), { recursive: true, force: true });
-    mkdirSync(at(PARTS_DIR), { recursive: true });
-    for (const part of parts)
-      writeText(`${PARTS_DIR}/${part.id}.json`, JSON.stringify(part, null, 2));
-  };
-
-  const loadParts = (): Part[] => {
-    if (!exists(PARTS_DIR)) return [];
-    return readdirSync(at(PARTS_DIR))
-      .filter((file) => file.endsWith(".json"))
-      .sort()
-      .map((file) => readJson(`${PARTS_DIR}/${file}`) as Part);
-  };
-
-  const loadPart = (partId: string): Checked<Part> => {
-    const path = `${PARTS_DIR}/${partId}.json`;
-    return exists(path) ? ok(readJson(path) as Part) : failed([`Missing ${path}`]);
-  };
-
-  const hasProposal = (partId: string) => exists(`${PROPOSALS_DIR}/${partId}.json`);
-
-  const loadProposal = (part: Part): Checked<Proposal> => {
-    const path = `${PROPOSALS_DIR}/${part.id}.json`;
-    if (!exists(path)) return failed([`Missing ${path}`]);
-    const input = readJson(path);
-    const errors = validateProposal(input, part);
-    return errors.length > 0 ? failed(errors) : ok(proposalSchema.parse(input));
-  };
-
-  const loadDecisions = (): Checked<Decision[]> => {
-    const decisions = decisionsSchema.safeParse(
-      exists(DECISIONS_PATH) ? readJson(DECISIONS_PATH) : [],
-    );
-    if (decisions.success) return ok(decisions.data);
-    return failed(
-      decisions.error.issues.map(
-        (issue) => `${DECISIONS_PATH} at "${issue.path.join(".")}": ${issue.message}`,
+  const loadCatalogProducts = (): Checked<CatalogProduct[]> => {
+    const catalog = loadCatalog();
+    if (!catalog.ok) return catalog;
+    return ok(
+      catalogProductsFrom(
+        catalog.value.map((record) => ({ ...record, brand: record.brand ?? null })),
       ),
     );
   };
 
-  const loadDoubts = (): Checked<RemainingDoubt[]> =>
-    exists(DOUBTS_PATH)
-      ? ok(readJson(DOUBTS_PATH) as RemainingDoubt[])
-      : failed([`No ${DOUBTS_PATH}. Run pnpm seed:consolidate first.`]);
-
-  const saveConsolidation = (consolidation: Consolidation): string[] => {
-    writeText(VOCABULARY_PATH, writeJsonText(consolidation.vocabulary));
-    writeText(CARREFOUR_MAPPING_PATH, writeJsonText(consolidation.mapping));
-    writeText(DOUBTS_PATH, writeJsonText(consolidation.doubts));
-    writeText(SUMMARY_PATH, renderSummary(consolidation));
-    return [VOCABULARY_PATH, CARREFOUR_MAPPING_PATH, DOUBTS_PATH, SUMMARY_PATH];
+  const loadSnapshotFetchedAt = (): string | null => {
+    if (!exists(CATALOG_PATH)) return null;
+    const meta = catalogMetaSchema.safeParse(readJson(CATALOG_PATH));
+    return meta.success ? meta.data.fetchedAt : null;
   };
 
-  const saveCatalog = ({ meta, products, tipos }: CatalogDownload, outputDir = CATALOG_DIR) => {
+  const loadEvalSet = (): Checked<EvalSet> => {
+    const examples = readdirSync(at(PROMPTS_DIR), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".md"))
+      .sort()
+      .flatMap((file) => exampleOrders(readFileSync(at(join(PROMPTS_DIR, file)), "utf8")));
+    const input = readJson(ORDER_EVAL_SET_PATH);
+    const errors = validateEvalSet(input, examples);
+    return errors.length > 0 ? failed(errors) : ok(evalSetSchema.parse(input));
+  };
+
+  const saveCatalog = ({ meta, products }: CatalogDownload, outputDir = CATALOG_DIR) => {
     const directory = resolve(root, outputDir);
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, "products.json"), JSON.stringify({ ...meta, products }, null, 2));
-    writeFileSync(join(directory, "tipos.json"), JSON.stringify({ ...meta, tipos }, null, 2));
     return outputDir;
   };
 
@@ -296,19 +196,9 @@ export function createDataFiles(root = ".") {
     promptsDir: at(PROMPTS_DIR),
     headCommit,
     openConversationLog,
-    loadCatalog,
-    loadProductTypes,
-    loadPaymentCards,
+    loadCatalogProducts,
+    loadSnapshotFetchedAt,
     loadEvalSet,
-    loadOrderFiles,
-    saveParts,
-    loadParts,
-    loadPart,
-    hasProposal,
-    loadProposal,
-    loadDecisions,
-    loadDoubts,
-    saveConsolidation,
     saveCatalog,
     saveEvalRun,
     loadLatestEvalRun,

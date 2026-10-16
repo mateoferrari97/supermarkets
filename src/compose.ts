@@ -1,7 +1,7 @@
 import { downloadCatalog as downloadCarrefourCatalog } from "./adapters/carrefour/catalog-download.ts";
-import { createCarrefourStore, snapshotProducts } from "./adapters/carrefour/carrefour-store.ts";
+import { createCarrefourStore } from "./adapters/carrefour/carrefour-store.ts";
+import { createInMemoryCatalogSearch } from "./adapters/catalog-search/in-memory-catalog-search.ts";
 import {
-  DEFAULT_MODEL,
   createClaudeCodeLlm,
   type ClaudeCodeLlmOptions,
   type LlmCall,
@@ -12,28 +12,17 @@ import {
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
-import type { Llm } from "./core/order-resolution/llm.ts";
-import {
-  createOrderResolver as createResolver,
-  type CatalogProduct,
-  type OrderResolver,
-} from "./core/order-resolution/resolve-order.ts";
-import type { OnlineStore, SnapshotProduct } from "./core/product-selection/online-store.ts";
-import type { PaymentCardTable } from "./core/product-selection/payment-cards.ts";
-import type { TipoMapping, Vocabulary } from "./core/product-types/schema.ts";
+import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
+import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
+import { matchOrder, type MatchedOrder } from "./core/order-matching/eval-run.ts";
+import type { Llm } from "./core/order-matching/llm.ts";
+import type { ReadReplyInput, ReadReplyOutput } from "./core/order-matching/read-reply.ts";
+import type { OnlineStore } from "./core/product-selection/online-store.ts";
 
 export type { LlmCall } from "./adapters/claude-code/claude-code-llm.ts";
 export type { Checked, PreviousEvalRun } from "./adapters/files/data-files.ts";
 
 export type LlmOptions = Omit<ClaudeCodeLlmOptions, "run" | "promptsDir">;
-
-export type OrderData = {
-  products: CatalogProduct[];
-  snapshot: SnapshotProduct[];
-  vocabulary: Vocabulary;
-  mapping: TipoMapping;
-  paymentCards: PaymentCardTable;
-};
 
 export type ConversationDependenciesWithoutSignal = Omit<ConversationDependencies, "signal">;
 
@@ -43,23 +32,14 @@ export type ConversationLog = {
   dependencies: ConversationDependenciesWithoutSignal;
 };
 
-export type OrderResolverOptions = { model?: string; onCall?: (call: LlmCall) => void };
+export type OrderMatcherOptions = { onCall?: (call: LlmCall) => void };
 
 const files = createDataFiles();
 
 export const {
-  loadCatalog,
-  loadProductTypes,
-  loadPaymentCards,
+  loadCatalogProducts,
+  loadSnapshotFetchedAt,
   loadEvalSet,
-  saveParts,
-  loadParts,
-  loadPart,
-  hasProposal,
-  loadProposal,
-  loadDecisions,
-  loadDoubts,
-  saveConsolidation,
   saveEvalRun,
   loadLatestEvalRun,
 } = files;
@@ -72,55 +52,43 @@ export function createOnlineStore(): OnlineStore {
   return createCarrefourStore();
 }
 
-export function loadOrderData(): Checked<OrderData> {
-  const loaded = files.loadOrderFiles();
-  if (!loaded.ok) return loaded;
-  const { catalog, vocabulary, mapping, paymentCards } = loaded.value;
+export function createCatalogSearch(): Checked<CatalogSearch> {
+  const products = loadCatalogProducts();
+  if (!products.ok) return products;
+  return { ok: true, value: createInMemoryCatalogSearch(products.value) };
+}
+
+export type OrderMatcher = {
+  products: CatalogProduct[];
+  snapshotFetchedAt: string | null;
+  matchOrder(orderText: string): Promise<MatchedOrder>;
+  readReply(input: ReadReplyInput): Promise<ReadReplyOutput>;
+};
+
+export function createOrderMatcher({ onCall }: OrderMatcherOptions = {}): Checked<OrderMatcher> {
+  const products = loadCatalogProducts();
+  if (!products.ok) return products;
+  const search = createInMemoryCatalogSearch(products.value);
+  const llm = createLlm({ onCall });
   return {
     ok: true,
     value: {
-      products: catalog.map((product) => ({
-        name: product.name,
-        brand: product.brand ?? null,
-        tipo: product.tipo,
-        inStock: product.availableQuantity > 0,
-      })),
-      snapshot: snapshotProducts(
-        [...catalog].sort(
-          (a, b) => Number(b.availableQuantity > 0) - Number(a.availableQuantity > 0),
-        ),
-      ),
-      vocabulary,
-      mapping,
-      paymentCards,
+      products: products.value,
+      snapshotFetchedAt: files.loadSnapshotFetchedAt(),
+      matchOrder: (orderText) => matchOrder(orderText, { search, llm }),
+      readReply: (input) => llm.readReply(input, new AbortController().signal),
     },
   };
 }
 
-export function createOrderResolver({
-  model = DEFAULT_MODEL,
-  onCall,
-}: OrderResolverOptions = {}): Checked<OrderResolver & { model: string }> {
-  const data = loadOrderData();
-  if (!data.ok) return data;
-  const { products, vocabulary, mapping } = data.value;
-  const llm = createLlm({ vocabulary, model, onCall });
-  return { ok: true, value: { ...createResolver({ products, vocabulary, mapping, llm }), model } };
-}
-
 export function createConversationDependencies(): Checked<ConversationDependenciesWithoutSignal> {
-  const data = loadOrderData();
-  if (!data.ok) return data;
-  const { products, snapshot, vocabulary, mapping, paymentCards } = data.value;
+  const search = createCatalogSearch();
+  if (!search.ok) return search;
   return {
     ok: true,
     value: {
-      products,
-      snapshot,
-      vocabulary,
-      mapping,
-      paymentCards,
-      llm: createLlm({ vocabulary }),
+      search: search.value,
+      llm: createLlm({}),
       store: createOnlineStore(),
     },
   };
@@ -138,10 +106,7 @@ export function openConversationLog(
     write,
     dependencies: {
       ...dependencies,
-      llm: createLlm({
-        vocabulary: dependencies.vocabulary,
-        onCall: (call) => write({ type: "llm-call", ...call }),
-      }),
+      llm: createLlm({ onCall: (call) => write({ type: "llm-call", ...call }) }),
       store: loggedStore(dependencies.store, write),
     },
   };

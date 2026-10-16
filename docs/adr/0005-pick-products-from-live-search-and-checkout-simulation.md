@@ -10,6 +10,10 @@ Understanding the order stays on the Catalog Snapshot (ADR 0003): the BM25 evide
 
 The cart is now repeatable only for the same search and simulation answers: the same order at another time, day of the week, region or card can get other products. Ties are broken by `itemId`, so the same answers always give the same cart.
 
+ADR 0011 removes the Payment Card and the preference for now: checkout is simulated without a card, and search is sorted by discount only.
+
+ADR 0012 amends this decision: live search is no longer called. The Candidates are Fits found in the Catalog Snapshot, and checkout simulation in the Branch still has the last word.
+
 ## Considered Options
 
 - **Pick from the Catalog Snapshot and confirm with one simulation (ADR 0002 as written).** Repeatable, but blind to the region, to real stock and to card promotions.

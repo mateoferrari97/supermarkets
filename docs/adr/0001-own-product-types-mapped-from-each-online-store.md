@@ -1,5 +1,5 @@
 ---
-Status: accepted
+Status: superseded by ADR-0012
 ---
 
 # Own Product Types, mapped from each Online Store's classification

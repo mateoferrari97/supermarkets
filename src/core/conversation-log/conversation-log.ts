@@ -5,6 +5,7 @@ import type { OnlineStore } from "../product-selection/online-store.ts";
 export type LlmCallRecord = {
   task: string;
   model: string;
+  effort: string | null;
   systemPromptSha256: string;
   input: unknown;
   rawOutput: string;
@@ -83,8 +84,6 @@ export function loggedStore(
   return {
     checkDelivery: (postalCode, signal) =>
       recorded("checkDelivery", { postalCode }, () => store.checkDelivery(postalCode, signal)),
-    findCandidates: (query, signal) =>
-      recorded("findCandidates", query, () => store.findCandidates(query, signal)),
     simulate: (request, signal) =>
       recorded("simulate", request, () => store.simulate(request, signal)),
     cartLink: (items) => {

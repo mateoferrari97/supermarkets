@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, it, vi } from "vitest";
-import {
-  createCarrefourStore,
-  HttpError,
-  snapshotProducts,
-  type HttpRequest,
-} from "./carrefour-store.ts";
+import { createCarrefourStore, HttpError, type HttpRequest } from "./carrefour-store.ts";
 
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
@@ -29,22 +24,6 @@ const recorded = (routes: Route[]) => {
   };
   return { store: createCarrefourStore(http), seen };
 };
-
-const searchRoutes: Route[] = [
-  [/\/checkout\/pub\/regions\?country=ARG&postalCode=1425$/, "regions"],
-  [/\/facets\/trade-policy\/1\?/, "facets-query-gaseosa"],
-  [/\/facets\/trade-policy\/1\/tipo-de-producto\/gaseosa\?/, "facets-tipo-gaseosa"],
-  [
-    /\/product-search\/trade-policy\/1\/tipo-de-producto\/gaseosa\/brand\/coca-cola\?/,
-    "search-gaseosa-coca-cola",
-  ],
-  [
-    /\/product-search\/trade-policy\/1\/tipo-de-producto\/gaseosa\/brand\/coca-cola\/brand\/pepsi\?/,
-    "search-gaseosa-coca-cola-pepsi",
-  ],
-];
-
-const cardTeaser = { name: "Tarjeta Carrefour 15%", minimumQuantity: 0 };
 
 const regionRoutes: Route[] = [
   [/\/checkout\/pub\/regions\?country=ARG&postalCode=1425$/, "regions"],
@@ -81,170 +60,11 @@ describe("createCarrefourStore", () => {
     await assert.rejects(store.checkDelivery("1425", signal), /answered 503/);
   });
 
-  it("searches in the region it checked delivery for, asking for the region once", async () => {
-    const { store, seen } = recorded(searchRoutes);
+  it("asks Carrefour for the region of a postal code once", async () => {
+    const { store, seen } = recorded(regionRoutes);
     await store.checkDelivery("1425", signal);
-    await store.findCandidates(
-      {
-        postalCode: "1425",
-        tipos: ["Gaseosa"],
-        brands: ["Coca-Cola"],
-        sort: "discount:desc",
-        limit: 2,
-      },
-      signal,
-    );
-    assert.equal(seen.filter(({ url }) => url.includes("/checkout/pub/regions")).length, 1);
-  });
-
-  it("fails instead of searching without a region", async () => {
-    const seen: HttpRequest[] = [];
-    const store = createCarrefourStore((request) => {
-      seen.push(request);
-      if (request.url.includes("/checkout/pub/regions")) return Promise.resolve([]);
-      return Promise.resolve(fixture("facets-query-gaseosa"));
-    });
-    await assert.rejects(
-      store.findCandidates(
-        {
-          postalCode: "1425",
-          tipos: ["Gaseosa"],
-          brands: [],
-          sort: "discount:desc",
-          limit: 2,
-        },
-        signal,
-      ),
-      /no region for postal code 1425/,
-    );
-    assert.ok(seen.every(({ url }) => !url.includes("/product-search/")));
-  });
-
-  it("lists available products of a Tipo and brand in the postal code's region", async () => {
-    const { store, seen } = recorded(searchRoutes);
-    const candidates = await store.findCandidates(
-      {
-        postalCode: "1425",
-        tipos: ["Gaseosa"],
-        brands: ["Coca-Cola"],
-        sort: "discount:desc",
-        limit: 2,
-      },
-      signal,
-    );
-    assert.deepEqual(candidates, [
-      {
-        productId: "393964",
-        itemId: "11324",
-        name: "Gaseosa cola Coca Cola Zero 2,25 lts",
-        brand: "Coca Cola",
-        measure: { dimension: "volume", amount: 2250 },
-        weightStepKg: null,
-        teasers: [cardTeaser],
-      },
-      {
-        productId: "30138",
-        itemId: "3807",
-        name: "Gaseosa cola Coca Cola sabor original 2,25 lts",
-        brand: "Coca Cola",
-        measure: { dimension: "volume", amount: 2250 },
-        weightStepKg: null,
-        teasers: [
-          cardTeaser,
-          {
-            name: "PROMO-2do al 50% Max 48 unidades Combinable COCA COLA-Reg-2-50-Aniv2 9 al 15.10",
-            minimumQuantity: 2,
-          },
-        ],
-      },
-    ]);
-    const search = new URL(seen.at(-1)!.url);
-    assert.equal(
-      search.searchParams.get("regionId"),
-      (fixture("regions") as { id: string }[])[0]!.id,
-    );
-    assert.equal(search.searchParams.get("hideUnavailableItems"), "true");
-    assert.equal(search.searchParams.get("sort"), "discount:desc");
-    assert.equal(search.searchParams.get("count"), "2");
-    assert.equal(search.searchParams.get("page"), "1");
-  });
-
-  it("finds nothing for a brand the Tipo does not carry or a Tipo search does not know", async () => {
-    const { store } = recorded(searchRoutes);
-    const query = { postalCode: "1425", sort: "discount:desc" as const, limit: 2 };
-    assert.deepEqual(
-      await store.findCandidates(
-        { ...query, tipos: ["Gaseosa"], brands: ["Marca Inventada"] },
-        signal,
-      ),
-      [],
-    );
-    assert.deepEqual(
-      await store.findCandidates({ ...query, tipos: ["Tipo inventado"], brands: [] }, signal),
-      [],
-    );
-  });
-
-  it("lists products of any of several brands in one search", async () => {
-    const { store, seen } = recorded(searchRoutes);
-    const candidates = await store.findCandidates(
-      {
-        postalCode: "1425",
-        tipos: ["Gaseosa"],
-        brands: ["Coca-Cola", "Pepsi", "Marca Inventada"],
-        sort: "price:asc",
-        limit: 3,
-      },
-      signal,
-    );
-    assert.deepEqual(
-      candidates.map(({ brand }) => brand),
-      ["Coca Cola", "Pepsi", "Pepsi"],
-    );
-    assert.equal(new URL(seen.at(-1)!.url).searchParams.get("sort"), "price:asc");
-  });
-
-  it("finds a brand written with one letter wrong", async () => {
-    const { store, seen } = recorded(searchRoutes);
-    const candidates = await store.findCandidates(
-      {
-        postalCode: "1425",
-        tipos: ["Gaseosa"],
-        brands: ["Coca Kola"],
-        sort: "discount:desc",
-        limit: 2,
-      },
-      signal,
-    );
-    assert.equal(candidates.length, 2);
-    assert.match(seen.at(-1)!.url, /\/brand\/coca-cola\?/);
-  });
-
-  it("reads the weight step of a product sold by weight", async () => {
-    const { store } = recorded([
-      [/\/checkout\/pub\/regions\?/, "regions"],
-      [/\/facets\/trade-policy\/1\?/, "facets-query-banana"],
-      [/\/product-search\/trade-policy\/1\/tipo-de-producto\/banana\?/, "search-banana"],
-    ]);
-    const [banana] = await store.findCandidates(
-      {
-        postalCode: "1425",
-        tipos: ["Banana"],
-        brands: [],
-        sort: "discount:desc",
-        limit: 2,
-      },
-      signal,
-    );
-    assert.deepEqual(banana, {
-      productId: "719074",
-      itemId: "185818",
-      name: "Banana selección x kg.",
-      brand: "Genérico",
-      measure: { dimension: "weight", amount: 500 },
-      weightStepKg: 0.5,
-      teasers: [cardTeaser],
-    });
+    await store.checkDelivery("1425", signal);
+    assert.equal(seen.length, 1);
   });
 
   it("fails when Carrefour answers with an error", async () => {
@@ -252,10 +72,7 @@ describe("createCarrefourStore", () => {
       Promise.reject(new Error("Carrefour GET answered 503")),
     );
     await assert.rejects(
-      store.simulate(
-        { postalCode: "1425", card: null, items: [{ itemId: "3807", quantity: 1 }] },
-        signal,
-      ),
+      store.simulate({ postalCode: "1425", items: [{ itemId: "3807", quantity: 1 }] }, signal),
       /503/,
     );
   });
@@ -265,7 +82,6 @@ describe("createCarrefourStore", () => {
     const simulation = await store.simulate(
       {
         postalCode: "1425",
-        card: null,
         items: [{ itemId: "3807", quantity: 2 }],
       },
       signal,
@@ -293,33 +109,11 @@ describe("createCarrefourStore", () => {
     });
   });
 
-  it("simulates with the Payment Card's payment system and BIN so its promotions apply", async () => {
-    const { store, seen } = recorded([[/orderForms\/simulation/, "simulation-card"]]);
-    const simulation = await store.simulate(
-      {
-        postalCode: "1425",
-        card: { paymentSystem: "502", bin: "507858" },
-        items: [{ itemId: "3807", quantity: 2 }],
-      },
-      signal,
-    );
-    assert.deepEqual(simulation.lines[0]?.promotions, [
-      "2do al 70% Tarjeta Carrefour o Cuenta digital Max 48 Combinable 9 al 15.10 COCA COLA",
-    ]);
-    assert.equal(simulation.total, 7800);
-    assert.deepEqual((seen[0]!.body as { paymentData: unknown }).paymentData, {
-      payments: [
-        { paymentSystem: "502", bin: "507858", installments: 1, value: 0, referenceValue: 0 },
-      ],
-    });
-  });
-
   it("marks an item checkout cannot deliver as unavailable and leaves it out of the total", async () => {
     const { store } = recorded([[/orderForms\/simulation/, "simulation-unavailable"]]);
     const simulation = await store.simulate(
       {
         postalCode: "1425",
-        card: null,
         items: [{ itemId: "11187", quantity: 1 }],
       },
       signal,
@@ -328,56 +122,34 @@ describe("createCarrefourStore", () => {
     assert.equal(simulation.total, 0);
   });
 
-  it("links a Carrefour cart with every item at its quantity from seller 1", () => {
+  it("links a Carrefour cart with every item from seller 1, skus in text order and quantities padded to keep that order", () => {
     const store = createCarrefourStore(() => Promise.reject(new Error("a link needs no request")));
     assert.equal(
       store.cartLink([
-        { itemId: "217502", quantity: 2 },
         { itemId: "9008", quantity: 1 },
+        { itemId: "217502", quantity: 2 },
       ]),
-      "https://www.carrefour.com.ar/checkout/cart/add?sku=217502&qty=2&seller=1&sku=9008&qty=1&seller=1&sc=1",
+      "https://www.carrefour.com.ar/checkout/cart/add?sku=217502&qty=02&seller=1&sku=9008&qty=1&seller=1&sc=1",
     );
   });
 
-  it("takes the measure's dimension from the name when the name gives one size of the other dimension", () => {
-    const record = {
-      productId: "1",
-      skuIds: ["9008"],
-      name: "Mostaza Natura 500 g.",
-      tipo: "Mostaza",
-      measureUnit: "CM3",
-      consumptionQuantity: "500.00",
-    };
-    const [mostaza, lata] = snapshotProducts([
-      record,
-      { ...record, skuIds: ["1000"], name: "Gaseosa Coca Cola 354 ml", consumptionQuantity: "354" },
-    ]);
-    assert.deepEqual(mostaza?.measure, { dimension: "weight", amount: 500 });
-    assert.deepEqual(lata?.measure, { dimension: "volume", amount: 354 });
-  });
-
-  it("turns Catalog Snapshot products into products to simulate, skipping those with no Tipo", () => {
-    const record = {
-      productId: "108211",
-      skuIds: ["7870"],
-      name: "Banana elegida x kg.",
-      brand: "Genérico",
-      tipo: "Banana",
-      measureUnit: "GRM",
-      consumptionQuantity: "1000.00",
-    };
-    assert.deepEqual(snapshotProducts([record, { ...record, tipo: null }]), [
-      {
-        productId: "108211",
-        itemId: "7870",
-        name: "Banana elegida x kg.",
-        brand: "Genérico",
-        measure: { dimension: "weight", amount: 1000 },
-        weightStepKg: null,
-        teasers: [],
-        tipo: "Banana",
-      },
-    ]);
+  it("links a cart that Carrefour reads with every quantity at its sku", () => {
+    const store = createCarrefourStore(() => Promise.reject(new Error("a link needs no request")));
+    const items = [
+      { itemId: "19873", quantity: 1 },
+      { itemId: "57446", quantity: 2 },
+      { itemId: "11324", quantity: 4 },
+      { itemId: "25012", quantity: 1 },
+      { itemId: "156687", quantity: 3 },
+      { itemId: "186506", quantity: 1 },
+      { itemId: "6631", quantity: 1 },
+      { itemId: "57565", quantity: 2 },
+      { itemId: "249859", quantity: 1 },
+      { itemId: "172757", quantity: 1 },
+      { itemId: "294448", quantity: 10 },
+    ];
+    const cart = asCarrefourReadsIt(store.cartLink(items));
+    assert.deepEqual(cart, new Map(items.map(({ itemId, quantity }) => [itemId, quantity])));
   });
 });
 
@@ -388,51 +160,31 @@ describe("createCarrefourStore and its signal", () => {
 
   it("passes the signal of each call to every request it makes", async () => {
     const { store, seen } = recorded([
-      ...searchRoutes,
+      ...regionRoutes,
       [/orderForms\/simulation/, "simulation-banana"],
     ]);
     const controller = new AbortController();
     await store.checkDelivery("1425", controller.signal);
-    await store.findCandidates(
-      {
-        postalCode: "1425",
-        tipos: ["Gaseosa"],
-        brands: ["Coca-Cola"],
-        sort: "discount:desc",
-        limit: 2,
-      },
-      controller.signal,
-    );
     await store.simulate(
-      { postalCode: "1425", card: null, items: [{ itemId: "7870", quantity: 1 }] },
+      { postalCode: "1425", items: [{ itemId: "7870", quantity: 1 }] },
       controller.signal,
     );
-    assert.ok(seen.length >= 5);
+    assert.equal(seen.length, 2);
     assert.ok(seen.every((request) => request.signal === controller.signal));
   });
 
-  it("asks again for a Tipo whose lookup failed instead of keeping the failure", async () => {
-    let failFacets = true;
-    const http = (request: HttpRequest) => {
-      if (failFacets && request.url.includes("/facets/trade-policy/1?")) {
-        failFacets = false;
+  it("asks again for a region whose lookup failed instead of keeping the failure", async () => {
+    let failRegions = true;
+    const http = () => {
+      if (failRegions) {
+        failRegions = false;
         return Promise.reject(new Error("aborted"));
       }
-      const route = searchRoutes.find(([pattern]) => pattern.test(request.url));
-      return route
-        ? Promise.resolve(fixture(route[1]))
-        : Promise.reject(new Error(`no recorded response for ${request.url}`));
+      return Promise.resolve(fixture("regions"));
     };
     const store = createCarrefourStore(http);
-    const query = {
-      postalCode: "1425",
-      tipos: ["Gaseosa"],
-      brands: ["Coca-Cola"],
-      sort: "discount:desc" as const,
-      limit: 2,
-    };
-    await assert.rejects(store.findCandidates(query, signal), /aborted/);
-    assert.equal((await store.findCandidates(query, signal)).length > 0, true);
+    await assert.rejects(store.checkDelivery("1425", signal), /aborted/);
+    assert.equal(await store.checkDelivery("1425", signal), "delivers");
   });
 
   it("hands the signal to fetch", async () => {
@@ -446,3 +198,11 @@ describe("createCarrefourStore and its signal", () => {
     assert.deepEqual(signals, [controller.signal]);
   });
 });
+
+function asCarrefourReadsIt(link: string): Map<string, number> {
+  const params = new URL(link).searchParams;
+  const textOrder = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const skus = params.getAll("sku").sort(textOrder);
+  const quantities = params.getAll("qty").sort(textOrder);
+  return new Map(skus.map((sku, index) => [sku, Number(quantities[index])]));
+}

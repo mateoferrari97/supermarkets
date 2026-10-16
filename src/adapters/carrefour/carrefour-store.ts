@@ -1,16 +1,10 @@
 import { z } from "zod";
-import { sameBrand, sizesIn } from "../../core/catalog/catalog.ts";
-import { normalize } from "../../core/catalog/text.ts";
-import type { Measure, PaymentCard } from "../../core/product-selection/concepts.ts";
 import type {
-  CandidateQuery,
   Delivery,
   OnlineStore,
   Simulation,
   SimulationItem,
   SimulationRequest,
-  SnapshotProduct,
-  StoreProduct,
 } from "../../core/product-selection/online-store.ts";
 
 export const CARREFOUR_URL = "https://www.carrefour.com.ar";
@@ -42,50 +36,6 @@ type Region = z.infer<typeof regionsSchema>[number];
 
 const rejectionSchema = z.object({ error: z.object({ code: z.string() }) });
 
-const facetsSchema = z.object({
-  facets: z.array(
-    z.object({
-      key: z.string(),
-      values: z.array(z.object({ name: z.string().nullish(), value: z.string().nullish() })),
-    }),
-  ),
-});
-
-const searchSchema = z.object({
-  products: z.array(
-    z.object({
-      productId: z.string(),
-      productName: z.string(),
-      brand: z.string().nullish(),
-      properties: z.array(z.object({ name: z.string(), values: z.array(z.string()) })).default([]),
-      items: z.array(
-        z.object({
-          itemId: z.string(),
-          measurementUnit: z.string().nullish(),
-          unitMultiplier: z.number().nullish(),
-          sellers: z
-            .array(
-              z.object({
-                sellerId: z.string(),
-                commertialOffer: z.object({
-                  teasers: z
-                    .array(
-                      z.object({
-                        name: z.string(),
-                        conditions: z.object({ minimumQuantity: z.number() }).nullish(),
-                      }),
-                    )
-                    .default([]),
-                }),
-              }),
-            )
-            .default([]),
-        }),
-      ),
-    }),
-  ),
-});
-
 const simulationSchema = z.object({
   items: z.array(
     z.object({
@@ -103,25 +53,8 @@ const simulationSchema = z.object({
     .nullish(),
 });
 
-const UNITS: Record<string, { dimension: Measure["dimension"]; factor: number }> = {
-  CM3: { dimension: "volume", factor: 1 },
-  ML: { dimension: "volume", factor: 1 },
-  ML1: { dimension: "volume", factor: 1 },
-  MIL: { dimension: "volume", factor: 1 },
-  LTR: { dimension: "volume", factor: 1000 },
-  LM1: { dimension: "volume", factor: 1000 },
-  GRM: { dimension: "weight", factor: 1 },
-  GRS: { dimension: "weight", factor: 1 },
-  GR1: { dimension: "weight", factor: 1 },
-  KGM: { dimension: "weight", factor: 1000 },
-};
-
 export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore {
   const regions = new Map<string, Promise<Region | null>>();
-  const tipoSlugs = new Map<string, Promise<string | null>>();
-
-  const search = (path: string, params: Record<string, string>) =>
-    `${CARREFOUR_URL}/api/intelligent-search/v1/${path}?${new URLSearchParams({ sc: "1", ...params })}`;
 
   const regionFor = (postalCode: string, signal: AbortSignal) => {
     const known = regions.get(postalCode);
@@ -150,106 +83,8 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     }
   };
 
-  const facetValue = async (
-    path: string,
-    params: Record<string, string>,
-    key: string,
-    name: string,
-    signal: AbortSignal,
-  ) => {
-    const body = facetsSchema.parse(
-      await http({ method: "GET", url: search(path, params), signal }),
-    );
-    const wanted = normalize(name);
-    const values = body.facets.find((candidate) => candidate.key === key)?.values ?? [];
-    const exact = values.find((value) => normalize(value.name ?? "") === wanted);
-    const close =
-      key === "brand" ? values.find((value) => sameBrand(name, value.name ?? "")) : undefined;
-    return (exact ?? close)?.value ?? null;
-  };
-
-  const slugForTipo = (tipo: string, signal: AbortSignal) => {
-    const known = tipoSlugs.get(tipo);
-    if (known) return known;
-    const slug = facetValue(
-      "facets/trade-policy/1",
-      { query: tipo },
-      "tipo-de-producto",
-      tipo,
-      signal,
-    );
-    tipoSlugs.set(tipo, slug);
-    slug.catch(() => tipoSlugs.delete(tipo));
-    return slug;
-  };
-
-  const slugsForBrands = async (
-    tipoPath: string,
-    region: Record<string, string>,
-    brands: string[],
-    signal: AbortSignal,
-  ) => {
-    const slugs = await Promise.all(
-      brands.map((brand) =>
-        facetValue(`facets/trade-policy/1/${tipoPath}`, region, "brand", brand, signal),
-      ),
-    );
-    return slugs.filter((slug): slug is string => slug !== null);
-  };
-
-  const findCandidates = async (
-    { postalCode, tipos, brands, sort, limit }: CandidateQuery,
-    signal: AbortSignal,
-  ) => {
-    const [found, ...slugs] = await Promise.all([
-      regionFor(postalCode, signal),
-      ...tipos.map((tipo) => slugForTipo(tipo, signal)),
-    ]);
-    if (!found) throw new Error(`Carrefour has no region for postal code ${postalCode}`);
-    const tipoPath = slugs
-      .filter((slug): slug is string => slug !== null)
-      .map((slug) => `tipo-de-producto/${slug}`)
-      .join("/");
-    if (!tipoPath) return [];
-    const region = { regionId: found.id };
-    let facets = tipoPath;
-    if (brands.length > 0) {
-      const brandSlugs = await slugsForBrands(tipoPath, region, brands, signal);
-      if (brandSlugs.length === 0) return [];
-      facets = [tipoPath, ...brandSlugs.map((slug) => `brand/${slug}`)].join("/");
-    }
-    const url = search(`product-search/trade-policy/1/${facets}`, {
-      ...region,
-      hideUnavailableItems: "true",
-      sort,
-      count: String(limit),
-      page: "1",
-    });
-    const body = searchSchema.parse(await http({ method: "GET", url, signal }));
-    return body.products.flatMap((product): StoreProduct[] => {
-      const item = product.items[0];
-      if (!item) return [];
-      return [
-        {
-          productId: product.productId,
-          itemId: item.itemId,
-          name: product.productName,
-          brand: product.brand ?? null,
-          measure: measureOf(product.productName, product.properties, item),
-          weightStepKg: item.measurementUnit === "kg" ? (item.unitMultiplier ?? 1) : null,
-          teasers: (
-            item.sellers.find(({ sellerId }) => sellerId === "1")?.commertialOffer.teasers ?? []
-          ).map(({ name, conditions }) => ({
-            name,
-            minimumQuantity: conditions?.minimumQuantity ?? 0,
-          })),
-        },
-      ];
-    });
-  };
-
   const simulate = async (
-    { postalCode, card, items }: SimulationRequest,
+    { postalCode, items }: SimulationRequest,
     signal: AbortSignal,
   ): Promise<Simulation> => {
     const url = `${CARREFOUR_URL}/api/checkout/pub/orderForms/simulation?sc=1&RnbBehavior=0`;
@@ -261,7 +96,6 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
           items: items.map(({ itemId, quantity }) => ({ id: itemId, quantity, seller: "1" })),
           country: "ARG",
           postalCode,
-          ...(card ? { paymentData: { payments: [payment(card)] } } : {}),
         },
         signal,
       }),
@@ -287,80 +121,20 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
     return { lines, total };
   };
 
-  return { checkDelivery, findCandidates, simulate, cartLink };
+  return { checkDelivery, simulate, cartLink };
 }
 
 function cartLink(items: SimulationItem[]): string {
   const params = new URLSearchParams();
-  for (const { itemId, quantity } of items) {
+  const inTextOrder = [...items].sort((a, b) => (a.itemId < b.itemId ? -1 : 1));
+  inTextOrder.forEach(({ itemId, quantity }, index) => {
+    const zeros = "0".repeat(inTextOrder.length - 1 - index);
     params.append("sku", itemId);
-    params.append("qty", String(quantity));
+    params.append("qty", `${zeros}${quantity}`);
     params.append("seller", "1");
-  }
+  });
   params.append("sc", "1");
   return `${CARREFOUR_URL}/checkout/cart/add?${params}`;
-}
-
-export type SnapshotRecord = {
-  productId: string;
-  skuIds: string[];
-  name: string;
-  brand?: string | null;
-  tipo: string | null;
-  measureUnit: string | null;
-  consumptionQuantity: string | null;
-};
-
-export function snapshotProducts(records: SnapshotRecord[]): SnapshotProduct[] {
-  return records.flatMap((record): SnapshotProduct[] => {
-    const [itemId] = record.skuIds;
-    if (itemId === undefined || record.tipo === null) return [];
-    const properties = [
-      { name: "Gramaje de unidad de medida", values: [record.measureUnit ?? ""] },
-      { name: "Gramaje de unidad de consumo", values: [record.consumptionQuantity ?? ""] },
-    ];
-    return [
-      {
-        productId: record.productId,
-        itemId,
-        name: record.name,
-        brand: record.brand ?? null,
-        measure: measureOf(record.name, properties, {}),
-        weightStepKg: null,
-        teasers: [],
-        tipo: record.tipo,
-      },
-    ];
-  });
-}
-
-function payment({ paymentSystem, bin }: PaymentCard) {
-  return {
-    paymentSystem,
-    ...(bin ? { bin } : {}),
-    installments: 1,
-    value: 0,
-    referenceValue: 0,
-  };
-}
-
-function measureOf(
-  productName: string,
-  properties: { name: string; values: string[] }[],
-  item: { measurementUnit?: string | null; unitMultiplier?: number | null },
-): Measure | null {
-  if (item.measurementUnit === "kg") {
-    return { dimension: "weight", amount: (item.unitMultiplier ?? 1) * 1000 };
-  }
-  const value = (name: string) => properties.find((property) => property.name === name)?.values[0];
-  const unit = UNITS[value("Gramaje de unidad de medida") ?? ""];
-  const amount = Number(value("Gramaje de unidad de consumo"));
-  if (!unit || !Number.isFinite(amount) || amount <= 0) return null;
-  const [named, ...others] = sizesIn(productName);
-  if (named && others.length === 0 && named.dimension !== unit.dimension) {
-    return { dimension: named.dimension, amount: named.amount };
-  }
-  return { dimension: unit.dimension, amount: amount * unit.factor };
 }
 
 const fetchJson: HttpClient = async (request) => {

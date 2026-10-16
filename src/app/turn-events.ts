@@ -1,8 +1,6 @@
-import type { ProductSelection } from "../core/product-selection/pick-products.ts";
+import type { AskedQuestion, Cart, Mark } from "../core/order-conversation/take-turn.ts";
 
-export type AskedQuestion = { number: number; options: string[] };
-
-export type Cart = ProductSelection & { paymentCard: string | null };
+export type { AskedQuestion, Cart, Mark };
 
 export type TurnEvent =
   | { type: "session"; sessionId: string }

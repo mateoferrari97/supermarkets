@@ -12,3 +12,5 @@ One file per decision, numbered in order, with a `Status` front matter of `propo
 - [0008](0008-the-owner-orders-in-a-local-chat-that-replaces-the-order-command.md): The Owner orders in a local chat that replaces the order command
 - [0009](0009-claude-md-is-a-short-map-into-a-content-first-docs-folder.md): `CLAUDE.md` is a short map into a content-first `docs/`; `.scratch/` is never linked
 - [0010](0010-check-the-knowledge-base-mechanically-in-pnpm-check.md): Check the knowledge base mechanically in `pnpm check`
+- [0011](0011-no-payment-card-or-preference-for-now.md): No Payment Card or preference for now; one fixed Selection Policy picks the products
+- [0012](0012-match-items-to-catalog-products-with-two-llm-calls-around-a-search.md): Match Items to catalog products with two LLM calls around a search
