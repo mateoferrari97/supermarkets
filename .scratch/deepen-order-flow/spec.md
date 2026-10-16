@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Deepen the order flow: Order, Cart, LLM checks, Selection, Item lines and Steps
 
