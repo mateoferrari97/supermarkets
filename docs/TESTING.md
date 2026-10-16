@@ -27,6 +27,8 @@ Tests never call Carrefour or start a Claude Code session.
 
 `evals/order-matching.json` measures the product picked per Item against the real LLM and the current Catalog Snapshot: Items read right, Matches recall, Fits precision and recall, pick right, wrong picks nobody sees, questions, stability, time and cost; its answer cases measure how `read-reply` reads a reply to questions. `pnpm order:eval` runs it on demand, 3 times per case, and costs money; it is not part of `pnpm test` or `pnpm check`. `pnpm check` only validates the eval set's shape (`pnpm order:eval-set`). The scoring itself is pure code in `src/core/order-matching/` with tests over fixed inputs. See [LLM](LLM.md#the-eval-set).
 
+`evals/planning.json` measures the same way the Topic of `route-message` and the first Plan `plan` shows: stock, budget, quantity ranges, forbidden products and words, one line per product and the kind of Idea sections, with an LLM judge of the Idea reported apart. `pnpm plan:eval` runs it on demand and `pnpm plan:eval-set` validates its shape in `pnpm check`. Its scoring is tested over fixed inputs in `src/core/planning/eval-score.test.ts`, the run of a first message with a fake `plan` in `eval-run.test.ts`, the loader checks in `eval-set.test.ts` and the report in `src/cli/plan-eval-report.test.ts`. See [LLM](LLM.md#the-planning-eval-set).
+
 ## Data validators
 
-`pnpm order:eval-set` validates the committed data in `evals/` and runs in `pnpm check` after the tests.
+`pnpm order:eval-set` and `pnpm plan:eval-set` validate the committed data in `evals/` and run in `pnpm check` after the tests.

@@ -27,7 +27,7 @@
 
 ## Before every push
 
-Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test` and `pnpm order:eval-set`.
+Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test`, `pnpm order:eval-set` and `pnpm plan:eval-set`.
 
 If a step fails, fix it or tell the user; never push with a failing step, and never skip a step to make it pass. When a test, build or check is added, add it to `pnpm check`.
 
@@ -54,6 +54,8 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - `pnpm order:eval [filter...] [--runs N]`: runs the order matching eval set with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-eval-set)).
 - `pnpm order:label <words> [--brand <brand>]`: lists likely products from the Catalog Snapshot to label an eval case.
 - `pnpm order:eval-set`: validates the committed data in `evals/` with the same loader every command uses.
+- `pnpm plan:eval [filter...] [--runs N]`: runs the planning eval set (routing and plan cases) with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-planning-eval-set)).
+- `pnpm plan:eval-set`: validates `evals/planning.json` with the same loader `pnpm plan:eval` uses.
 - `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `products.json` in `.data/carrefour/`, or in the directory given as its argument. `.data/` is not committed.
 
 ## Workflow
