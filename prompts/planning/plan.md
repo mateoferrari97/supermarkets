@@ -136,7 +136,7 @@ over by: $1050
 A weekly menu with a diet and what the Owner already has, with nothing searched yet:
 
 <conversation>
-<owner>las comidas de la semana sin TACC, ya tengo aceite y sal</owner>
+<owner>armame las cenas de lunes a viernes para 2, soy celíaca; aceite y sal tengo</owner>
 </conversation>
 <products>
 </products>
@@ -147,7 +147,7 @@ A weekly menu with a diet and what the Owner already has, with nothing searched 
 The same conversation once code gave back the results:
 
 <conversation>
-<owner>las comidas de la semana sin TACC, ya tengo aceite y sal</owner>
+<owner>armame las cenas de lunes a viernes para 2, soy celíaca; aceite y sal tengo</owner>
 </conversation>
 <products>
 p301 | Fideos spaghetti sin TACC 500 g | Matarazzo | Almacén | Fideos | $4800 | packaged, 500 g
@@ -162,7 +162,7 @@ p309 | Fideos tirabuzón 500 g | Lucchetti | Almacén | Fideos | $1500 | package
 </products>
 <last-plan>none</last-plan>
 
-{ "kind": "answer", "queries": [], "message": "Te armé las cenas de lunes a viernes para 2, todo sin TACC. Dejé afuera el aceite y la sal que ya tenés. ¿Para cuántos son? Lo ajusto.", "plan": { "title": "Cenas de la semana sin TACC", "idea": [ { "heading": "Lunes", "text": "Spaghetti sin TACC con salsa de carne." }, { "heading": "Martes", "text": "Pollo al horno con puré de zapallo." }, { "heading": "Miércoles", "text": "Arroz con pollo y cebolla." }, { "heading": "Jueves", "text": "Tortilla de zapallo y cebolla." }, { "heading": "Viernes", "text": "Hamburguesas caseras con arroz." } ], "lines": [ { "productId": "p301", "quantity": 1, "purpose": "para el lunes", "reason": "Fideos sin TACC" }, { "productId": "p308", "quantity": 1, "purpose": "para el lunes", "reason": "Salsa sin TACC" }, { "productId": "p304", "quantity": 1000, "purpose": "para el lunes y el viernes", "reason": "Para la salsa y las hamburguesas" }, { "productId": "p303", "quantity": 1000, "purpose": "para el martes y el miércoles", "reason": "Pechuga para dos cenas" }, { "productId": "p307", "quantity": 1500, "purpose": "para el martes y el jueves", "reason": "Para el puré y la tortilla" }, { "productId": "p302", "quantity": 1, "purpose": "para el miércoles y el viernes", "reason": "Arroz, naturalmente sin TACC" }, { "productId": "p306", "quantity": 750, "purpose": "para el lunes, el miércoles y el jueves", "reason": "Cebolla para tres comidas" }, { "productId": "p305", "quantity": 1, "purpose": "para el jueves y el viernes", "reason": "Para la tortilla y las hamburguesas" } ] }, "budget": null }
+{ "kind": "answer", "queries": [], "message": "Te armé las cenas de lunes a viernes para 2, todo sin TACC. Dejé afuera el aceite y la sal que ya tenés.", "plan": { "title": "Cenas de la semana sin TACC", "idea": [ { "heading": "Lunes", "text": "Spaghetti sin TACC con salsa de carne." }, { "heading": "Martes", "text": "Pollo al horno con puré de zapallo." }, { "heading": "Miércoles", "text": "Arroz con pollo y cebolla." }, { "heading": "Jueves", "text": "Tortilla de zapallo y cebolla." }, { "heading": "Viernes", "text": "Hamburguesas caseras con arroz." } ], "lines": [ { "productId": "p301", "quantity": 1, "purpose": "para el lunes", "reason": "Fideos sin TACC" }, { "productId": "p308", "quantity": 1, "purpose": "para el lunes", "reason": "Salsa sin TACC" }, { "productId": "p304", "quantity": 1000, "purpose": "para el lunes y el viernes", "reason": "Para la salsa y las hamburguesas" }, { "productId": "p303", "quantity": 1000, "purpose": "para el martes y el miércoles", "reason": "Pechuga para dos cenas" }, { "productId": "p307", "quantity": 1500, "purpose": "para el martes y el jueves", "reason": "Para el puré y la tortilla" }, { "productId": "p302", "quantity": 1, "purpose": "para el miércoles y el viernes", "reason": "Arroz, naturalmente sin TACC" }, { "productId": "p306", "quantity": 750, "purpose": "para el lunes, el miércoles y el jueves", "reason": "Cebolla para tres comidas" }, { "productId": "p305", "quantity": 1, "purpose": "para el jueves y el viernes", "reason": "Para la tortilla y las hamburguesas" } ] }, "budget": null }
 
 An allergy, with nothing searched yet:
 

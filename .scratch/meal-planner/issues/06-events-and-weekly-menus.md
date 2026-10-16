@@ -4,13 +4,21 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Merging, the over-budget retry and the over-budget amount as plain data tests
-- [ ] `Reply` `plan` carries the over-budget amount; the chat shows the over-budget line
-- [ ] `prompts/planning/plan.md` gains examples for an event with a budget, a weekly menu, a diet or allergy, and what the Owner already has
-- [ ] Checked by hand in `pnpm dev` with the asado and the weekly menu; screenshots in Comments
-- [ ] `docs/LLM.md` documents the merge and the budget retry
-- [ ] `pnpm check` is green
+- [x] Merging, the over-budget retry and the over-budget amount as plain data tests
+- [x] `Reply` `plan` carries the over-budget amount; the chat shows the over-budget line
+- [x] `prompts/planning/plan.md` gains examples for an event with a budget, a weekly menu, a diet or allergy, and what the Owner already has
+- [x] Checked by hand in `pnpm dev` with the asado and the weekly menu; screenshots in Comments
+- [x] `docs/LLM.md` documents the merge and the budget retry
+- [x] `pnpm check` is green
 
 ## Comments
+
+- Merging: `checkPlan` (`src/core/planning/plan.ts`) checks every line first, so a rule error still names the line the planner wrote, then merges lines with the same `productId` in the place of the first: quantities summed, purposes and reasons joined with ", ", each text once. The merged quantity is rounded to the Sale Step and priced, and the last Plan shown carries the merged lines.
+- Budget: the `plan` answer gains `budget` (pesos or null) in the port, the adapter schema and the prompt; `checkPlan` rejects a budget that is not positive. `overBudget(plan, budget)` gives the amount over, rounded to cents, or null. `planWithinBudget` (`src/core/planning/plan-budget.ts`) wraps `planWithSearches`: a Plan over its budget goes back once with `overBudget: { budget, total }` in `PlanInput` (an optional field, rendered as `<over-budget>`), the retry may search with its own 3 rounds, and an answer with no Plan in the retry keeps the first Plan. Tests: `plan.test.ts` (merging, budget, `overBudget`), `plan-budget.test.ts` (retry), `take-turn.test.ts` (wiring), `claude-code-llm.test.ts` (schema and rendering).
+- `Reply` `plan` and the `plan` turn event carry `overBudget`; the chat shows "Este plan se pasa de tu presupuesto por $ …" under the total. That line has no automated test (the chat has none) and was not seen in the hand check, see below.
+- Prompt: `prompts/planning/plan.md` gains the `<over-budget>` input, the `budget` output, rules for events, budgets, weekly menus, diets and allergies, and examples for an asado with a budget, its over-budget retry, a weekly menu sin TACC with what the Owner already has, and a milk allergy. Existing examples gained `"budget": null`. The weekly menu example first used the ticket's exact words; the first hand check copied it almost line by line, so its Owner text was changed to "armame las cenas de lunes a viernes para 2, soy celíaca; aceite y sal tengo" and the menu was checked again.
+- Hand check in `pnpm dev` on port 3600, postal code 1425. "Un asado para 10 con unos $50.000": one search round of 8 queries and a Plan of 5 lines, total $ 49.960,75, with the budget 50000 in the answer, so no retry ([06-asado-for-10-within-budget.png](../screenshots/06-asado-for-10-within-budget.png)). "sumale 2 kg de vacío y morcilla para todos, mismo presupuesto" got a revised Plan of $ 49.571,00, again within the budget. "poné los 2 kg de vacío y el chorizo igual, aunque me pase del presupuesto" got a Plan of $ 89.452,00 with `budget` null in the Conversation Log, so no retry and no over-budget line ([06-asado-revised-past-budget.png](../screenshots/06-asado-revised-past-budget.png)). The planner kept every budgeted Plan under its budget, so the retry and the over-budget line were not seen live; they are covered by the tests above.
+- "las comidas de la semana sin TACC, ya tengo aceite y sal" got a clarifying question (how many people, which meals); "para 3, solo las cenas de lunes a viernes" got one search round and a Plan with one Idea section per day, 8 lines, no aceite or sal, only sin TACC or naturally gluten-free products, and shared ingredients as one line each: the onion "para el lunes, el miércoles, el jueves y el viernes", the mince "para el lunes y el viernes", total $ 66.624,10 ([06-weekly-menu-days.png](../screenshots/06-weekly-menu-days.png), [06-weekly-menu-lines.png](../screenshots/06-weekly-menu-lines.png)). The planner wrote those lines already merged, so code merging did not change them; merging is covered by `plan.test.ts`.
+- The Conversation Logs of the hand check were written to the main checkout's `.data/conversations/` through the `.data` symlink; nothing else there was changed.
