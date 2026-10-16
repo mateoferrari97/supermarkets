@@ -6,7 +6,7 @@ Every test runs with Vitest (ADR 0007): `pnpm test` is `vitest run`, and `pnpm c
 
 ## Where tests go
 
-A test sits next to the file it tests, named `<file>.test.ts`: `src/core/order-matching/match-items.test.ts` tests `match-items.ts`. Repo tooling in `scripts/` is tested the same way (`scripts/check-docs.test.ts`).
+A test sits next to the file it tests, named `<file>.test.ts`: `src/core/order-matching/match-items.test.ts` tests `match-items.ts`. Repo tooling in `scripts/` is tested the same way (`scripts/check-docs.test.ts`). A table of cases shared by two tests lives in its own file next to the code it describes: `src/core/order-matching/item-line-cases.ts` lists every size and quantity text with the Item it parses to or its failure, and both `item.test.ts` and `src/adapters/claude-code/llm-output-schemas.test.ts` (the line schema accepts exactly what the parser accepts) run it.
 
 ## What a test checks
 

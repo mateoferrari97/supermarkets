@@ -1,3 +1,5 @@
+import { roundMeasure } from "./item.ts";
+
 export type SizeDimension = "volume" | "weight" | "units" | "length";
 
 export type PackageSize = { dimension: SizeDimension; amount: number };
@@ -61,7 +63,7 @@ export function packageSize(
   }
   const amount = Number(consumptionQuantity);
   if (amount <= 0) return null;
-  return { dimension: unit.dimension, amount: Math.round(amount * unit.factor * 1000) / 1000 };
+  return { dimension: unit.dimension, amount: roundMeasure(amount * unit.factor) };
 }
 
 function saleOf(record: SnapshotRecord): Sale {

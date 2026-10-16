@@ -1,10 +1,25 @@
 import { z } from "zod";
-const lineSchema = z.strictObject({
+import {
+  parseQuantity,
+  parseSize,
+  QUANTITY_PATTERN,
+  SIZE_PATTERN,
+} from "../../core/order-matching/item.ts";
+
+export const lineSchema = z.strictObject({
   original: z.string().min(1),
   product: z.string().min(1),
   brand: z.string().min(1).nullable(),
-  size: z.string().regex(/^(common|biggest|smallest|\d+(\.\d+)? (ml|l|g|kg))$/),
-  quantity: z.string().regex(/^(minimum|\d+ unit|\d+(\.\d+)? (g|kg))$/),
+  size: z
+    .string()
+    .regex(SIZE_PATTERN)
+    .refine((text) => parseSize(text) !== null, { message: "Size is not a positive amount" }),
+  quantity: z
+    .string()
+    .regex(QUANTITY_PATTERN)
+    .refine((text) => parseQuantity(text) !== null, {
+      message: "Quantity is not a positive amount",
+    }),
 });
 
 export type LineOutput = z.infer<typeof lineSchema>;

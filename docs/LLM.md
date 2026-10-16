@@ -8,7 +8,7 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 
 - `Llm` in `src/core/order-matching/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `readReply`) with the input and output types of each call.
 - `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` and `read-reply` run on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012). The model takes no `temperature`, so the same text can resolve differently between runs.
-- `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call.
+- `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call; the `size` and `quantity` of a line are built from the patterns and parsers of `src/core/order-matching/item.ts`, so the JSON schema sent to Claude Code carries the same patterns the parser reads.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
 - The adapter's `onCall` reports every session that returns a result: task, model, effort, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
 
@@ -21,7 +21,7 @@ The LLM turns the Owner's words into fixed forms; plain code makes every choice 
 - `size`: `common`, `biggest`, `smallest`, or `<amount> <ml|l|g|kg>` ("2.25 l"), parsed into `{ kind: "exact", dimension, amount }` with the amount in ml or g.
 - `quantity`: `minimum`, `<n> unit` with a whole `n`, or `<amount> <g|kg>`, parsed into `{ kind: "units", count }` or `{ kind: "weight", grams }`.
 
-A string the parser rejects, such as "0 kg" or "1.5 unit", fails the call like an answer that does not fit its schema.
+Amounts are rounded to thousandths of ml or g by `roundMeasure`, the same rounding the Catalog Snapshot sizes and the Candidates use. A string the parser rejects, such as "0 kg", "0.0001 g" or "1.5 unit", fails the line schema, so the call fails like any answer that does not fit its schema. `src/core/order-matching/item-line-cases.ts` lists every accepted and rejected format; the Item tests and the line schema tests both run it.
 
 ## The `fit-products` task
 
