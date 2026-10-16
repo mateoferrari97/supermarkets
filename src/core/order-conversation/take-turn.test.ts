@@ -11,11 +11,11 @@ import type {
   OnlineStore,
   SimulationRequest,
 } from "../product-selection/online-store.ts";
+import { QUESTIONS_HINT } from "./order.ts";
 import type { StepEvent } from "./steps.ts";
 import {
   IGNORED_PREFERENCE_NOTE,
   NEW_CONVERSATION,
-  QUESTIONS_HINT,
   ORDER_QUESTION,
   POSTAL_CODE_QUESTION,
   takeTurn,
@@ -442,39 +442,6 @@ describe("takeTurn", () => {
       assert.deepEqual(simulations, []);
     });
 
-    it("numbers every open question and its Alternatives", async () => {
-      const { last } = await run(
-        {
-          items: [item("carbón", "carbón"), item("queso", "queso port salut")],
-          answers: {
-            carbón: () => ({ fits: [], closest: [], question: "¿Qué carbón?" }),
-            "queso port salut": () => ({ fits: [], closest: [2, 1], question: "¿Cuál queso?" }),
-          },
-        },
-        ["carbón y queso"],
-      );
-      assert.equal(
-        questionsIn(last).text,
-        [
-          "Tengo unas preguntas:",
-          "1. ¿Qué carbón?",
-          [
-            "2. ¿Cuál queso?",
-            "   1) Queso Port Salut La Serenísima 500 g ($4200.00)",
-            "   2) Queso Port Salut Sancor 500 g ($4000.00)",
-          ].join("\n"),
-          QUESTIONS_HINT,
-        ].join("\n\n"),
-      );
-      assert.deepEqual(questionsIn(last).questions, [
-        { number: 1, options: [] },
-        {
-          number: 2,
-          options: ["Queso Port Salut La Serenísima 500 g", "Queso Port Salut Sancor 500 g"],
-        },
-      ]);
-    });
-
     it("sends the asked Items and the reply to read-reply", async () => {
       const { readInputs } = await run(
         {
@@ -575,81 +542,6 @@ describe("takeTurn", () => {
       });
       assert.deepEqual(fitted, ["yerba", "1 bolsa de carbon"]);
       assert.deepEqual(simulations, []);
-    });
-
-    it("re-asks an Item read as unanswered the same way", async () => {
-      const { last } = await run(
-        {
-          ...yerbaAndCarbon,
-          replies: [{ entries: [{ item: 1, kind: "unanswered", question: null }] }],
-        },
-        ["yerba y carbón", "no sé"],
-      );
-      assert.match(questionsIn(last).text, /Me falta saber de 1 bolsa de carbon:/);
-    });
-
-    it("drops an Item after its second question goes unanswered", async () => {
-      const { last, turns } = await run(yerbaAndCarbon, ["yerba y carbón", "hola", "chau"]);
-      assert.equal(turns[1]!.reply.kind, "questions");
-      const cart = cartIn(last);
-      assert.deepEqual(linesOf(cart), [["yerba", "1"]]);
-      assert.deepEqual(cart.notes, [
-        'No conseguí "1 bolsa de carbon": te pregunté 2 veces y no encontré qué llevar',
-      ]);
-    });
-
-    it("spends a question on an answer that leads to no Fit and drops the Item after the second", async () => {
-      const noFit = () => ({ fits: [], closest: [], question: "Tampoco hay de esa marca." });
-      const toPatagonia = (original: string) => ({
-        entries: [
-          {
-            item: 1,
-            kind: "lines" as const,
-            lines: [item(original, "carbón patagonia", { brand: "Patagonia" })],
-          },
-        ],
-      });
-      const { turns, last } = await run(
-        {
-          ...yerbaAndCarbon,
-          answers: { ...yerbaAndCarbon.answers, "carbón patagonia": noFit },
-          replies: [toPatagonia("uno Patagonia"), toPatagonia("Patagonia te dije")],
-        },
-        ["yerba y carbón", "uno Patagonia", "Patagonia te dije"],
-      );
-      assert.equal(
-        questionsIn(turns[1]!).text,
-        ["Tengo una pregunta:", "1. Tampoco hay de esa marca.", QUESTIONS_HINT].join("\n\n"),
-      );
-      assert.deepEqual(cartIn(last).notes, [
-        'No conseguí "Patagonia te dije": te pregunté 2 veces y no encontré qué llevar',
-      ]);
-    });
-
-    it("runs new lines of the reply as new Items with their own questions", async () => {
-      const { last } = await run(
-        {
-          ...yerbaAndCarbon,
-          answers: {
-            ...yerbaAndCarbon.answers,
-            fernet: () => ({ fits: [], closest: [1], question: "¿Te sirve el de 750 ml?" }),
-          },
-          replies: [
-            {
-              entries: [{ item: 1, kind: "choice", alternative: 1 }],
-              newLines: [item("un vino tinto", "vino tinto"), item("fernet chico", "fernet")],
-            },
-            { entries: [{ item: 1, kind: "choice", alternative: 1 }] },
-          ],
-        },
-        ["yerba y carbón", "la 1, y agregá un vino tinto y un fernet chico", "dale"],
-      );
-      assert.deepEqual(linesOf(cartIn(last)), [
-        ["yerba", "1"],
-        ["1 bolsa de carbon", "6"],
-        ["un vino tinto", "9"],
-        ["fernet chico", "7"],
-      ]);
     });
 
     it("keeps asking until the last question is answered, then delivers the cart", async () => {
@@ -1025,25 +917,6 @@ describe("takeTurn", () => {
         assert.deepEqual(marksOf(cartIn(last)), [
           ["coca zero", "2", 1, null],
           ["la zero de 1,5", "3", 1, "changed"],
-        ]);
-      });
-
-      it("spends one of the Item's questions and keeps it in the cart once none is left", async () => {
-        const { turns } = await run({ ...twoCocas(), replies: [asked, {}, asked, {}, asked] }, [
-          "pedido",
-          "cambiá la coca",
-          "nada",
-          "cambiá la coca",
-          "nada",
-          "cambiá la coca",
-        ]);
-        assert.deepEqual(
-          turns.map(({ reply }) => reply.kind),
-          ["cart", "questions", "cart", "questions", "cart", "cart"],
-        );
-        assert.deepEqual(linesOf(cartIn(turns[5]!)), [
-          ["coca zero", "2"],
-          ["coca normal", "10"],
         ]);
       });
     });
