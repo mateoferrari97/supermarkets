@@ -35,7 +35,7 @@ export async function planWithSearches(
     const found = await steps.run({ kind: "search", queries }, () =>
       Promise.resolve(
         queries.flatMap((query) =>
-          search.findMatches({ product: query, brand: null }, PLAN_MATCHES_LIMIT),
+          search.findMatches({ product: query, brand: null }, "plan", PLAN_MATCHES_LIMIT),
         ),
       ),
     );

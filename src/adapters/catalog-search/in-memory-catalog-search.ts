@@ -3,6 +3,7 @@ import {
   MATCHES_LIMIT,
   type CatalogSearch,
   type SearchItem,
+  type SearchScope,
 } from "../../core/order-matching/catalog-search.ts";
 import { buildBm25Index } from "./bm25.ts";
 import { buildWordSimilarityIndex } from "./word-similarity.ts";
@@ -19,8 +20,9 @@ export const EXCLUDED_DEPARTMENTS: readonly string[] = [
 
 const excluded = new Set(EXCLUDED_DEPARTMENTS.map((department) => department.normalize("NFC")));
 
-export function searchable(product: CatalogProduct): boolean {
-  return product.inStock && !excluded.has(product.department.normalize("NFC"));
+export function searchable(product: CatalogProduct, scope: SearchScope): boolean {
+  if (!product.inStock) return false;
+  return scope === "plan" || !excluded.has(product.department.normalize("NFC"));
 }
 
 export function queriesFor({ product, brand }: SearchItem): string[] {
@@ -40,15 +42,31 @@ function ranks(scores: Map<number, number>): Map<number, number> {
   return result;
 }
 
-export function createInMemoryCatalogSearch(products: CatalogProduct[]): CatalogSearch {
-  const indexed = products.filter(searchable);
-  const documents = indexed.map((product) =>
+type ScopeIndex = { products: CatalogProduct[]; rankings: Ranking[] };
+
+type Ranking = { scores(query: string): Map<number, number> };
+
+function indexOf(products: CatalogProduct[]): ScopeIndex {
+  const documents = products.map((product) =>
     [product.name, product.brand ?? "", product.tipo ?? ""].join(" "),
   );
-  const rankings = [buildBm25Index(documents), buildWordSimilarityIndex(documents)];
+  return { products, rankings: [buildBm25Index(documents), buildWordSimilarityIndex(documents)] };
+}
+
+export function createInMemoryCatalogSearch(products: CatalogProduct[]): CatalogSearch {
+  const indexes = new Map<SearchScope, ScopeIndex>();
+  const indexFor = (scope: SearchScope) => {
+    let index = indexes.get(scope);
+    if (!index) {
+      index = indexOf(products.filter((product) => searchable(product, scope)));
+      indexes.set(scope, index);
+    }
+    return index;
+  };
 
   return {
-    findMatches(item, limit = MATCHES_LIMIT) {
+    findMatches(item, scope, limit = MATCHES_LIMIT) {
+      const { products: indexed, rankings } = indexFor(scope);
       const fused = new Map<number, number>();
       for (const query of queriesFor(item)) {
         for (const ranking of rankings) {

@@ -40,7 +40,7 @@ const catalog: CatalogProduct[] = [
 const words = (text: string) => text.toLowerCase().split(/\W+/u).filter(Boolean);
 
 const search: CatalogSearch = {
-  findMatches: ({ product, brand }, limit = 30) => {
+  findMatches: ({ product, brand }, _scope, limit = 30) => {
     const query = new Set(words(`${product} ${brand ?? ""}`));
     return catalog
       .filter((candidate) =>
@@ -109,7 +109,7 @@ describe("matchItems", () => {
     assert.equal(match!.question, null);
     assert.deepEqual(
       match!.matches,
-      search.findMatches({ product: "Carbón para asado", brand: null }, 30),
+      search.findMatches({ product: "Carbón para asado", brand: null }, "order", 30),
     );
     assert.deepEqual(seen[0]!.matches, match!.matches);
   });
@@ -188,9 +188,9 @@ describe("matchItems", () => {
   it("reports a step per Item, started before its search and done when its call returns", async () => {
     const log: string[] = [];
     const watched: CatalogSearch = {
-      findMatches: (searchItem, limit) => {
-        log.push(`search ${searchItem.product}`);
-        return search.findMatches(searchItem, limit);
+      findMatches: (searchItem, scope, limit) => {
+        log.push(`search ${searchItem.product} in ${scope}`);
+        return search.findMatches(searchItem, scope, limit);
       },
     };
     const llm: FitProductsLlm = {
@@ -208,10 +208,10 @@ describe("matchItems", () => {
     );
     assert.deepEqual(log, [
       "started 1 bolsa de carbon",
-      "search Carbón para asado",
+      "search Carbón para asado in order",
       "call Carbón para asado",
       "started birra",
-      "search Cerveza",
+      "search Cerveza in order",
       "call Cerveza",
       "done 1 bolsa de carbon",
       "done birra",
