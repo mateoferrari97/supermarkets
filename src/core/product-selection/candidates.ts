@@ -3,7 +3,7 @@ import type {
   PackageSize,
   SizeDimension,
 } from "../order-matching/catalog-product.ts";
-import type { Item, Quantity, Size } from "../order-matching/item.ts";
+import { roundMeasure, type Item, type Quantity, type Size } from "../order-matching/item.ts";
 
 export const CANDIDATES_LIMIT = 10;
 
@@ -157,7 +157,7 @@ function optionFor(
   const { size } = product.sale;
   if (quantity.kind === "weight") {
     if (size?.dimension !== "weight") return null;
-    const packages = Math.ceil(round(quantity.grams / size.amount));
+    const packages = Math.ceil(roundMeasure(quantity.grams / size.amount));
     return { product, quantity: packages, measured: quantity.grams, notes: [] };
   }
   const count = unitsOf(quantity);
@@ -168,10 +168,10 @@ function byWeightOption(item: Item, product: CatalogProduct, stepKg: number) {
   const { quantity } = item;
   if (quantity.kind === "weight") {
     const askedKg = quantity.grams / 1000;
-    const steps = Math.max(1, Math.ceil(round(askedKg / stepKg)));
-    const boughtKg = round(steps * stepKg);
+    const steps = Math.max(1, Math.ceil(roundMeasure(askedKg / stepKg)));
+    const boughtKg = roundMeasure(steps * stepKg);
     const note =
-      boughtKg === round(askedKg)
+      boughtKg === roundMeasure(askedKg)
         ? null
         : `${capitalized(item.product)} se vende de a ${kilosText(stepKg)}: llevo ${kilosText(boughtKg)}`;
     return {
@@ -182,7 +182,7 @@ function byWeightOption(item: Item, product: CatalogProduct, stepKg: number) {
     };
   }
   const steps = unitsOf(quantity);
-  const boughtKg = round(steps * stepKg);
+  const boughtKg = roundMeasure(steps * stepKg);
   const note =
     quantity.kind === "units" ? `Carrefour vende por kg: llevo ${kilosText(boughtKg)}` : null;
   return { product, quantity: steps, measured: boughtKg * 1000, notes: [note] };
@@ -206,16 +206,14 @@ function majorityDimension(sized: Sized[]): SizeDimension {
 }
 
 function sizeKey(size: PackageSize): string {
-  return `${size.dimension}:${round(size.amount)}`;
+  return `${size.dimension}:${roundMeasure(size.amount)}`;
 }
 
 function sameAmount(a: number, b: number): boolean {
-  return round(a) === round(b);
+  return roundMeasure(a) === roundMeasure(b);
 }
 
-const round = (value: number) => Math.round(value * 1000) / 1000;
-
-const decimal = (value: number) => String(round(value)).replace(".", ",");
+const decimal = (value: number) => String(roundMeasure(value)).replace(".", ",");
 
 const kilosText = (kg: number) => (kg < 1 ? `${Math.round(kg * 1000)} g` : `${decimal(kg)} kg`);
 

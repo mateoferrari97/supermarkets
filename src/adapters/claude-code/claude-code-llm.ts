@@ -4,12 +4,7 @@ import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import {
-  parseQuantity,
-  parseSize,
-  type Item,
-  type ParseOrderOutput,
-} from "../../core/order-matching/item.ts";
+import { parseLine, type Item, type ParseOrderOutput } from "../../core/order-matching/item.ts";
 import {
   ALTERNATIVES_LIMIT,
   type FitProductsInput,
@@ -195,14 +190,13 @@ function readParseOrder({
 }
 
 function readLine(task: LlmTask, line: LineOutput): Item {
-  const size = parseSize(line.size);
-  const quantity = parseQuantity(line.quantity);
-  if (!size || !quantity) {
+  const parsed = parseLine(line);
+  if (!parsed.ok) {
     throw new Error(
-      `Claude Code session for ${task} returned an invalid answer: "${line.original}" has size "${line.size}" and quantity "${line.quantity}"`,
+      `Claude Code session for ${task} returned an invalid answer: ${parsed.failure}`,
     );
   }
-  return { original: line.original, product: line.product, brand: line.brand, size, quantity };
+  return parsed.item;
 }
 
 export function renderReply({ items, reply }: ReadReplyInput): string {
