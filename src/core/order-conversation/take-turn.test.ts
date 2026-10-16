@@ -92,6 +92,7 @@ type Script = {
   replies?: Partial<ReadReplyOutput>[];
   deliveries?: Record<string, Delivery>;
   plans?: PlanOutput[];
+  unavailable?: string[];
 };
 
 const conversation = ({
@@ -101,6 +102,7 @@ const conversation = ({
   replies = [],
   deliveries = {},
   plans = [],
+  unavailable = [],
 }: Script = {}) => {
   const calls: string[] = [];
   const routed: string[] = [];
@@ -170,7 +172,7 @@ const conversation = ({
         const lines = request.items.map(({ itemId, quantity }) => ({
           itemId,
           quantity,
-          available: true,
+          available: !unavailable.includes(itemId),
           total: priceOf(itemId) * quantity,
           savings: 0,
           promotions: [],
@@ -460,6 +462,107 @@ describe("takeTurn", () => {
       );
       assert.deepEqual(last.reply, { kind: "ask", text: "¿Para cuántas personas?" });
       assert.equal(last.state.stage, "planning");
+    });
+
+    const searchCheese: PlanOutput = { kind: "search", queries: ["queso", "vino"] };
+    const withWine: PlanOutput = {
+      kind: "answer",
+      message: "Acá va la lasaña con vino.",
+      plan: {
+        title: "Lasaña para 4",
+        idea: [{ heading: "Pasos", text: "Armá capas y horneá 40 minutos." }],
+        lines: [
+          { productId: "p4", quantity: 2, purpose: "para la lasaña", reason: "Queso" },
+          { productId: "p9", quantity: 1, purpose: "para acompañar", reason: "Vino" },
+        ],
+      },
+    };
+    const confirm: PlanOutput = { kind: "confirm" };
+
+    it("confirms the Plan shown into a simulated cart that shows its Idea", async () => {
+      const { last, calls, simulations } = await run(
+        { topic: "plan", plans: [searchCheese, withWine, confirm] },
+        ["quiero hacer lasaña para 4", "Confirmo"],
+      );
+      const cart = cartIn(last);
+      assert.deepEqual(linesOf(cart), [
+        ["Queso Port Salut Sancor 500 g — para la lasaña", "4"],
+        ["Vino tinto Toro 1 l — para acompañar", "9"],
+      ]);
+      assert.deepEqual(
+        cart.lines.map(({ quantity }) => quantity),
+        [2, 1],
+      );
+      assert.deepEqual(cart.idea, {
+        title: "Lasaña para 4",
+        sections: [{ heading: "Pasos", text: "Armá capas y horneá 40 minutos." }],
+      });
+      assert.equal(cart.total, 8000 + 2500);
+      assert.equal(cart.cartLink, "cart:4x2,9x1");
+      assert.ok(!calls.includes("fitProducts") && !calls.includes("parseOrder"));
+      assert.ok(simulations.length > 0);
+      assert.equal(last.state.stage, "cart");
+    });
+
+    it("shows a Plan's product that is not available as not got with its Note", async () => {
+      const { last } = await run(
+        { topic: "plan", plans: [searchCheese, withWine, confirm], unavailable: ["9"] },
+        ["quiero hacer lasaña para 4", "Confirmo"],
+      );
+      const cart = cartIn(last);
+      assert.deepEqual(linesOf(cart), [["Queso Port Salut Sancor 500 g — para la lasaña", "4"]]);
+      assert.deepEqual(cart.notes, [
+        'No conseguí "Vino tinto Toro 1 l — para acompañar": no hay ninguno disponible en tu sucursal',
+      ]);
+    });
+
+    it("ends the turn with an error when the planner confirms before a Plan was shown", async () => {
+      await assert.rejects(toPlan(["quiero hacer lasaña para 4"], [confirm]), {
+        message: "plan answer breaks a rule: a confirm with no Plan shown",
+      });
+    });
+
+    it("corrects the cart of a confirmed Plan as the cart of an order and keeps its Idea", async () => {
+      const { last, readInputs } = await run(
+        {
+          topic: "plan",
+          plans: [searchCheese, withWine, confirm],
+          answers: {
+            "queso port salut": (input) => ({
+              fits: input.matches.flatMap((match, index) =>
+                match.name.includes("La Serenísima") ? [index + 1] : [],
+              ),
+            }),
+          },
+          replies: [
+            {
+              entries: [
+                {
+                  item: 1,
+                  kind: "lines",
+                  lines: [
+                    item("el queso La Serenísima", "queso port salut", { brand: "La Serenísima" }),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        ["quiero hacer lasaña para 4", "Confirmo", "el queso La Serenísima"],
+      );
+      assert.deepEqual(
+        readInputs[0]!.items.map(({ original }) => original),
+        ["Queso Port Salut Sancor 500 g — para la lasaña", "Vino tinto Toro 1 l — para acompañar"],
+      );
+      const cart = cartIn(last);
+      assert.deepEqual(
+        cart.lines.map((line) => [line.original, line.product.itemId, line.mark]),
+        [
+          ["el queso La Serenísima", "5", "changed"],
+          ["Vino tinto Toro 1 l — para acompañar", "9", null],
+        ],
+      );
+      assert.equal(cart.idea?.title, "Lasaña para 4");
     });
 
     it("ends the turn with an error when the planner proposes a product it did not see", async () => {

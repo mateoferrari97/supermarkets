@@ -1,3 +1,4 @@
+import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import type { Item } from "../order-matching/item.ts";
 import type { ItemMatch, Question } from "../order-matching/match-items.ts";
 import type { ReadReplyOutput, ReplyEntry, ReplyItem } from "../order-matching/read-reply.ts";
@@ -10,6 +11,7 @@ import {
   type ItemToChoose,
   type SimulatedCart,
 } from "../product-selection/cart.ts";
+import { itemOfPlanLine, type Plan, type PlanIdea } from "../planning/plan.ts";
 
 export const MAX_QUESTIONS = 2;
 
@@ -47,6 +49,7 @@ export type Order = {
   removed: string[];
   ignoredPreference: boolean;
   cartShown: boolean;
+  idea: PlanIdea | null;
 };
 
 type ToMatch = { kind: "to-match"; item: Item; questionsSpent: number; mark: Mark | null };
@@ -77,6 +80,7 @@ export type Cart = {
   notes: string[];
   warning: string;
   cartLink: string | null;
+  idea: PlanIdea | null;
 };
 
 export type CartTaken = { state: { stage: "cart" } & Order; cart: Cart };
@@ -94,9 +98,38 @@ export function startOrder(
       removed: [],
       ignoredPreference,
       cartShown: false,
+      idea: null,
     },
     matched,
   );
+}
+
+export function orderFromPlan(postalCode: string, plan: Plan, products: CatalogProduct[]): Order {
+  return {
+    postalCode,
+    items: plan.lines.map((line): OrderItem => {
+      const product = products.find(({ productId }) => productId === line.productId);
+      if (!product) throw new Error(`no product ${line.productId} seen for the confirmed Plan`);
+      const item = itemOfPlanLine(line, product);
+      return {
+        kind: "ready",
+        item,
+        toBuy: {
+          kind: "choose",
+          original: item.original,
+          note: null,
+          candidates: [candidateOf(item, product)],
+        },
+        questionsSpent: 0,
+        mark: null,
+      };
+    }),
+    dropped: [],
+    removed: [],
+    ignoredPreference: false,
+    cartShown: false,
+    idea: { title: plan.title, sections: plan.idea },
+  };
 }
 
 export function replyItems(order: Order): ReplyItem[] {
@@ -367,6 +400,7 @@ export function takeCart(order: Order, simulated: SimulatedCart): CartTaken {
       removed: [],
       ignoredPreference: false,
       cartShown: true,
+      idea: order.idea,
     },
     cart: {
       postalCode: order.postalCode,
@@ -380,6 +414,7 @@ export function takeCart(order: Order, simulated: SimulatedCart): CartTaken {
       ],
       warning: CART_WARNING,
       cartLink: simulated.cartLink,
+      idea: order.idea,
     },
   };
 }

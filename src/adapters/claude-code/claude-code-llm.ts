@@ -198,6 +198,7 @@ export function createClaudeCodeLlm({
 }
 
 function readPlan({ kind, queries, message, plan }: z.infer<typeof planOutputSchema>): PlanOutput {
+  if (kind === "confirm") return { kind };
   return kind === "search" ? { kind, queries } : { kind, message: message!, plan };
 }
 

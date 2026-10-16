@@ -44,7 +44,7 @@ const planSchema = z.strictObject({
 
 export const planOutputSchema = z
   .strictObject({
-    kind: z.enum(["search", "answer"]),
+    kind: z.enum(["search", "answer", "confirm"]),
     queries: z.array(z.string().min(1)),
     message: z.string().min(1).nullable(),
     plan: planSchema.nullable(),

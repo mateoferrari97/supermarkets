@@ -3,7 +3,7 @@ import type { ParseOrderLlm } from "../order-matching/item.ts";
 import { matchItems, type FitProductsLlm } from "../order-matching/match-items.ts";
 import { checkedReadReply, type ReadReplyLlm } from "../order-matching/read-reply.ts";
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
-import type { Plan, PlanLlm, PlanMessage, PlanShown } from "../planning/plan.ts";
+import type { Plan, PlanIdea, PlanLlm, PlanMessage, PlanShown } from "../planning/plan.ts";
 import { planWithSearches } from "../planning/plan-searches.ts";
 import type { RouteMessageLlm } from "../planning/route-message.ts";
 import { simulateCart } from "../product-selection/cart.ts";
@@ -12,6 +12,7 @@ import { postalCodeFrom } from "../product-selection/postal-code.ts";
 import {
   applyReply,
   nextStep,
+  orderFromPlan,
   replyItems,
   startOrder,
   takeCart,
@@ -24,7 +25,7 @@ import {
 } from "./order.ts";
 import { stepsFrom, type OnStep, type Steps } from "./steps.ts";
 
-export type { AskedQuestion, Cart, CartLineShown, Mark, PlanShown };
+export type { AskedQuestion, Cart, CartLineShown, Mark, PlanIdea, PlanShown };
 
 export const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
 export const ORDER_QUESTION = "¿Qué necesitás del súper?";
@@ -152,6 +153,9 @@ async function planningTurn(
     deps,
     steps,
   );
+  if (output.kind === "confirm") {
+    return nextTurn(orderFromPlan(state.postalCode, state.lastPlan!, products), deps, steps);
+  }
   const next: Planning = {
     ...state,
     messages: [...messages, { role: "planner", text: output.message }],
