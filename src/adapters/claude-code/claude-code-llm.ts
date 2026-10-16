@@ -16,23 +16,31 @@ import {
   fitProductsOutputSchema,
   parseOrderOutputSchema,
   readReplyOutputSchema,
+  routeMessageOutputSchema,
   type LineOutput,
 } from "./llm-output-schemas.ts";
 import type { Llm } from "../../core/order-matching/llm.ts";
 
-export const DEFAULT_BUDGET_USD = 0.25;
-
-export type LlmTask = "parse-order" | "fit-products" | "read-reply";
+export type LlmTask = "route-message" | "parse-order" | "fit-products" | "read-reply";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type TaskModel = { model: string; effort: Effort | null };
 
 export const TASK_MODELS: Record<LlmTask, TaskModel> = {
+  "route-message": { model: "claude-haiku-5-5", effort: null },
   "parse-order": { model: "claude-sonnet-5-5", effort: "low" },
   "fit-products": { model: "claude-sonnet-5-5", effort: null },
   "read-reply": { model: "claude-sonnet-5-5", effort: "low" },
 };
 
+export const TASK_BUDGETS_USD: Record<LlmTask, number> = {
+  "route-message": 0.25,
+  "parse-order": 0.25,
+  "fit-products": 0.25,
+  "read-reply": 0.25,
+};
+
 const PROMPT_FILES: Record<LlmTask, string> = {
+  "route-message": "planning/route-message.md",
   "parse-order": "order-matching/parse-order.md",
   "fit-products": "order-matching/fit-products.md",
   "read-reply": "order-matching/read-reply.md",
@@ -59,7 +67,7 @@ export type LlmCall = {
 export type ClaudeCodeLlmOptions = {
   promptsDir: string;
   models?: Partial<Record<LlmTask, TaskModel>>;
-  budgetUsd?: number;
+  budgetsUsd?: Partial<Record<LlmTask, number>>;
   run?: ProcessRunner;
   onCall?: (call: LlmCall) => void;
 };
@@ -76,7 +84,7 @@ const sessionResultSchema = z.object({
 export function createClaudeCodeLlm({
   promptsDir,
   models = {},
-  budgetUsd = DEFAULT_BUDGET_USD,
+  budgetsUsd = {},
   run = createProcessRunner("claude"),
   onCall,
 }: ClaudeCodeLlmOptions): Llm {
@@ -104,7 +112,7 @@ export function createClaudeCodeLlm({
       "--strict-mcp-config",
       "--no-session-persistence",
       "--max-budget-usd",
-      String(budgetUsd),
+      String(budgetsUsd[task] ?? TASK_BUDGETS_USD[task]),
       "--output-format",
       "json",
       ...(effort === null ? [] : ["--effort", effort]),
@@ -143,6 +151,14 @@ export function createClaudeCodeLlm({
   };
 
   return {
+    routeMessage: (text, signal) =>
+      ask(
+        "route-message",
+        prompt("route-message"),
+        routeMessageOutputSchema,
+        `<message>\n${text}\n</message>`,
+        signal,
+      ),
     parseOrder: async (orderText, signal) =>
       readParseOrder(
         await ask(

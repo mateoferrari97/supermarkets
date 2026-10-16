@@ -10,12 +10,16 @@ import type { ReadReplyInput } from "../../core/order-matching/read-reply.ts";
 import {
   createClaudeCodeLlm,
   createProcessRunner,
+  TASK_BUDGETS_USD,
+  TASK_MODELS,
   type LlmCall,
   type ProcessResult,
 } from "./claude-code-llm.ts";
 
 const promptsDir = mkdtempSync(join(tmpdir(), "prompts-"));
 mkdirSync(join(promptsDir, "order-matching"));
+mkdirSync(join(promptsDir, "planning"));
+writeFileSync(join(promptsDir, "planning", "route-message.md"), "Route the message.");
 writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
 writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
 writeFileSync(join(promptsDir, "order-matching", "read-reply.md"), "Read the reply.");
@@ -129,6 +133,71 @@ describe("createClaudeCodeLlm", () => {
     const llm = llmWith(session({ structured_output: {} }), [], argsSeen);
     await assert.rejects(llm.parseOrder("yerba", controller.signal), { name: "AbortError" });
     assert.equal(argsSeen.length, 0);
+  });
+});
+
+describe("budget per session", () => {
+  const budgetOf = (args: string[]) => args[args.indexOf("--max-budget-usd") + 1];
+
+  it("gives each task's session its own budget", async () => {
+    const argsSeen: string[][] = [];
+    const llm = createClaudeCodeLlm({
+      promptsDir,
+      budgetsUsd: { "route-message": 0.05 },
+      run: (args) => {
+        argsSeen.push(args);
+        const routing = args.includes("Route the message.");
+        return Promise.resolve(
+          session({ structured_output: routing ? { topic: "order" } : yerba }),
+        );
+      },
+    });
+    await llm.routeMessage("yerba", signal);
+    await llm.parseOrder("yerba", signal);
+    assert.deepEqual(argsSeen.map(budgetOf), ["0.05", String(TASK_BUDGETS_USD["parse-order"])]);
+  });
+});
+
+describe("routeMessage", () => {
+  const topic = (value: string) => session({ structured_output: { topic: value } });
+
+  it("runs Haiku at its default effort with its prompt and the message wrapped in <message>", async () => {
+    const calls: LlmCall[] = [];
+    const argsSeen: string[][] = [];
+    const inputsSeen: string[] = [];
+    const llm = llmWith(topic("plan"), calls, argsSeen, [], inputsSeen);
+    const answer = await llm.routeMessage("quiero hacer lasaña para 4", signal);
+    assert.deepEqual(answer, { topic: "plan" });
+    const args = argsSeen[0]!;
+    assert.equal(args[args.indexOf("--model") + 1], "claude-haiku-5-5");
+    assert.equal(args.includes("--effort"), false);
+    assert.equal(args[args.indexOf("--system-prompt") + 1], "Route the message.");
+    assert.deepEqual(inputsSeen, ["<message>\nquiero hacer lasaña para 4\n</message>"]);
+    assert.deepEqual(
+      calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
+      [
+        {
+          task: "route-message",
+          model: "claude-haiku-5-5",
+          effort: null,
+          input: "<message>\nquiero hacer lasaña para 4\n</message>",
+        },
+      ],
+    );
+    assert.deepEqual(TASK_MODELS["route-message"], { model: "claude-haiku-5-5", effort: null });
+  });
+
+  it("returns each Topic", async () => {
+    for (const value of ["order", "plan", "off-topic"]) {
+      assert.deepEqual(await llmWith(topic(value)).routeMessage("hola", signal), { topic: value });
+    }
+  });
+
+  it("fails on a Topic it does not know", async () => {
+    await assert.rejects(
+      llmWith(topic("recipe")).routeMessage("hola", signal),
+      /route-message returned an invalid answer/,
+    );
   });
 });
 

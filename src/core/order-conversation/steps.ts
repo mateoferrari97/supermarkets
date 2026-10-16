@@ -1,4 +1,5 @@
 export type Step =
+  | { kind: "understand-message" }
   | { kind: "understand-order" }
   | { kind: "understand-answer" }
   | { kind: "choose-products"; original: string }

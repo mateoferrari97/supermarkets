@@ -8,12 +8,16 @@ Plans are the one exception ([ADR 0013](adr/0013-in-a-plan-the-llm-proposes-seen
 
 ## The port and its adapter
 
-- `Llm` in `src/core/order-matching/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `readReply`) with the input and output types of each call.
-- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session. `TASK_MODELS` fixes the model and effort of each task: `parse-order` and `read-reply` run on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012). The model takes no `temperature`, so the same text can resolve differently between runs.
+- `Llm` in `src/core/order-matching/llm.ts` is the port: one method per task (`routeMessage`, `parseOrder`, `fitProducts`, `readReply`) with the input and output types of each call.
+- `src/adapters/claude-code/claude-code-llm.ts` implements it by running one Claude Code session per call (`claude -p`) with no tools, a JSON schema for the answer and a budget per session set per task in `TASK_BUDGETS_USD` (0.25 USD for every task today; `budgetsUsd` overrides it per task). `TASK_MODELS` fixes the model and effort of each task: `route-message` runs on `claude-haiku-5-5` at its default effort, `parse-order` and `read-reply` run on `claude-sonnet-5-5` with `--effort low` and `fit-products` on `claude-sonnet-5-5` at its default effort (ADR 0012). The model takes no `temperature`, so the same text can resolve differently between runs.
 - `src/adapters/claude-code/llm-output-schemas.ts` holds the zod schemas the answers are parsed with; an answer that does not fit its schema fails the call; the `size` and `quantity` of a line are built from the patterns and parsers of `src/core/order-matching/item.ts`, so the JSON schema sent to Claude Code carries the same patterns the parser reads.
 - The checks of an answer against its input, for `fit-products` and `read-reply`, run in core, not in the adapter (ADR 0006): the adapter keeps the prompts, the output schemas and the parsing of lines, and core calls the port through `checkedFitProducts` and `checkedReadReply`.
 - `src/compose.ts` wires the adapter (`createLlm`); tests use fakes of `Llm` instead.
 - The adapter's `onCall` reports every session that returns a result: task, model, effort, SHA-256 of the system prompt, input, raw output, cost and duration. `pnpm order:eval` sums its cost; the chat writes it to the Conversation Log in `.data/conversations/` (see [ARCHITECTURE](../ARCHITECTURE.md#an-order-end-to-end)).
+
+## The `route-message` task
+
+`routeMessage(text, signal)` labels the first message after the postal code with its Topic, before anything else reads it. The adapter sends the Owner's text wrapped in `<message>` tags. The LLM returns `{ topic }`, one of `order`, `plan` or `off-topic` (`src/core/planning/route-message.ts`); any other value fails the schema. `takeTurn` calls it only in stage `order`, under the step "Entendiendo tu mensaje". An `order` goes to `parse-order` with the same text; `off-topic` and, until planning is built, `plan` get the fixed text "Puedo ayudarte con compras del súper: pedidos, recetas, comidas de la semana, eventos y regalos de Carrefour. ¿Qué necesitás?" and the conversation stays in stage `order`. The prompt prefers `order` when in doubt, so a plain order never lands in planning. Like every call, it is reported by `onCall` and written to the Conversation Log.
 
 ## The `parse-order` task
 
@@ -42,7 +46,7 @@ The LLM returns `entries`, one per Item the reply touches: `{ item, kind: "choic
 
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/`, named after the task: `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-matching/read-reply.md`. The adapter reads the file on each call. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/`, named after the task: `planning/route-message.md`, `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-matching/read-reply.md`. The adapter reads the file on each call. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 

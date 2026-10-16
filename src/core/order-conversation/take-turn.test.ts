@@ -5,6 +5,7 @@ import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import type { Item } from "../order-matching/item.ts";
 import type { FitProductsInput, FitProductsOutput } from "../order-matching/match-items.ts";
 import type { ReadReplyInput, ReadReplyOutput } from "../order-matching/read-reply.ts";
+import type { Topic } from "../planning/route-message.ts";
 import type {
   Delivery,
   OnlineStore,
@@ -14,6 +15,7 @@ import { QUESTIONS_HINT } from "./order.ts";
 import type { StepEvent } from "./steps.ts";
 import {
   NEW_CONVERSATION,
+  OFF_TOPIC_TEXT,
   ORDER_QUESTION,
   POSTAL_CODE_QUESTION,
   takeTurn,
@@ -83,14 +85,23 @@ const item = (original: string, product: string, overrides: Partial<Item> = {}):
 });
 
 type Script = {
+  topic?: Topic;
   items?: Item[];
   answers?: Record<string, (input: FitProductsInput) => Partial<FitProductsOutput>>;
   replies?: Partial<ReadReplyOutput>[];
   deliveries?: Record<string, Delivery>;
 };
 
-const conversation = ({ items = [], answers = {}, replies = [], deliveries = {} }: Script = {}) => {
+const conversation = ({
+  topic = "order",
+  items = [],
+  answers = {},
+  replies = [],
+  deliveries = {},
+}: Script = {}) => {
   const calls: string[] = [];
+  const routed: string[] = [];
+  const parsed: string[] = [];
   const signals: AbortSignal[] = [];
   const simulations: SimulationRequest[] = [];
   const readInputs: ReadReplyInput[] = [];
@@ -104,8 +115,14 @@ const conversation = ({ items = [], answers = {}, replies = [], deliveries = {} 
   const deps: ConversationDependencies = {
     search,
     llm: {
-      parseOrder: (_text, signal) => {
+      routeMessage: (text, signal) => {
+        seen("routeMessage", signal);
+        routed.push(text);
+        return Promise.resolve({ topic });
+      },
+      parseOrder: (text, signal) => {
         seen("parseOrder", signal);
+        parsed.push(text);
         return Promise.resolve({ items, ignoredPreference: false });
       },
       fitProducts: (input, signal) => {
@@ -153,7 +170,7 @@ const conversation = ({ items = [], answers = {}, replies = [], deliveries = {} 
         `cart:${cart.map(({ itemId, quantity }) => `${itemId}x${quantity}`).join(",")}`,
     } satisfies OnlineStore,
   };
-  return { deps, calls, signals, simulations, readInputs, fitted };
+  return { deps, calls, signals, simulations, readInputs, fitted, routed, parsed };
 };
 
 const ordering: ConversationState = { stage: "order", postalCode: "1425" };
@@ -262,10 +279,13 @@ describe("takeTurn", () => {
       );
     });
 
-    it("calls only call 1, call 2 and checkout simulation for an order", async () => {
+    it("calls only route-message, call 1, call 2 and checkout simulation for an order", async () => {
       const { deps, calls } = conversation({ items: [item("yerba", "yerba")] });
       await takeTurn(ordering, "yerba", deps);
-      assert.deepEqual(new Set(calls), new Set(["parseOrder", "fitProducts", "simulate"]));
+      assert.deepEqual(
+        new Set(calls),
+        new Set(["routeMessage", "parseOrder", "fitProducts", "simulate"]),
+      );
     });
 
     it("keeps the conversation open after the cart", async () => {
@@ -284,6 +304,65 @@ describe("takeTurn", () => {
       assert.deepEqual(readInputs[0]!.items, [
         { kind: "bought", original: "yerba", product: catalog[0] },
       ]);
+    });
+  });
+
+  describe("routing", () => {
+    it("sends the order's text to parse-order once route-message labels it an order", async () => {
+      const { deps, routed, parsed } = conversation({ items: [item("yerba", "yerba")] });
+      const turn = await takeTurn(ordering, "  2 leches y pan ", deps);
+      assert.deepEqual(routed, ["2 leches y pan"]);
+      assert.deepEqual(parsed, ["2 leches y pan"]);
+      assert.equal(turn.reply.kind, "cart");
+    });
+
+    it("answers an off-topic message with the fixed text and stays in stage order", async () => {
+      const { deps, calls } = conversation({ topic: "off-topic" });
+      const turn = await takeTurn(ordering, "¿quién ganó el partido?", deps);
+      assert.deepEqual(turn, { state: ordering, reply: { kind: "ask", text: OFF_TOPIC_TEXT } });
+      assert.deepEqual(calls, ["routeMessage"]);
+    });
+
+    it("answers a plan message with the fixed text and stays in stage order", async () => {
+      const { deps, calls } = conversation({ topic: "plan" });
+      const turn = await takeTurn(ordering, "quiero hacer lasaña para 4", deps);
+      assert.deepEqual(turn, { state: ordering, reply: { kind: "ask", text: OFF_TOPIC_TEXT } });
+      assert.deepEqual(calls, ["routeMessage"]);
+    });
+
+    it("lets the Owner write again after an off-topic message and reads the order", async () => {
+      const fake = conversation({ topic: "off-topic", items: [item("yerba", "yerba")] });
+      const first = await takeTurn(ordering, "hola", fake.deps);
+      const second = await takeTurn(first.state, "yerba", {
+        ...fake.deps,
+        llm: { ...fake.deps.llm, routeMessage: () => Promise.resolve({ topic: "order" }) },
+      });
+      assert.equal(second.reply.kind, "cart");
+      assert.deepEqual(fake.parsed, ["yerba"]);
+    });
+
+    it("reports understanding the message before anything else", async () => {
+      const { deps } = conversation({ topic: "off-topic" });
+      const events: StepEvent[] = [];
+      await takeTurn(ordering, "hola", deps, (event) => events.push(event));
+      assert.deepEqual(
+        events.map(({ status, step }) => [status, step]),
+        [
+          ["started", { kind: "understand-message" }],
+          ["done", { kind: "understand-message" }],
+        ],
+      );
+    });
+
+    it("does not route replies to questions or to a cart", async () => {
+      const { routed } = await run(
+        {
+          items: [item("yerba", "yerba")],
+          replies: [{ newLines: [item("un vino", "vino tinto")] }],
+        },
+        ["yerba", "agregá un vino"],
+      );
+      assert.deepEqual(routed, ["yerba"]);
     });
   });
 
@@ -518,7 +597,7 @@ describe("takeTurn", () => {
   });
 
   describe("steps", () => {
-    it("reports understanding the order, one step per Item and simulating the cart, in order, with ids from one Steps", async () => {
+    it("reports understanding the message and the order, one step per Item and simulating the cart, in order, with ids from one Steps", async () => {
       const { deps } = conversation({
         items: [item("yerba", "yerba"), item("2 quesos", "queso port salut")],
       });
@@ -526,6 +605,7 @@ describe("takeTurn", () => {
       await takeTurn(ordering, "yerba y 2 quesos", deps, (event) => events.push(event));
       const started = events.filter(({ status }) => status === "started").map(({ step }) => step);
       assert.deepEqual(started, [
+        { kind: "understand-message" },
         { kind: "understand-order" },
         { kind: "choose-products", original: "yerba" },
         { kind: "choose-products", original: "2 quesos" },
@@ -533,18 +613,19 @@ describe("takeTurn", () => {
       ]);
       assert.deepEqual(
         events.filter(({ status }) => status === "started").map(({ id }) => id),
-        [1, 2, 3, 4],
+        [1, 2, 3, 4, 5],
       );
       assert.deepEqual(
         events.filter(({ status }) => status === "done").map(({ id, step }) => ({ id, step })),
         [
-          { id: 1, step: { kind: "understand-order" } },
-          { id: 2, step: { kind: "choose-products", original: "yerba" } },
-          { id: 3, step: { kind: "choose-products", original: "2 quesos" } },
-          { id: 4, step: { kind: "simulate-cart" } },
+          { id: 1, step: { kind: "understand-message" } },
+          { id: 2, step: { kind: "understand-order" } },
+          { id: 3, step: { kind: "choose-products", original: "yerba" } },
+          { id: 4, step: { kind: "choose-products", original: "2 quesos" } },
+          { id: 5, step: { kind: "simulate-cart" } },
         ],
       );
-      assert.equal(events.length, 8);
+      assert.equal(events.length, 10);
     });
   });
 
@@ -587,7 +668,7 @@ describe("takeTurn", () => {
       await takeTurn(state, "yerba", { ...deps, signal: controller.signal });
       assert.deepEqual(
         new Set(calls),
-        new Set(["checkDelivery", "parseOrder", "fitProducts", "simulate"]),
+        new Set(["checkDelivery", "routeMessage", "parseOrder", "fitProducts", "simulate"]),
       );
       assert.ok(signals.every((signal) => signal === controller.signal));
     });
