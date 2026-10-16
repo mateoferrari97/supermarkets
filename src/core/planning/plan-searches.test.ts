@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
-import type { CatalogSearch, SearchItem } from "../order-matching/catalog-search.ts";
+import type { CatalogSearch, SearchItem, SearchScope } from "../order-matching/catalog-search.ts";
 import { stepsFrom, type StepEvent } from "../order-conversation/steps.ts";
 import type { PlanInput, PlanOutput } from "./plan.ts";
 import { planWithSearches } from "./plan-searches.ts";
@@ -26,11 +26,11 @@ const catalog = [
   ...Array.from({ length: 30 }, (_, index) => product(`q${String(index)}`, "Queso rallado")),
 ];
 
-const searched: { item: SearchItem; limit: number | undefined }[] = [];
+const searched: { item: SearchItem; scope: SearchScope; limit: number | undefined }[] = [];
 
 const search: CatalogSearch = {
-  findMatches: (item, limit) => {
-    searched.push({ item, limit });
+  findMatches: (item, scope, limit) => {
+    searched.push({ item, scope, limit });
     const words = item.product.toLowerCase().split(" ");
     return catalog
       .filter(({ name }) => words.some((word) => name.toLowerCase().includes(word)))
@@ -88,14 +88,14 @@ describe("planWithSearches", () => {
     assert.equal(inputs.length, 1);
   });
 
-  it("runs each query for 20 Matches and gives the results to the next call", async () => {
+  it("runs each query in the plan scope for 20 Matches and gives the results to the next call", async () => {
     const { result, inputs } = run([{ kind: "search", queries: ["lasaña", "tomate"] }, answer]);
     const { products } = await result;
     assert.deepEqual(
-      searched.map(({ item, limit }) => [item.product, item.brand, limit]),
+      searched.map(({ item, scope, limit }) => [item.product, item.brand, scope, limit]),
       [
-        ["lasaña", null, 20],
-        ["tomate", null, 20],
+        ["lasaña", null, "plan", 20],
+        ["tomate", null, "plan", 20],
       ],
     );
     assert.deepEqual(ids(inputs[1]!.products), ["p1", "p2"]);

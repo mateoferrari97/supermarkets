@@ -14,6 +14,7 @@ export async function planWithinBudget(
   steps: Steps,
 ): Promise<PlannedWithinBudget> {
   const first = await planWithSearches(input, deps, steps);
+  if (first.output.kind === "confirm") return { ...first, overBudget: null };
   const { plan, budget } = first.output;
   const over = plan === null ? null : overBudget(plan, budget);
   if (plan === null || budget === null || over === null) return { ...first, overBudget: null };
@@ -27,7 +28,11 @@ export async function planWithinBudget(
     deps,
     steps,
   );
-  const retried = retry.output.plan;
-  if (retried === null) return { ...first, products: retry.products, overBudget: over };
-  return { ...retry, overBudget: overBudget(retried, retry.output.budget ?? budget) };
+  if (retry.output.kind === "confirm" || retry.output.plan === null) {
+    return { ...first, products: retry.products, overBudget: over };
+  }
+  return {
+    ...retry,
+    overBudget: overBudget(retry.output.plan, retry.output.budget ?? budget),
+  };
 }

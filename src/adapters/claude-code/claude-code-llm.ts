@@ -210,6 +210,7 @@ function readPlan({
   plan,
   budget,
 }: z.infer<typeof planOutputSchema>): PlanOutput {
+  if (kind === "confirm") return { kind };
   return kind === "search" ? { kind, queries } : { kind, message: message!, plan, budget };
 }
 

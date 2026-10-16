@@ -5,6 +5,8 @@ export const MATCHES_LIMIT = 30;
 
 export type SearchItem = Pick<Item, "product" | "brand">;
 
+export type SearchScope = "order" | "plan";
+
 export type CatalogSearch = {
-  findMatches(item: SearchItem, limit?: number): CatalogProduct[];
+  findMatches(item: SearchItem, scope: SearchScope, limit?: number): CatalogProduct[];
 };

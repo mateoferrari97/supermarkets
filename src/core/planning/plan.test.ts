@@ -227,6 +227,17 @@ describe("checkPlan", () => {
     });
   });
 
+  it("keeps a confirm once a Plan was shown", () => {
+    const shown = { ...input(), lastPlan: planOf([line("p1", 1)]) };
+    assert.deepEqual(checkPlan(shown, { kind: "confirm" }), { kind: "confirm" });
+  });
+
+  it("rejects a confirm when no Plan was shown", () => {
+    assert.throws(() => checkPlan(input(), { kind: "confirm" }), {
+      message: "plan answer breaks a rule: a confirm with no Plan shown",
+    });
+  });
+
   it("rejects a Plan with more than 60 lines", () => {
     assert.throws(failure(Array.from({ length: 61 }, () => line("p1", 1))), {
       message: "plan answer breaks a rule: 61 lines, more than 60",

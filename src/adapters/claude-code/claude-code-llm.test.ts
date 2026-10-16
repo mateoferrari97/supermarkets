@@ -351,6 +351,11 @@ describe("plan", () => {
     );
   });
 
+  it("returns a confirm of the last Plan shown", async () => {
+    const llm = llmWith(output({ kind: "confirm" }));
+    assert.deepEqual(await llm.plan(input, signal), { kind: "confirm" });
+  });
+
   it("fails on a search with no queries", async () => {
     await assert.rejects(
       llmWith(output({ kind: "search" })).plan(input, signal),

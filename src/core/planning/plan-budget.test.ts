@@ -5,6 +5,7 @@ import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import { stepsFrom } from "../order-conversation/steps.ts";
 import type { Plan, PlanInput, PlanOutput } from "./plan.ts";
 import { planWithinBudget } from "./plan-budget.ts";
+import type { PlannedTurn } from "./plan-searches.ts";
 
 const product = (productId: string, name: string, price: number): CatalogProduct => ({
   productId,
@@ -51,7 +52,7 @@ const answerOf = (plan: Plan | null, budget: number | null = 50000): PlanOutput 
 const start: PlanInput = {
   messages: [{ role: "owner", text: "un asado para 10 con unos $50.000" }],
   products: [tenderloin, shortRibs, sausage],
-  lastPlan: null,
+  lastPlan: asadoOf([["p2", 5000]]),
 };
 
 const run = (outputs: PlanOutput[]) => {
@@ -66,9 +67,10 @@ const run = (outputs: PlanOutput[]) => {
   return { inputs, result: planWithinBudget(start, { llm, search }, stepsFrom({})) };
 };
 
-const linesOf = (output: {
-  plan: { lines: { product: CatalogProduct; quantity: number }[] } | null;
-}) => output.plan?.lines.map(({ product, quantity }) => [product.productId, quantity]);
+const linesOf = (output: PlannedTurn["output"]) =>
+  output.kind === "answer"
+    ? output.plan?.lines.map(({ product, quantity }) => [product.productId, quantity])
+    : undefined;
 
 describe("planWithinBudget", () => {
   it("shows a Plan that fits the budget after one call", async () => {
@@ -153,7 +155,22 @@ describe("planWithinBudget", () => {
     const { result } = run([answerOf(asadoOf([["p1", 3000]])), answerOf(null)]);
     const { output, overBudget } = await result;
     assert.deepEqual(linesOf(output), [["p1", 3000]]);
-    assert.equal(output.message, "Te armé el asado.");
+    assert.equal(output.kind === "answer" && output.message, "Te armé el asado.");
+    assert.equal(overBudget, 10000);
+  });
+
+  it("confirms the last Plan shown without a retry", async () => {
+    const { result, inputs } = run([{ kind: "confirm" }]);
+    const { output, overBudget } = await result;
+    assert.equal(inputs.length, 1);
+    assert.deepEqual(output, { kind: "confirm" });
+    assert.equal(overBudget, null);
+  });
+
+  it("keeps the first Plan when the retry confirms instead of revising", async () => {
+    const { result } = run([answerOf(asadoOf([["p1", 3000]])), { kind: "confirm" }]);
+    const { output, overBudget } = await result;
+    assert.deepEqual(linesOf(output), [["p1", 3000]]);
     assert.equal(overBudget, 10000);
   });
 });
