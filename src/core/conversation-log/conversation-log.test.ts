@@ -111,7 +111,7 @@ describe("loggedSearch", () => {
       ticking(),
     );
 
-    assert.equal(logged.findMatches({ product: "carne picada", brand: null }, 20), found);
+    assert.equal(logged.findMatches({ product: "carne picada", brand: null }, "order", 20), found);
     assert.deepEqual(events, [
       {
         type: "search-call",

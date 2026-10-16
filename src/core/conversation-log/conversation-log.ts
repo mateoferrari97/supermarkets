@@ -117,9 +117,9 @@ export function loggedSearch(
   now: Clock = monotonic,
 ): CatalogSearch {
   return {
-    findMatches: (item, limit) => {
+    findMatches: (item, scope, limit) => {
       const started = now();
-      const found = search.findMatches(item, limit);
+      const found = search.findMatches(item, scope, limit);
       write({
         type: "search-call",
         product: item.product,

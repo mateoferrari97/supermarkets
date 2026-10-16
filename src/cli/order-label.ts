@@ -16,6 +16,8 @@ if (words.length === 0 || (brandFlag !== -1 && brand === null)) {
 
 const search = valueOf(createCatalogSearch());
 const product = words.join(" ");
-for (const [index, match] of search.findMatches({ product, brand }, LABEL_LIMIT).entries()) {
+for (const [index, match] of search
+  .findMatches({ product, brand }, "order", LABEL_LIMIT)
+  .entries()) {
   console.log(`${String(index + 1)}. ${productLine(match)}`);
 }

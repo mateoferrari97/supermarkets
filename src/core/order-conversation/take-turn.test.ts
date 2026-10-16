@@ -68,7 +68,7 @@ const catalog: CatalogProduct[] = [
 const words = (text: string) => text.toLowerCase().split(/\W+/u).filter(Boolean);
 
 const search: CatalogSearch = {
-  findMatches: ({ product: wanted }, limit = 30) => {
+  findMatches: ({ product: wanted }, _scope, limit = 30) => {
     const query = new Set(words(wanted));
     return catalog
       .filter((candidate) => words(candidate.name).some((word) => query.has(word)))

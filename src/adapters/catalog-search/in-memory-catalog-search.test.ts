@@ -62,12 +62,18 @@ describe("createInMemoryCatalogSearch", () => {
   const search = createInMemoryCatalogSearch(catalog);
 
   it("reads a misspelt variety through trigrams", () => {
-    const [first] = search.findMatches({ product: "Queso porsalud light", brand: null }, 3);
+    const [first] = search.findMatches(
+      { product: "Queso porsalud light", brand: null },
+      "order",
+      3,
+    );
     assert.equal(first?.name, "Queso Port Salut Light La Paulina horma x kg");
   });
 
   it("finds Carbón de leña for Carbón para asado", () => {
-    const matches = names(search.findMatches({ product: "Carbón para asado", brand: null }));
+    const matches = names(
+      search.findMatches({ product: "Carbón para asado", brand: null }, "order"),
+    );
     assert.ok(matches.includes("Carbón de leña 4 kg."));
   });
 
@@ -76,15 +82,18 @@ describe("createInMemoryCatalogSearch", () => {
       ["Bolsa leña dura Patagonia 4 kg.", "Patagonia", "Carbón de leña"],
       ["Pilas Eveready AA 4 u.", "Eveready", "Pilas"],
     ]);
-    const matches = createInMemoryCatalogSearch(tipoOnly).findMatches({
-      product: "carbón",
-      brand: null,
-    });
+    const matches = createInMemoryCatalogSearch(tipoOnly).findMatches(
+      {
+        product: "carbón",
+        brand: null,
+      },
+      "order",
+    );
     assert.deepEqual(names(matches), ["Bolsa leña dura Patagonia 4 kg."]);
   });
 
   it("ranks the picaña above picante products", () => {
-    const matches = names(search.findMatches({ product: "Picaña", brand: null }));
+    const matches = names(search.findMatches({ product: "Picaña", brand: null }, "order"));
     assert.equal(matches[0], "Picaña de cerdo Etiqueta Negra x kg");
     for (const picante of matches.filter((name) => /picante/i.test(name))) {
       assert.ok(matches.indexOf(picante) > 0, picante);
@@ -92,12 +101,14 @@ describe("createInMemoryCatalogSearch", () => {
   });
 
   it("keeps a picanha named apart among the Matches", () => {
-    const matches = names(search.findMatches({ product: "Picaña", brand: null }));
+    const matches = names(search.findMatches({ product: "Picaña", brand: null }, "order"));
     assert.ok(matches.includes("Tapa de cuadril (picanha) Huella Natural x kg"));
   });
 
   it("never filters by a brand the snapshot lacks", () => {
-    const matches = names(search.findMatches({ product: "provoleta", brand: "Santa Julia" }));
+    const matches = names(
+      search.findMatches({ product: "provoleta", brand: "Santa Julia" }, "order"),
+    );
     assert.ok(matches.includes("Queso provoleta La Serenísima 180 g."));
     assert.ok(matches.includes("Provoleta parrillera Wapi x kg."));
     assert.ok(
@@ -107,14 +118,14 @@ describe("createInMemoryCatalogSearch", () => {
   });
 
   it("ranks a brand named above the same product of another brand", () => {
-    const matches = names(search.findMatches({ product: "provoleta", brand: "Wapi" }));
+    const matches = names(search.findMatches({ product: "provoleta", brand: "Wapi" }, "order"));
     assert.equal(matches[0], "Provoleta parrillera Wapi x kg.");
   });
 
-  it("leaves out products without stock and excluded departments", () => {
+  it("leaves out products without stock and excluded departments in the order scope", () => {
     const found = new Set(
       ["asado", "carbón", "parrilla", "pinza", "remera", "juguete", "filtro"].flatMap((product) =>
-        names(search.findMatches({ product, brand: null }, 100)),
+        names(search.findMatches({ product, brand: null }, "order", 100)),
       ),
     );
     for (const name of [
@@ -130,16 +141,43 @@ describe("createInMemoryCatalogSearch", () => {
     assert.ok(found.has("Tira de asado x kg"));
   });
 
+  it("finds products of every approved department in the plan scope", () => {
+    const found = new Set(
+      ["asado", "parrilla", "pinza", "remera", "juguete", "filtro"].flatMap((product) =>
+        names(search.findMatches({ product, brand: null }, "plan", 100)),
+      ),
+    );
+    for (const name of [
+      "Tira de asado x kg",
+      "Parrilla portátil para asado",
+      "Pinza para asado acero",
+      "Remera asado",
+      "Carbón activado para filtro",
+      "Juego de asado de juguete",
+    ]) {
+      assert.ok(found.has(name), name);
+    }
+  });
+
+  it("never returns a product without stock in the plan scope", () => {
+    const matches = names(search.findMatches({ product: "carbón", brand: null }, "plan", 100));
+    assert.ok(matches.includes("Carbón de leña 4 kg."));
+    assert.ok(!matches.includes("Carbón vegetal Carbocor 3 kg."));
+  });
+
   it("keeps catalog order on equal scores", () => {
     const twins = snapshot([
       ["Yerba mate 1 kg.", "Taragüí", "Yerba"],
       ["Yerba mate 1 kg.", "Playadito", "Yerba"],
       ["Yerba mate 1 kg.", "Rosamonte", "Yerba"],
     ]);
-    const matches = createInMemoryCatalogSearch(twins).findMatches({
-      product: "yerba",
-      brand: null,
-    });
+    const matches = createInMemoryCatalogSearch(twins).findMatches(
+      {
+        product: "yerba",
+        brand: null,
+      },
+      "order",
+    );
     assert.deepEqual(
       matches.map((product) => product.productId),
       ["1", "2", "3"],
@@ -155,11 +193,17 @@ describe("createInMemoryCatalogSearch", () => {
       ]),
     );
     const searchMany = createInMemoryCatalogSearch(many);
-    assert.equal(searchMany.findMatches({ product: "galletitas", brand: null }).length, 30);
-    assert.equal(searchMany.findMatches({ product: "galletitas", brand: null }, 5).length, 5);
+    assert.equal(
+      searchMany.findMatches({ product: "galletitas", brand: null }, "order").length,
+      30,
+    );
+    assert.equal(
+      searchMany.findMatches({ product: "galletitas", brand: null }, "order", 5).length,
+      5,
+    );
   });
 
   it("returns nothing for a query without words", () => {
-    assert.deepEqual(search.findMatches({ product: "¿?", brand: null }), []);
+    assert.deepEqual(search.findMatches({ product: "¿?", brand: null }, "order"), []);
   });
 });

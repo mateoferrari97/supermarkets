@@ -43,7 +43,7 @@ export async function matchItems(
 ): Promise<ItemMatch[]> {
   return inParallel(items, FIT_PRODUCTS_CONCURRENCY, steps.signal, (item, index) =>
     steps.run({ kind: "choose-products", original: item.original }, async () => {
-      const matches = search.findMatches(item, MATCHES_LIMIT);
+      const matches = search.findMatches(item, "order", MATCHES_LIMIT);
       const alsoInThisLine = items
         .filter((other, otherIndex) => otherIndex !== index && other.original === item.original)
         .map((other) => other.product);
