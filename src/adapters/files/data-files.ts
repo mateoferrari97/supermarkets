@@ -17,6 +17,12 @@ import {
   catalogProductsFrom,
   type CatalogProduct,
 } from "../../core/order-matching/catalog-product.ts";
+import type { AgentEvalRun } from "../../core/agent-chat/eval-run.ts";
+import {
+  agentEvalSetSchema,
+  validateAgentEvalSet,
+  type AgentEvalSet,
+} from "../../core/agent-chat/eval-set.ts";
 import type { EvalRun } from "../../core/order-matching/eval-run.ts";
 import {
   evalSetSchema,
@@ -39,6 +45,8 @@ export const ORDER_EVAL_SET_PATH = "evals/order-matching.json";
 export const ORDER_EVAL_RUNS_DIR = ".data/order-matching/eval-runs";
 export const PLANNING_EVAL_SET_PATH = "evals/planning.json";
 export const PLANNING_EVAL_RUNS_DIR = ".data/planning/eval-runs";
+export const AGENT_EVAL_SET_PATH = "evals/agent.json";
+export const AGENT_EVAL_RUNS_DIR = ".data/agent/eval-runs";
 export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
 export const CHAT_DIR = ".data/chat";
@@ -161,6 +169,19 @@ export function createDataFiles(root = ".") {
     const input = readJson(PLANNING_EVAL_SET_PATH);
     const errors = validatePlanningEvalSet(input, examples);
     return errors.length > 0 ? failed(errors) : ok(planningEvalSetSchema.parse(input));
+  };
+
+  const loadAgentEvalSet = (): Checked<AgentEvalSet> => {
+    const input = readJson(AGENT_EVAL_SET_PATH);
+    const errors = validateAgentEvalSet(input);
+    return errors.length > 0 ? failed(errors) : ok(agentEvalSetSchema.parse(input));
+  };
+
+  const saveAgentEvalRun = (run: AgentEvalRun): string => {
+    mkdirSync(at(AGENT_EVAL_RUNS_DIR), { recursive: true });
+    const path = join(AGENT_EVAL_RUNS_DIR, `${run.startedAt.replaceAll(":", "-")}.json`);
+    writeText(path, writeJsonText(run));
+    return path;
   };
 
   const savePlanningEvalRun = (run: PlanningEvalRun): string => {
@@ -318,6 +339,8 @@ export function createDataFiles(root = ".") {
     loadEvalSet,
     loadPlanningEvalSet,
     savePlanningEvalRun,
+    loadAgentEvalSet,
+    saveAgentEvalRun,
     saveCatalog,
     saveEvalRun,
     loadLatestEvalRun,

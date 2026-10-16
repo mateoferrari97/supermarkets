@@ -70,6 +70,7 @@ describe("the committed data", () => {
     const files = createDataFiles(repoRoot);
     assert.equal(files.loadEvalSet().ok, true);
     assert.equal(files.loadPlanningEvalSet().ok, true);
+    assert.equal(files.loadAgentEvalSet().ok, true);
   });
 });
 
@@ -95,6 +96,64 @@ describe("loadEvalSet", () => {
       ok: false,
       errors: ['eval case "yerba" order is an example order of the prompts'],
     });
+  });
+});
+
+describe("loadAgentEvalSet", () => {
+  const stories = [
+    "postal-code-once",
+    "change-postal-code",
+    "add-to-past-order",
+    "repeat-order",
+    "precise-product",
+    "more-options",
+    "one-round",
+    "confirm-first",
+    "correction",
+    "plan",
+    "off-topic",
+  ];
+  const everything = {
+    id: "everything",
+    covers: stories,
+    setup: { postalCode: "1425" },
+    turns: [{ owner: "hola", ends: "text" }],
+  };
+
+  it("returns the agent eval set when it is valid", () => {
+    write("evals/agent.json", { cases: [everything] });
+    assert.deepEqual(createDataFiles(root).loadAgentEvalSet(), {
+      ok: true,
+      value: { cases: [everything] },
+    });
+  });
+
+  it("fails with the validator's errors", () => {
+    write("evals/agent.json", { cases: [everything, everything] });
+    assert.deepEqual(createDataFiles(root).loadAgentEvalSet(), {
+      ok: false,
+      errors: ['case "everything" id is used more than once'],
+    });
+  });
+
+  it("saves each run under its start time", () => {
+    const run = {
+      startedAt: "2026-10-16T10:00:00.000Z",
+      snapshotFetchedAt: null,
+      models: [],
+      runsPerCase: 1,
+      filters: [],
+      durationMs: 0,
+      costUsd: 0,
+      sessions: 0,
+      stale: [],
+      totals: { cases: { hits: 0, total: 0 }, errors: { hits: 0, total: 0 } },
+      unexpectedFailures: [],
+      cases: [],
+    };
+    const path = createDataFiles(root).saveAgentEvalRun(run);
+    assert.equal(path, ".data/agent/eval-runs/2026-10-16T10-00-00.000Z.json");
+    assert.deepEqual(read(path), run);
   });
 });
 

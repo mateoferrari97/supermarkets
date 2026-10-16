@@ -159,7 +159,11 @@ export async function resolveItem(
   const brand = textOr(input.brand, null);
   const size = textOr(input.size, "common");
   const quantity = textOr(input.quantity, "minimum");
-  const parsed = parseLine({ original: description, product: description, brand, size, quantity });
+  const original =
+    brand === null || description.toLowerCase().includes(brand.toLowerCase())
+      ? description
+      : `${description} ${brand}`;
+  const parsed = parseLine({ original, product: description, brand, size, quantity });
   if (!parsed.ok) {
     return { kind: "refused", reason: "invalid-size-or-quantity", detail: parsed.failure };
   }

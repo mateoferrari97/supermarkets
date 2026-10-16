@@ -30,6 +30,8 @@ Tests never call Carrefour or start a Claude Code session.
 
 `evals/planning.json` measures the same way the Topic of `route-message` and the first Plan `plan` shows: stock, budget, quantity ranges, forbidden products and words, one line per product and the kind of Idea sections, with an LLM judge of the Idea reported apart. `pnpm plan:eval` runs it on demand and `pnpm plan:eval-set` validates its shape in `pnpm check`. Its scoring is tested over fixed inputs in `src/core/planning/eval-score.test.ts`, the run of a first message with a fake `plan` in `eval-run.test.ts`, the loader checks in `eval-set.test.ts` and the report in `src/cli/plan-eval-report.test.ts`. See [LLM](LLM.md#the-planning-eval-set).
 
+`evals/agent.json` measures the agent: scripted Owner messages over a given Profile, Chat and past Orders, scored by code on the tool calls of each turn, how each turn ended and the products of the cart. `pnpm agent:eval` runs it on demand with real Claude Code sessions, and `pnpm agent:eval-set` validates its shape in `pnpm check`. Its pieces are tested with fakes and no live call: the validator in `src/core/agent-chat/eval-set.test.ts`, the store over the snapshot in `eval-store.test.ts`, the run of a case with a scripted `ChatAgent` in `eval-run.test.ts`, the scoring over fixed runs in `eval-score.test.ts` and the report in `src/cli/agent-eval-report.test.ts`. See [LLM](LLM.md#the-agent-eval-set).
+
 ## Data validators
 
-`pnpm order:eval-set` and `pnpm plan:eval-set` validate the committed data in `evals/` and run in `pnpm check` after the tests.
+`pnpm order:eval-set`, `pnpm plan:eval-set` and `pnpm agent:eval-set` validate the committed data in `evals/` and run in `pnpm check` after the tests.

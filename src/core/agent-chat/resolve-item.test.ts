@@ -86,6 +86,20 @@ describe("resolveItem", () => {
     if (output.kind === "picked") assert.equal(output.quantity, 3);
   });
 
+  it("gives call 2 the brand in the Owner's words, once", async () => {
+    const originals: string[] = [];
+    const { dependencies } = setup({
+      llm: llmFitting(({ item }) => {
+        originals.push(item.original);
+        return {};
+      }),
+    });
+    await resolveItem({ description: "leche", brand: "Verónica" }, dependencies, signal);
+    await resolveItem({ description: "leche verónica", brand: "Verónica" }, dependencies, signal);
+    await resolveItem({ description: "leche" }, dependencies, signal);
+    assert.deepEqual(originals, ["leche Verónica", "leche verónica", "leche"]);
+  });
+
   it("answers none when no product fits and nothing else was found, without simulating", async () => {
     const { dependencies, simulated } = setup({
       llm: llmFitting(() => ({ fits: [], closest: [], question: "¿Cuál?" })),

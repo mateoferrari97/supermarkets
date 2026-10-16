@@ -16,6 +16,8 @@ import {
 } from "./core/conversation-log/conversation-log.ts";
 import { agentTools, type ToolsForTurn } from "./core/agent-chat/tools.ts";
 import type { ChatAgent } from "./core/agent-chat/agent.ts";
+import { runAgentCase, type AgentRun } from "./core/agent-chat/eval-run.ts";
+import type { AgentCase } from "./core/agent-chat/eval-set.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
 import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
 import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
@@ -62,6 +64,8 @@ export const {
   loadLatestEvalRun,
   loadPlanningEvalSet,
   savePlanningEvalRun,
+  loadAgentEvalSet,
+  saveAgentEvalRun,
 } = files;
 
 export function createLlm(options: LlmOptions): Llm {
@@ -155,6 +159,31 @@ export function createPlanningEvaluator({
       routeMessage: async (text) => (await llm.routeMessage(text, signal())).topic,
       planFirstMessage: (message) => planFirstMessage(message, { llm, search }),
       judgeIdea: (input) => judge.judgeIdea(input, signal()),
+    },
+  };
+}
+
+export type AgentEvaluator = {
+  products: CatalogProduct[];
+  snapshotFetchedAt: string | null;
+  runCase(evalCase: AgentCase): Promise<AgentRun>;
+};
+
+export function createAgentEvaluator({
+  onCall,
+}: OrderMatcherOptions = {}): Checked<AgentEvaluator> {
+  const products = loadCatalogProducts();
+  if (!products.ok) return products;
+  const search = createInMemoryCatalogSearch(products.value);
+  const llm = createLlm({ onCall });
+  const agent = createChatAgent();
+  return {
+    ok: true,
+    value: {
+      products: products.value,
+      snapshotFetchedAt: files.loadSnapshotFetchedAt(),
+      runCase: (evalCase) =>
+        runAgentCase(evalCase, { agent, products: products.value, search, llm }),
     },
   };
 }
