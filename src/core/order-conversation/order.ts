@@ -7,6 +7,7 @@ import {
   money,
   type CartLine,
   type ItemToBuy,
+  type ItemToChoose,
   type SimulatedCart,
 } from "../product-selection/cart.ts";
 
@@ -27,7 +28,7 @@ type InCart = {
 };
 
 export type OrderItem =
-  | { kind: "ready"; item: Item; toBuy: ItemToBuy; questionsSpent: number; mark: Mark | null }
+  | { kind: "ready"; item: Item; toBuy: ItemToChoose; questionsSpent: number; mark: Mark | null }
   | {
       kind: "asked";
       item: Item;
@@ -61,7 +62,6 @@ export type ItemToBuyInOrder = {
   toBuy: ItemToBuy;
   questionsSpent: number;
   mark: Mark | null;
-  keptReason: string | null;
 };
 
 export type NextStep =
@@ -188,12 +188,12 @@ function answerOf(
           kind: "ready",
           item: current.item,
           toBuy: {
+            kind: "choose",
             original: current.item.original,
             note: null,
             candidates: [
               candidateOf(current.item, current.question.alternatives[entry.alternative - 1]!),
             ],
-            kept: false,
           },
           questionsSpent: current.questionsSpent,
           mark: current.mark,
@@ -251,10 +251,10 @@ function matchedItem(
         kind: "ready",
         item,
         toBuy: {
+          kind: "choose",
           original: item.original,
           note,
           candidates: candidatesFor(item, fits),
-          kept: false,
         },
         questionsSpent,
         mark,
@@ -307,21 +307,21 @@ export function nextStep(order: Order): NextStep {
 function itemsToBuy(order: Order): ItemToBuyInOrder[] {
   return order.items.flatMap((entry): ItemToBuyInOrder[] => {
     if (entry.kind === "ready") {
-      return [{ ...entry, keptReason: null }];
+      const { item, toBuy, questionsSpent, mark } = entry;
+      return [{ item, toBuy, questionsSpent, mark }];
     }
     if (entry.kind === "in-cart") {
       return [
         {
           item: entry.item,
           toBuy: {
+            kind: "keep",
             original: entry.item.original,
-            note: null,
-            candidates: [entry.candidate],
-            kept: true,
+            candidate: entry.candidate,
+            reason: entry.reason,
           },
           questionsSpent: entry.questionsSpent,
           mark: null,
-          keptReason: entry.reason,
         },
       ];
     }
@@ -348,21 +348,13 @@ export function takeCart(order: Order, simulated: SimulatedCart): CartTaken {
       notGot.push(result.note);
       continue;
     }
-    const { line } = result;
-    const candidate = bought.toBuy.candidates.find(
-      ({ product, quantity }) =>
-        product.itemId === line.product.itemId && quantity === line.quantity,
-    )!;
-    const shown =
-      bought.keptReason === null
-        ? { ...line, mark: bought.mark }
-        : { ...line, reason: bought.keptReason, notes: [], mark: null };
-    lines.push(shown);
+    const { candidate, line } = result;
+    lines.push({ ...line, mark: bought.mark });
     inCart.push({
       kind: "in-cart",
       item: bought.item,
       candidate,
-      reason: shown.reason,
+      reason: line.reason,
       questionsSpent: bought.questionsSpent,
     });
   }

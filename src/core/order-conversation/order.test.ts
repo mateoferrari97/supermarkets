@@ -85,7 +85,9 @@ const boughtOf = (step: NextStep) => {
   if (step.kind !== "buy") throw new Error(`nothing to buy: ${step.kind}`);
   return step.items.map(({ toBuy }) => [
     toBuy.original,
-    toBuy.candidates.map(({ product: bought }) => bought.itemId),
+    toBuy.kind === "keep"
+      ? [toBuy.candidate.product.itemId]
+      : toBuy.candidates.map(({ product: bought }) => bought.itemId),
   ]);
 };
 
@@ -116,7 +118,12 @@ const applying = (order: Order, output: Partial<ReadReplyOutput>) =>
 const replied = (order: Order, output: Partial<ReadReplyOutput>, matched: ItemMatch[] = []) =>
   withMatches(applying(order, output).order, matched);
 
-const lineFor = (original: string, { product: bought, quantity }: Candidate, notes: string[]) => {
+const lineFor = (
+  original: string,
+  { product: bought, quantity }: Candidate,
+  reason: string,
+  notes: string[],
+) => {
   const price = bought.price ?? 0;
   const line: CartLine = {
     original,
@@ -124,7 +131,7 @@ const lineFor = (original: string, { product: bought, quantity }: Candidate, not
     quantity,
     unitPrice: price,
     total: price * quantity,
-    reason: "Es el más barato por kilo.",
+    reason,
     notes,
   };
   return line;
@@ -138,9 +145,20 @@ const simulatedFor = (order: Order, { notGot = {}, notes = {} }: Simulated = {})
   const bought = step.items.map(({ toBuy }): Bought => {
     const note = notGot[toBuy.original];
     if (note !== undefined) return { kind: "not-got", note };
+    if (toBuy.kind === "keep") {
+      const { candidate, reason } = toBuy;
+      return { kind: "bought", candidate, line: lineFor(toBuy.original, candidate, reason, []) };
+    }
+    const candidate = toBuy.candidates[0]!;
     return {
       kind: "bought",
-      line: lineFor(toBuy.original, toBuy.candidates[0]!, notes[toBuy.original] ?? []),
+      candidate,
+      line: lineFor(
+        toBuy.original,
+        candidate,
+        "Es el más barato por kilo.",
+        notes[toBuy.original] ?? [],
+      ),
     };
   });
   return { bought, total: 9999, cartLink: "cart:link" };
@@ -346,17 +364,16 @@ describe("Order", () => {
       assert.equal(step.kind, "buy");
       if (step.kind !== "buy") return;
       assert.deepEqual(
-        step.items.map(({ toBuy, keptReason, mark }) => [
+        step.items.map(({ toBuy, mark }) => [
           toBuy.original,
-          toBuy.candidates.map(({ product: bought }) => bought.itemId),
-          toBuy.kept,
-          keptReason,
+          toBuy.kind,
+          toBuy.kind === "keep" ? [toBuy.candidate.product.itemId, toBuy.reason] : null,
           mark,
         ]),
         [
-          ["yerba", ["1"], true, "Es el más barato", null],
-          ["coca zero", ["9"], true, "Es el más barato", null],
-          ["queso", ["4"], true, "Es el más barato", null],
+          ["yerba", "keep", ["1", "Es el más barato"], null],
+          ["coca zero", "keep", ["9", "Es el más barato"], null],
+          ["queso", "keep", ["4", "Es el más barato"], null],
         ],
       );
     });
@@ -487,7 +504,7 @@ describe("Order", () => {
       const [candidate] = candidatesFor(yerbaLine, [yerba]);
       assert.deepEqual(cart, {
         postalCode: "1425",
-        lines: [{ ...lineFor("yerba", candidate!, []), mark: null }],
+        lines: [{ ...lineFor("yerba", candidate!, "Es el más barato por kilo.", []), mark: null }],
         total: 9999,
         notes: [],
         warning: CART_WARNING,
@@ -510,6 +527,32 @@ describe("Order", () => {
         ignoredPreference: false,
         cartShown: true,
       });
+    });
+
+    it("keeps in the cart the Candidate the cart says it bought", () => {
+      const queso = item("queso");
+      const order = startOrder("1425", [fits(queso, sancor, vino)], false);
+      const step = nextStep(order);
+      if (step.kind !== "buy") throw new Error(`nothing to buy: ${step.kind}`);
+      const toBuy = step.items[0]!.toBuy;
+      if (toBuy.kind !== "choose") throw new Error(`not chosen: ${toBuy.kind}`);
+      const [first, second] = toBuy.candidates;
+      assert.notEqual(first!.product.itemId, second!.product.itemId);
+      const { state } = takeCart(order, {
+        bought: [
+          {
+            kind: "bought",
+            candidate: second!,
+            line: lineFor("queso", second!, "Es el más barato por kilo.", []),
+          },
+        ],
+        total: 9999,
+        cartLink: "cart:link",
+      });
+      assert.deepEqual(
+        state.items.map((entry) => (entry.kind === "in-cart" ? entry.candidate : null)),
+        [second],
+      );
     });
 
     it("puts the Notes under the table in order: dropped Items, Items not got, removed Items, the ignored preference", () => {
@@ -544,7 +587,7 @@ describe("Order", () => {
       );
     });
 
-    it("marks corrected lines as changed and added ones as new, and shows kept Items with their reason and no Notes", () => {
+    it("marks corrected lines as changed and added ones as new, and keeps the cart's reason and Notes of each line", () => {
       const smaller = item("la coca de 1,5", "coca cola zero");
       const wine = item("vino");
       const order = replied(
@@ -553,7 +596,7 @@ describe("Order", () => {
         [fits(smaller, serenisima), fits(wine, vino)],
       );
       const { cart } = taken(order, {
-        notes: { yerba: ["Tomé 'yerba' como yerba mate."], "la coca de 1,5": ["Llevo 1,5 l"] },
+        notes: { "la coca de 1,5": ["Llevo 1,5 l"] },
       });
       assert.deepEqual(
         cart.lines.map(({ original, mark, reason, notes }) => [original, mark, reason, notes]),
@@ -618,10 +661,10 @@ describe("Order", () => {
             kind: "ready",
             item: yerbaLine,
             toBuy: {
+              kind: "choose",
               original: "yerba",
               note: null,
               candidates: candidatesFor(yerbaLine, [yerba]),
-              kept: false,
             },
             questionsSpent: 0,
             mark: null,
