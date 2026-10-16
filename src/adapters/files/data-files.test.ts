@@ -11,8 +11,6 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { summarize } from "../../core/order-matching/eval-score.ts";
-import { summarizePlanning } from "../../core/planning/eval-score.ts";
 import { createDataFiles } from "./data-files.ts";
 
 const repoRoot = join(import.meta.dirname, "../../..");
@@ -25,12 +23,6 @@ const write = (path: string, value: unknown) => {
 };
 
 const read = (path: string): unknown => JSON.parse(readFileSync(join(root, path), "utf8"));
-
-const yerbaCase = {
-  id: "yerba",
-  order: "una yerba",
-  items: [{ product: "Yerba", brand: null, size: "common", quantity: "minimum", fits: ["1"] }],
-};
 
 const catalogProduct = (
   productId: string,
@@ -57,8 +49,6 @@ const catalogProduct = (
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "data-files-"));
-  write("evals/order-matching.json", { cases: [yerbaCase] });
-  write("prompts/order-matching/parse-order.md", "# Examples\n\n<order>\nyerba y sal\n</order>\n");
 });
 
 afterEach(() => {
@@ -68,34 +58,7 @@ afterEach(() => {
 describe("the committed data", () => {
   it("loads with no errors", () => {
     const files = createDataFiles(repoRoot);
-    assert.equal(files.loadEvalSet().ok, true);
-    assert.equal(files.loadPlanningEvalSet().ok, true);
     assert.equal(files.loadAgentEvalSet().ok, true);
-  });
-});
-
-describe("loadEvalSet", () => {
-  it("returns the eval set when it is valid", () => {
-    assert.deepEqual(createDataFiles(root).loadEvalSet(), {
-      ok: true,
-      value: { cases: [yerbaCase] },
-    });
-  });
-
-  it("fails with the validator's errors", () => {
-    write("evals/order-matching.json", { cases: [yerbaCase, yerbaCase] });
-    assert.deepEqual(createDataFiles(root).loadEvalSet(), {
-      ok: false,
-      errors: ['eval case "yerba" id is used more than once'],
-    });
-  });
-
-  it("rejects an order equal to an example order of any prompt", () => {
-    write("evals/order-matching.json", { cases: [{ ...yerbaCase, order: "Yerba y sal" }] });
-    assert.deepEqual(createDataFiles(root).loadEvalSet(), {
-      ok: false,
-      errors: ['eval case "yerba" order is an example order of the prompts'],
-    });
   });
 });
 
@@ -153,70 +116,6 @@ describe("loadAgentEvalSet", () => {
     };
     const path = createDataFiles(root).saveAgentEvalRun(run);
     assert.equal(path, ".data/agent/eval-runs/2026-10-16T10-00-00.000Z.json");
-    assert.deepEqual(read(path), run);
-  });
-});
-
-describe("loadPlanningEvalSet", () => {
-  const offTopic = { id: "boca", message: "¿juega Boca?", topic: "off-topic" };
-  const lasagna = {
-    id: "lasagna",
-    message: "lasaña para 4",
-    covers: ["recipe", "event", "weekly-menu", "gift", "advice", "constraints", "idea-in-cart"],
-    plan: true,
-  };
-
-  beforeEach(() => {
-    write("evals/planning.json", { routes: [offTopic], plans: [lasagna] });
-    write(
-      "prompts/planning/plan.md",
-      "# Examples\n\n<conversation>\n<owner>quiero hacer ñoquis</owner>\n</conversation>\n",
-    );
-  });
-
-  it("returns the planning eval set when it is valid", () => {
-    assert.deepEqual(createDataFiles(root).loadPlanningEvalSet(), {
-      ok: true,
-      value: { routes: [offTopic], plans: [lasagna] },
-    });
-  });
-
-  it("fails with the validator's errors", () => {
-    write("evals/planning.json", { routes: [offTopic, offTopic], plans: [lasagna] });
-    assert.deepEqual(createDataFiles(root).loadPlanningEvalSet(), {
-      ok: false,
-      errors: ['routing case "boca" id is used more than once'],
-    });
-  });
-
-  it("rejects a message equal to an example message of any prompt", () => {
-    write("evals/planning.json", {
-      routes: [offTopic],
-      plans: [{ ...lasagna, message: "Quiero hacer ñoquis" }],
-    });
-    assert.deepEqual(createDataFiles(root).loadPlanningEvalSet(), {
-      ok: false,
-      errors: ['plan case "lasagna" message is an example message of the prompts'],
-    });
-  });
-
-  it("saves each run under its start time", () => {
-    const run = {
-      startedAt: "2026-10-16T10:00:00.000Z",
-      snapshotFetchedAt: null,
-      models: [],
-      runsPerCase: 1,
-      filters: [],
-      durationMs: 1,
-      costUsd: 0,
-      sessions: 0,
-      stale: [],
-      totals: summarizePlanning([], []),
-      routes: [],
-      plans: [],
-    };
-    const path = createDataFiles(root).savePlanningEvalRun(run);
-    assert.equal(path, ".data/planning/eval-runs/2026-10-16T10-00-00.000Z.json");
     assert.deepEqual(read(path), run);
   });
 });
@@ -332,38 +231,6 @@ describe("loadCatalogProducts", () => {
   });
 });
 
-describe("the eval runs", () => {
-  const run = (startedAt: string) => ({
-    startedAt,
-    snapshotFetchedAt: null,
-    models: ["claude-sonnet-5-5"],
-    runsPerCase: 3,
-    filters: [],
-    durationMs: 1,
-    costUsd: 0,
-    sessions: 0,
-    stale: [],
-    totals: summarize([]),
-    cases: [{ id: "yerba", order: "una yerba", expectedToFail: null, passed: true, runs: [] }],
-    answers: [],
-  });
-
-  it("has no latest run before the first one", () => {
-    assert.equal(createDataFiles(root).loadLatestEvalRun(), null);
-  });
-
-  it("saves each run under its start time and reads back the latest", () => {
-    const files = createDataFiles(root);
-    const path = files.saveEvalRun(run("2026-10-13T10:00:00.000Z"));
-    files.saveEvalRun(run("2026-10-14T10:00:00.000Z"));
-    assert.equal(path, ".data/order-matching/eval-runs/2026-10-13T10-00-00.000Z.json");
-    assert.deepEqual(files.loadLatestEvalRun(), {
-      startedAt: "2026-10-14T10:00:00.000Z",
-      cases: [{ id: "yerba", passed: true }],
-    });
-  });
-});
-
 describe("saveCatalog", () => {
   it("writes the products with the metadata into the output directory", () => {
     const files = createDataFiles(root);
@@ -386,61 +253,9 @@ describe("saveCatalog", () => {
 });
 
 describe("promptsDir", () => {
-  it("points at the order resolution prompts", () => {
+  it("points at the prompts", () => {
     cpSync(join(repoRoot, "prompts"), join(root, "prompts"), { recursive: true });
     assert.ok(readdirSync(createDataFiles(root).promptsDir).length > 0);
-  });
-});
-
-describe("openConversationLog", () => {
-  const startedAt = new Date(2026, 9, 15, 9, 5, 7);
-
-  it("names the file after the local start time and the session id", () => {
-    const log = createDataFiles(root).openConversationLog("abc-123", startedAt);
-    assert.equal(log.path, join(".data/conversations", "2026-10-15-090507-abc-123.jsonl"));
-  });
-
-  it("appends one JSON line per event, each with an ISO timestamp", () => {
-    const log = createDataFiles(root).openConversationLog("abc-123", startedAt);
-
-    log.write({ type: "conversation-started", sessionId: "abc-123", commit: null });
-    log.write({ type: "owner-message", text: "1425" });
-
-    const lines = readFileSync(join(root, log.path), "utf8")
-      .trimEnd()
-      .split("\n")
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
-    assert.equal(lines.length, 2);
-    assert.match(String(lines[0]!.at), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    assert.deepEqual(
-      lines.map((line) => Object.fromEntries(Object.entries(line).filter(([key]) => key !== "at"))),
-      [
-        { type: "conversation-started", sessionId: "abc-123", commit: null },
-        { type: "owner-message", text: "1425" },
-      ],
-    );
-  });
-
-  it("reports a failed write instead of throwing", () => {
-    write(".data/conversations", "not a folder");
-    const reported: string[] = [];
-    const log = createDataFiles(root).openConversationLog("abc-123", startedAt, (message) =>
-      reported.push(message),
-    );
-
-    log.write({ type: "owner-message", text: "1425" });
-
-    assert.deepEqual(reported, [`Could not write the Conversation Log ${log.path}`]);
-  });
-});
-
-describe("headCommit", () => {
-  it("returns the commit checked out in the repo", () => {
-    assert.match(createDataFiles(repoRoot).headCommit() ?? "", /^[0-9a-f]{40}$/);
-  });
-
-  it("returns null outside a git repository", () => {
-    assert.equal(createDataFiles(root).headCommit(), null);
   });
 });
 

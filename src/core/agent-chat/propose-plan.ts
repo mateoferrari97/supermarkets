@@ -93,12 +93,7 @@ export function proposePlan(
   };
   let shown;
   try {
-    const checked = checkPlan(
-      { messages: [], products: seen, lastPlan: null },
-      { kind: "answer", message: "", plan, budget },
-    );
-    if (checked.kind !== "answer" || checked.plan === null) throw new Error("no Plan");
-    shown = checked.plan;
+    shown = checkPlan(plan, seen, budget);
   } catch (error) {
     return refused("breaks-a-rule", error instanceof Error ? error.message : String(error));
   }

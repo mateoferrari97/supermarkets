@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { stepsFrom } from "../order-conversation/steps.ts";
+import { stepsFrom } from "../order-matching/steps.ts";
 import { matchItems } from "../order-matching/match-items.ts";
 import { parseLine } from "../order-matching/item.ts";
 import { simulateCart } from "../product-selection/cart.ts";

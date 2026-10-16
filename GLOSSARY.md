@@ -64,10 +64,6 @@ _Avoid_: Session, conversation, thread, history
 What the Assistant remembers about the Owner across Orders, such as their postal code. The Owner states it once in the Chat, can change it at any time, and is not asked for it again.
 _Avoid_: Preferences, settings, account, user data
 
-**Topic**:
-The label the first message of a conversation gets: `order` when it names what to buy, `plan` when it states an intent that becomes a Plan, or `off-topic` when it is not about shopping.
-_Avoid_: Intent, category, route
-
 **Plan**:
 A proposal of products with quantities and the Idea behind them, built by the LLM from products a code search returned. The Owner revises and confirms it before it becomes a cart; until then nothing is bought (ADR 0013).
 _Avoid_: Shopping list, recipe list, suggestion
@@ -83,7 +79,3 @@ _Avoid_: Recipe list, suggestion, description
 **Order**:
 One purchase inside the Chat: its Items and where each stands (read, asked, in the cart). It opens with the first message about something to buy and closes when its cart link is given, and a clear Correction soon after reopens it; closed Orders stay in the Chat as past Orders the Assistant can refer to.
 _Avoid_: Basket, shopping list, conversation state
-
-**Conversation Log**:
-The record of one turn of the Assistant in the Chat, including what the LLM and the Online Store were asked and answered along the way. It exists to review mistakes after the fact; it is never shown to the Owner.
-_Avoid_: Transcript, chat history, order log

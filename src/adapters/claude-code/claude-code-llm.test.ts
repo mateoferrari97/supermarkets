@@ -6,27 +6,17 @@ import { join } from "node:path";
 import { describe, it } from "vitest";
 import type { CatalogProduct } from "../../core/order-matching/catalog-product.ts";
 import type { FitProductsInput } from "../../core/order-matching/match-items.ts";
-import type { PlanInput } from "../../core/planning/plan.ts";
-import type { ReadReplyInput } from "../../core/order-matching/read-reply.ts";
 import {
-  createClaudeCodeIdeaJudge,
   createClaudeCodeLlm,
   createProcessRunner,
   TASK_BUDGETS_USD,
-  TASK_MODELS,
   type LlmCall,
   type ProcessResult,
 } from "./claude-code-llm.ts";
 
 const promptsDir = mkdtempSync(join(tmpdir(), "prompts-"));
 mkdirSync(join(promptsDir, "order-matching"));
-mkdirSync(join(promptsDir, "planning"));
-writeFileSync(join(promptsDir, "planning", "route-message.md"), "Route the message.");
-writeFileSync(join(promptsDir, "planning", "plan.md"), "Plan with the catalog.");
-writeFileSync(join(promptsDir, "planning", "judge-idea.md"), "Judge the Idea.");
-writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
 writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
-writeFileSync(join(promptsDir, "order-matching", "read-reply.md"), "Read the reply.");
 
 const session = (fields: Record<string, unknown>): ProcessResult => ({
   exitCode: 0,
@@ -61,33 +51,36 @@ const llmWith = (
     onCall: (call) => calls.push(call),
   });
 
-const yerba = {
-  lines: [
-    { original: "yerba", product: "Yerba", brand: null, size: "common", quantity: "minimum" },
-  ],
-  ignoredPreference: false,
-};
+const fits = { fits: [1], closest: [], note: null, question: null };
 
 describe("createClaudeCodeLlm", () => {
+  const matches = (): FitProductsInput => ({
+    item: {
+      original: "yerba",
+      product: "Yerba",
+      brand: null,
+      size: { kind: "common" },
+      quantity: { kind: "minimum" },
+    },
+    alsoInThisLine: [],
+    matches: [],
+  });
+
   it("returns the validated structured output and reports the call with its raw output", async () => {
     const calls: LlmCall[] = [];
     const argsSeen: string[][] = [];
-    const result = session({ structured_output: yerba });
+    const result = session({ structured_output: fits });
     const llm = llmWith(result, calls, argsSeen);
-    const answer = await llm.parseOrder("yerba", signal);
-    assert.deepEqual(
-      answer.items.map(({ product }) => product),
-      ["Yerba"],
-    );
+    assert.deepEqual(await llm.fitProducts(matches(), signal), fits);
     const args = argsSeen[0]!;
     const systemPrompt = args[args.indexOf("--system-prompt") + 1]!;
     assert.deepEqual(calls, [
       {
-        task: "parse-order",
+        task: "fit-products",
         model: "claude-sonnet-5-5",
-        effort: "low",
+        effort: null,
         systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
-        input: "<order>\nyerba\n</order>",
+        input: calls[0]!.input,
         rawOutput: result.stdout,
         costUsd: 0.0137,
         durationMs: 3039,
@@ -96,11 +89,6 @@ describe("createClaudeCodeLlm", () => {
     assert.equal(args[args.indexOf("--tools") + 1], "");
     assert.ok(args.includes("--no-session-persistence"));
     assert.equal("$schema" in JSON.parse(args[args.indexOf("--json-schema") + 1]!), false);
-  });
-
-  it("fails on an answer that does not match the task's schema", async () => {
-    const llm = llmWith(session({ structured_output: { lines: [{ original: "" }] } }));
-    await assert.rejects(llm.parseOrder("yerba", signal), /parse-order returned an invalid answer/);
   });
 
   it("fails when the session reports an error such as an exhausted budget", async () => {
@@ -112,21 +100,21 @@ describe("createClaudeCodeLlm", () => {
       }),
     );
     await assert.rejects(
-      llm.parseOrder("yerba", signal),
-      /parse-order failed \(error_max_budget_usd\): Reached maximum budget/,
+      llm.fitProducts(matches(), signal),
+      /fit-products failed \(error_max_budget_usd\): Reached maximum budget/,
     );
   });
 
   it("fails when the CLI exits with an error", async () => {
     const llm = llmWith({ exitCode: 1, stdout: "", stderr: "Not logged in\n" });
-    await assert.rejects(llm.parseOrder("yerba", signal), /exited with 1: Not logged in/);
+    await assert.rejects(llm.fitProducts(matches(), signal), /exited with 1: Not logged in/);
   });
 
   it("passes the signal of the call to the session it runs", async () => {
     const signalsSeen: AbortSignal[] = [];
     const controller = new AbortController();
-    const llm = llmWith(session({ structured_output: yerba }), [], [], signalsSeen);
-    await llm.parseOrder("yerba", controller.signal);
+    const llm = llmWith(session({ structured_output: fits }), [], [], signalsSeen);
+    await llm.fitProducts(matches(), controller.signal);
     assert.deepEqual(signalsSeen, [controller.signal]);
   });
 
@@ -135,393 +123,24 @@ describe("createClaudeCodeLlm", () => {
     const controller = new AbortController();
     controller.abort();
     const llm = llmWith(session({ structured_output: {} }), [], argsSeen);
-    await assert.rejects(llm.parseOrder("yerba", controller.signal), { name: "AbortError" });
+    await assert.rejects(llm.fitProducts(matches(), controller.signal), { name: "AbortError" });
     assert.equal(argsSeen.length, 0);
   });
-});
 
-describe("budget per session", () => {
-  const budgetOf = (args: string[]) => args[args.indexOf("--max-budget-usd") + 1];
-
-  it("gives each task's session its own budget", async () => {
+  it("gives the session of the task its own budget", async () => {
     const argsSeen: string[][] = [];
     const llm = createClaudeCodeLlm({
       promptsDir,
-      budgetsUsd: { "route-message": 0.05 },
+      budgetsUsd: { "fit-products": 0.05 },
       run: (args) => {
         argsSeen.push(args);
-        const routing = args.includes("Route the message.");
-        return Promise.resolve(
-          session({ structured_output: routing ? { topic: "order" } : yerba }),
-        );
+        return Promise.resolve(session({ structured_output: fits }));
       },
     });
-    await llm.routeMessage("yerba", signal);
-    await llm.parseOrder("yerba", signal);
-    assert.deepEqual(argsSeen.map(budgetOf), ["0.05", String(TASK_BUDGETS_USD["parse-order"])]);
-  });
-});
-
-describe("routeMessage", () => {
-  const topic = (value: string) => session({ structured_output: { topic: value } });
-
-  it("runs Haiku at its default effort with its prompt and the message wrapped in <message>", async () => {
-    const calls: LlmCall[] = [];
-    const argsSeen: string[][] = [];
-    const inputsSeen: string[] = [];
-    const llm = llmWith(topic("plan"), calls, argsSeen, [], inputsSeen);
-    const answer = await llm.routeMessage("quiero hacer lasaña para 4", signal);
-    assert.deepEqual(answer, { topic: "plan" });
+    await llm.fitProducts(matches(), signal);
     const args = argsSeen[0]!;
-    assert.equal(args[args.indexOf("--model") + 1], "claude-haiku-5-5");
-    assert.equal(args.includes("--effort"), false);
-    assert.equal(args[args.indexOf("--system-prompt") + 1], "Route the message.");
-    assert.deepEqual(inputsSeen, ["<message>\nquiero hacer lasaña para 4\n</message>"]);
-    assert.deepEqual(
-      calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
-      [
-        {
-          task: "route-message",
-          model: "claude-haiku-5-5",
-          effort: null,
-          input: "<message>\nquiero hacer lasaña para 4\n</message>",
-        },
-      ],
-    );
-    assert.deepEqual(TASK_MODELS["route-message"], { model: "claude-haiku-5-5", effort: null });
-  });
-
-  it("returns each Topic", async () => {
-    for (const value of ["order", "plan", "off-topic"]) {
-      assert.deepEqual(await llmWith(topic(value)).routeMessage("hola", signal), { topic: value });
-    }
-  });
-
-  it("fails on a Topic it does not know", async () => {
-    await assert.rejects(
-      llmWith(topic("recipe")).routeMessage("hola", signal),
-      /route-message returned an invalid answer/,
-    );
-  });
-});
-
-describe("plan", () => {
-  const products: CatalogProduct[] = [
-    {
-      productId: "p1",
-      itemId: "1",
-      name: "Tapas para lasaña 500 g",
-      brand: "La Salteña",
-      department: "Almacén",
-      tipo: "Pastas frescas",
-      price: 2500,
-      inStock: true,
-      sale: { kind: "packaged", size: { dimension: "weight", amount: 500 } },
-      teasers: [],
-    },
-    {
-      productId: "p2",
-      itemId: "2",
-      name: "Carne picada especial x kg",
-      brand: null,
-      department: "Carnes",
-      tipo: null,
-      price: 9000,
-      inStock: true,
-      sale: { kind: "by-weight", saleStepKg: 0.5 },
-      teasers: [],
-    },
-    {
-      productId: "p3",
-      itemId: "3",
-      name: "Salsa de tomate",
-      brand: null,
-      department: "Almacén",
-      tipo: null,
-      price: null,
-      inStock: true,
-      sale: { kind: "packaged", size: null },
-      teasers: [],
-    },
-  ];
-  const plan = {
-    title: "Lasaña para 4",
-    idea: [{ heading: "Pasos", text: "Armá capas y horneá." }],
-    lines: [{ productId: "p1", quantity: 2, purpose: "para la lasaña", reason: "La pasta" }],
-  };
-  const input: PlanInput = {
-    messages: [
-      { role: "owner", text: "quiero hacer lasaña para 4" },
-      { role: "planner", text: "Acá va la lasaña." },
-      { role: "owner", text: "que sea para 6" },
-    ],
-    products,
-    lastPlan: plan,
-  };
-  const output = (fields: Record<string, unknown>) =>
-    session({
-      structured_output: {
-        kind: "answer",
-        queries: [],
-        message: null,
-        plan: null,
-        budget: null,
-        ...fields,
-      },
-    });
-
-  it("runs Sonnet at its default effort with its prompt and the conversation it renders", async () => {
-    const calls: LlmCall[] = [];
-    const argsSeen: string[][] = [];
-    const inputsSeen: string[] = [];
-    const llm = llmWith(output({ message: "¿Algo más?" }), calls, argsSeen, [], inputsSeen);
-    await llm.plan(input, signal);
-    const args = argsSeen[0]!;
-    assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
-    assert.equal(args.includes("--effort"), false);
-    assert.equal(args[args.indexOf("--system-prompt") + 1], "Plan with the catalog.");
-    assert.equal(
-      inputsSeen[0],
-      [
-        "<conversation>",
-        "<owner>quiero hacer lasaña para 4</owner>",
-        "<planner>Acá va la lasaña.</planner>",
-        "<owner>que sea para 6</owner>",
-        "</conversation>",
-        "<products>",
-        "p1 | Tapas para lasaña 500 g | La Salteña | Almacén | Pastas frescas | $2500 | packaged, 500 g",
-        "p2 | Carne picada especial x kg | sin marca | Carnes | sin tipo | $9000 per kg | by weight, Sale Step 500 g",
-        "p3 | Salsa de tomate | sin marca | Almacén | sin tipo | no price | packaged, size unknown",
-        "</products>",
-        "<last-plan>",
-        "<title>Lasaña para 4</title>",
-        "<idea>",
-        "## Pasos",
-        "Armá capas y horneá.",
-        "</idea>",
-        "<lines>",
-        "p1 | 2 | para la lasaña | La pasta",
-        "</lines>",
-        "</last-plan>",
-      ].join("\n"),
-    );
-    assert.deepEqual(
-      calls.map(({ task, model, effort }) => ({ task, model, effort })),
-      [{ task: "plan", model: "claude-sonnet-5-5", effort: null }],
-    );
-    assert.deepEqual(TASK_MODELS.plan, { model: "claude-sonnet-5-5", effort: null });
-  });
-
-  it("says when no Plan was shown yet", async () => {
-    const inputsSeen: string[] = [];
-    const llm = llmWith(output({ message: "¿Para cuántos?" }), [], [], [], inputsSeen);
-    await llm.plan({ ...input, products: [], lastPlan: null }, signal);
-    assert.match(inputsSeen[0]!, /<products>\n<\/products>\n<last-plan>none<\/last-plan>$/);
-  });
-
-  it("returns a search with its queries", async () => {
-    const llm = llmWith(output({ kind: "search", queries: ["tapas lasaña", "carne picada"] }));
-    assert.deepEqual(await llm.plan(input, signal), {
-      kind: "search",
-      queries: ["tapas lasaña", "carne picada"],
-    });
-  });
-
-  it("returns an answer with its message, Plan and budget", async () => {
-    const llm = llmWith(output({ message: "Acá va.", plan, budget: 50000 }));
-    assert.deepEqual(await llm.plan(input, signal), {
-      kind: "answer",
-      message: "Acá va.",
-      plan,
-      budget: 50000,
-    });
-  });
-
-  it("returns an answer with no budget", async () => {
-    const llm = llmWith(output({ message: "Acá va.", plan }));
-    const answer = await llm.plan(input, signal);
-    assert.equal(answer.kind === "answer" && answer.budget, null);
-  });
-
-  it("renders the Owner's budget and the total of a Plan sent back over it", async () => {
-    const inputsSeen: string[] = [];
-    const llm = llmWith(output({ message: "Acá va." }), [], [], [], inputsSeen);
-    await llm.plan({ ...input, overBudget: { budget: 50000, total: 58000.5 } }, signal);
-    assert.match(
-      inputsSeen[0]!,
-      /<\/last-plan>\n<over-budget>\nbudget: \$50000\ntotal: \$58000\.5\nover by: \$8000\.5\n<\/over-budget>$/,
-    );
-  });
-
-  it("returns a confirm of the last Plan shown", async () => {
-    const llm = llmWith(output({ kind: "confirm" }));
-    assert.deepEqual(await llm.plan(input, signal), { kind: "confirm" });
-  });
-
-  it("renders the searches of this turn with how many products each found", async () => {
-    const inputsSeen: string[] = [];
-    const llm = llmWith(output({ message: "¿Algo más?" }), [], [], [], inputsSeen);
-    await llm.plan(
-      {
-        ...input,
-        searches: [
-          { query: "tapas para lasaña", found: 1 },
-          { query: "vacío", found: 0 },
-        ],
-      },
-      signal,
-    );
-    assert.ok(
-      inputsSeen[0]!.endsWith(
-        ["<searches>", "tapas para lasaña | found 1", "vacío | found 0", "</searches>"].join("\n"),
-      ),
-    );
-  });
-
-  it("tells the session a search takes at most 8 queries", async () => {
-    const argsSeen: string[][] = [];
-    await llmWith(output({ message: "¿Algo más?" }), [], argsSeen).plan(input, signal);
-    const args = argsSeen[0]!;
-    const schema = JSON.parse(args[args.indexOf("--json-schema") + 1]!) as {
-      properties: { queries: { maxItems?: number } };
-    };
-    assert.equal(schema.properties.queries.maxItems, 8);
-  });
-
-  it("fails on a search with no queries", async () => {
-    await assert.rejects(
-      llmWith(output({ kind: "search" })).plan(input, signal),
-      /plan returned an invalid answer/,
-    );
-  });
-
-  it("fails on an answer with no message", async () => {
-    await assert.rejects(
-      llmWith(output({ plan })).plan(input, signal),
-      /plan returned an invalid answer/,
-    );
-  });
-});
-
-describe("parseOrder", () => {
-  const line = (fields: Record<string, unknown>) => ({
-    original: "coca 2,25",
-    product: "Gaseosa cola",
-    brand: "Coca Cola",
-    size: "common",
-    quantity: "minimum",
-    ...fields,
-  });
-  const answer = (lines: Record<string, unknown>[], ignoredPreference = false) =>
-    session({ structured_output: { lines, ignoredPreference } });
-
-  it("runs Sonnet at low effort with its prompt and the order wrapped in <order>", async () => {
-    const calls: LlmCall[] = [];
-    const argsSeen: string[][] = [];
-    const inputsSeen: string[] = [];
-    const llm = llmWith(answer([line({})]), calls, argsSeen, [], inputsSeen);
-    await llm.parseOrder("coca 2,25, pan", signal);
-    const args = argsSeen[0]!;
-    assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
-    assert.equal(args[args.indexOf("--effort") + 1], "low");
-    assert.equal(args[args.indexOf("--system-prompt") + 1], "Parse the order.");
-    assert.deepEqual(inputsSeen, ["<order>\ncoca 2,25, pan\n</order>"]);
-    assert.deepEqual(
-      calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
-      [
-        {
-          task: "parse-order",
-          model: "claude-sonnet-5-5",
-          effort: "low",
-          input: "<order>\ncoca 2,25, pan\n</order>",
-        },
-      ],
-    );
-  });
-
-  it("runs the model and effort it is given for the task", async () => {
-    const argsSeen: string[][] = [];
-    const llm = createClaudeCodeLlm({
-      promptsDir,
-      models: { "parse-order": { model: "claude-haiku-5-5", effort: null } },
-      run: (args) => {
-        argsSeen.push(args);
-        return Promise.resolve(answer([line({})]));
-      },
-    });
-    await llm.parseOrder("coca", signal);
-    const args = argsSeen[0]!;
-    assert.equal(args[args.indexOf("--model") + 1], "claude-haiku-5-5");
-    assert.equal(args.includes("--effort"), false);
-  });
-
-  it("parses each line's size and quantity into the Item", async () => {
-    const llm = llmWith(
-      answer(
-        [
-          line({ size: "2.25 l" }),
-          line({
-            original: "picana 2kg",
-            product: "Picaña",
-            brand: null,
-            size: "common",
-            quantity: "1.5 kg",
-          }),
-          line({
-            original: "coca cola zero grande",
-            product: "Gaseosa cola zero",
-            size: "biggest",
-            quantity: "2 unit",
-          }),
-        ],
-        true,
-      ),
-    );
-    assert.deepEqual(await llm.parseOrder("coca 2,25, picana 2kg", signal), {
-      items: [
-        {
-          original: "coca 2,25",
-          product: "Gaseosa cola",
-          brand: "Coca Cola",
-          size: { kind: "exact", dimension: "volume", amount: 2250 },
-          quantity: { kind: "minimum" },
-        },
-        {
-          original: "picana 2kg",
-          product: "Picaña",
-          brand: null,
-          size: { kind: "common" },
-          quantity: { kind: "weight", grams: 1500 },
-        },
-        {
-          original: "coca cola zero grande",
-          product: "Gaseosa cola zero",
-          brand: "Coca Cola",
-          size: { kind: "biggest" },
-          quantity: { kind: "units", count: 2 },
-        },
-      ],
-      ignoredPreference: true,
-    });
-  });
-
-  it.each([
-    ["a size it cannot read", { size: "grande" }],
-    ["a size of zero", { size: "0 ml" }],
-    ["a weight as the quantity's size", { quantity: "2 l" }],
-    ["a quantity of zero", { quantity: "0 kg" }],
-    ["a count of no units", { quantity: "0 unit" }],
-  ])("fails on %s", async (_case, fields) => {
-    const llm = llmWith(answer([line(fields)]));
-    await assert.rejects(llm.parseOrder("coca", signal), /parse-order returned an invalid answer/);
-  });
-
-  it("fails on an answer without lines", async () => {
-    const llm = llmWith(answer([]));
-    await assert.rejects(
-      llm.parseOrder("pago con Visa", signal),
-      /parse-order returned an invalid answer/,
-    );
+    assert.equal(args[args.indexOf("--max-budget-usd") + 1], "0.05");
+    assert.equal(TASK_BUDGETS_USD["fit-products"], 0.25);
   });
 });
 
@@ -626,305 +245,6 @@ describe("fitProducts", () => {
     await assert.rejects(
       llm.fitProducts(input(), signal),
       /fit-products returned an invalid answer/,
-    );
-  });
-});
-
-describe("readReply", () => {
-  const product = (name: string, brand: string | null): CatalogProduct => ({
-    productId: name,
-    itemId: name,
-    name,
-    brand,
-    department: "Bebidas",
-    tipo: null,
-    price: 1000,
-    inStock: true,
-    sale: { kind: "packaged", size: null },
-    teasers: [],
-  });
-  const input: ReadReplyInput = {
-    items: [
-      {
-        kind: "asked",
-        original: "cerveza artesanal de tamarindo",
-        question: {
-          text: "No encontré cerveza de tamarindo. ¿Te sirve alguna?",
-          alternatives: [
-            product("Cerveza ipa República Artesanal 473 ml", "República Artesanal"),
-            product("Cerveza roja Patagonia 730 cc", "Patagonia"),
-          ],
-        },
-      },
-      {
-        kind: "bought",
-        original: "coca cola zero grande",
-        product: product("Gaseosa cola Coca Cola Zero 2,25 lts", "Coca Cola"),
-      },
-      {
-        kind: "asked",
-        original: "1 bolsa de carbon",
-        question: {
-          text: "¿Te sirve este?",
-          alternatives: [product("Carbón vegetal 4 kg", null)],
-        },
-      },
-    ],
-    reply: "la 2, y sacá el carbón",
-  };
-  const line = (fields: Record<string, unknown>) => ({
-    original: "un vino tinto",
-    product: "Vino tinto",
-    brand: null,
-    size: "common",
-    quantity: "minimum",
-    ...fields,
-  });
-  const answer = (entries: Record<string, unknown>[], newLines: unknown[] = []) =>
-    session({ structured_output: { entries, newLines, ignoredPreference: false } });
-
-  it("runs Sonnet at low effort with its prompt and the Items and reply it renders", async () => {
-    const calls: LlmCall[] = [];
-    const argsSeen: string[][] = [];
-    const inputsSeen: string[] = [];
-    const llm = llmWith(
-      answer([
-        { item: 1, kind: "choice", alternative: 2 },
-        { item: 3, kind: "drop" },
-      ]),
-      calls,
-      argsSeen,
-      [],
-      inputsSeen,
-    );
-    assert.deepEqual(await llm.readReply(input, signal), {
-      entries: [
-        { item: 1, kind: "choice", alternative: 2 },
-        { item: 3, kind: "drop" },
-      ],
-      newLines: [],
-      ignoredPreference: false,
-    });
-    const args = argsSeen[0]!;
-    assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
-    assert.equal(args[args.indexOf("--effort") + 1], "low");
-    assert.equal(args[args.indexOf("--system-prompt") + 1], "Read the reply.");
-    const rendered = [
-      "<items>",
-      '<item number="1" state="asked">',
-      "<original>cerveza artesanal de tamarindo</original>",
-      "<question>No encontré cerveza de tamarindo. ¿Te sirve alguna?</question>",
-      "<alternatives>",
-      "1. Cerveza ipa República Artesanal 473 ml | República Artesanal",
-      "2. Cerveza roja Patagonia 730 cc | Patagonia",
-      "</alternatives>",
-      "</item>",
-      '<item number="2" state="in-cart">',
-      "<original>coca cola zero grande</original>",
-      "<bought>Gaseosa cola Coca Cola Zero 2,25 lts | Coca Cola</bought>",
-      "</item>",
-      '<item number="3" state="asked">',
-      "<original>1 bolsa de carbon</original>",
-      "<question>¿Te sirve este?</question>",
-      "<alternatives>",
-      "1. Carbón vegetal 4 kg | sin marca",
-      "</alternatives>",
-      "</item>",
-      "</items>",
-      "<reply>",
-      "la 2, y sacá el carbón",
-      "</reply>",
-    ].join("\n");
-    assert.deepEqual(inputsSeen, [rendered]);
-    assert.deepEqual(
-      calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
-      [{ task: "read-reply", model: "claude-sonnet-5-5", effort: "low", input: rendered }],
-    );
-  });
-
-  it("parses the size and quantity of replacing lines and new lines into Items", async () => {
-    const llm = llmWith(
-      answer(
-        [
-          {
-            item: 2,
-            kind: "lines",
-            lines: [
-              line({
-                original: "la coca de 1,5",
-                product: "Gaseosa cola zero",
-                brand: "Coca Cola",
-                size: "1.5 l",
-              }),
-            ],
-          },
-        ],
-        [line({ quantity: "2 unit" })],
-      ),
-    );
-    assert.deepEqual(await llm.readReply(input, signal), {
-      entries: [
-        {
-          item: 2,
-          kind: "lines",
-          lines: [
-            {
-              original: "la coca de 1,5",
-              product: "Gaseosa cola zero",
-              brand: "Coca Cola",
-              size: { kind: "exact", dimension: "volume", amount: 1500 },
-              quantity: { kind: "minimum" },
-            },
-          ],
-        },
-      ],
-      newLines: [
-        {
-          original: "un vino tinto",
-          product: "Vino tinto",
-          brand: null,
-          size: { kind: "common" },
-          quantity: { kind: "units", count: 2 },
-        },
-      ],
-      ignoredPreference: false,
-    });
-  });
-
-  it("keeps a question for an ambiguous Correction of an Item in the cart", async () => {
-    const llm = llmWith(
-      answer([
-        { item: 1, kind: "choice", alternative: 1 },
-        { item: 2, kind: "unanswered", question: "¿Cuál coca, la zero o la normal?" },
-        { item: 3, kind: "unanswered", question: null },
-      ]),
-    );
-    assert.deepEqual((await llm.readReply(input, signal)).entries[1], {
-      item: 2,
-      kind: "unanswered",
-      question: "¿Cuál coca, la zero o la normal?",
-    });
-  });
-
-  it.each([
-    ["an alternative of zero", [{ item: 1, kind: "choice", alternative: 0 }]],
-    ["lines without a line", [{ item: 2, kind: "lines", lines: [] }]],
-    [
-      "a line with a size it cannot read",
-      [{ item: 2, kind: "lines", lines: [line({ size: "1,5" })] }],
-    ],
-    ["an unknown kind", [{ item: 1, kind: "any" }]],
-  ])("fails on %s", async (_case, entries) => {
-    const llm = llmWith(answer(entries));
-    await assert.rejects(llm.readReply(input, signal), /read-reply returned an invalid answer/);
-  });
-
-  it("fails on a new line with a quantity it cannot read", async () => {
-    const llm = llmWith(answer([], [line({ quantity: "0 unit" })]));
-    await assert.rejects(llm.readReply(input, signal), /read-reply returned an invalid answer/);
-  });
-});
-
-describe("judgeIdea", () => {
-  const judgeWith = (
-    result: ProcessResult,
-    calls: LlmCall[],
-    argsSeen: string[][],
-    inputsSeen: string[],
-  ) =>
-    createClaudeCodeIdeaJudge({
-      promptsDir,
-      run: (args, input) => {
-        argsSeen.push(args);
-        inputsSeen.push(input);
-        return Promise.resolve(result);
-      },
-      onCall: (call) => calls.push(call),
-    });
-
-  it("renders the request, the message and the Plan and returns the judgment", async () => {
-    const calls: LlmCall[] = [];
-    const argsSeen: string[][] = [];
-    const inputsSeen: string[] = [];
-    const judge = judgeWith(
-      session({ structured_output: { sensible: true, reason: "Cantidades razonables" } }),
-      calls,
-      argsSeen,
-      inputsSeen,
-    );
-    const judgment = await judge.judgeIdea(
-      {
-        request: "un asado para 10",
-        message: "Te armé un asado.",
-        plan: {
-          title: "Asado para 10",
-          idea: [{ heading: "Pasos", text: "Prendé el fuego." }],
-          lines: [
-            {
-              productId: "p1",
-              name: "Asado x kg",
-              sale: { kind: "by-weight", saleStepKg: 1.2 },
-              quantity: 2400,
-              purpose: "para el asado",
-              total: 28800,
-            },
-            {
-              productId: "p2",
-              name: "Carbón 4 kg",
-              sale: { kind: "packaged", size: null },
-              quantity: 2,
-              purpose: "para la parrilla",
-              total: null,
-            },
-          ],
-          total: 28800,
-        },
-      },
-      signal,
-    );
-    assert.deepEqual(judgment, { sensible: true, reason: "Cantidades razonables" });
-    const [args] = argsSeen;
-    assert.equal(args![args!.indexOf("--system-prompt") + 1], "Judge the Idea.");
-    assert.equal(
-      inputsSeen[0],
-      [
-        "<request>un asado para 10</request>",
-        "<message>Te armé un asado.</message>",
-        "<plan>",
-        "<title>Asado para 10</title>",
-        "<idea>",
-        "## Pasos",
-        "Prendé el fuego.",
-        "</idea>",
-        "<lines>",
-        "Asado x kg | 2400 g | para el asado | $28800",
-        "Carbón 4 kg | 2 u | para la parrilla | no price",
-        "</lines>",
-        "<total>$28800</total>",
-        "</plan>",
-      ].join("\n"),
-    );
-    assert.deepEqual(
-      calls.map(({ task, model, effort }) => ({ task, model, effort })),
-      [{ task: "judge-idea", model: "claude-sonnet-5-5", effort: null }],
-    );
-  });
-
-  it("says when no Plan was shown", async () => {
-    const inputsSeen: string[] = [];
-    const judge = judgeWith(
-      session({ structured_output: { sensible: false, reason: "No responde" } }),
-      [],
-      [],
-      inputsSeen,
-    );
-    await judge.judgeIdea(
-      { request: "¿qué vino va con pescado?", message: null, plan: null },
-      signal,
-    );
-    assert.equal(
-      inputsSeen[0],
-      "<request>¿qué vino va con pescado?</request>\n<message>none</message>\n<plan>none</plan>",
     );
   });
 });

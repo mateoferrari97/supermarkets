@@ -1,11 +1,4 @@
-export type Step =
-  | { kind: "understand-message" }
-  | { kind: "understand-order" }
-  | { kind: "understand-answer" }
-  | { kind: "choose-products"; original: string }
-  | { kind: "plan" }
-  | { kind: "search"; queries: string[] }
-  | { kind: "simulate-cart" };
+export type Step = { kind: "choose-products"; original: string };
 
 export type StepEvent =
   | { status: "started"; id: number; step: Step }

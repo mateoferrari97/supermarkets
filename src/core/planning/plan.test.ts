@@ -48,22 +48,8 @@ const planOf = (lines: PlanLine[]): Plan => ({
   lines,
 });
 
-const input = (products: CatalogProduct[] = seen) => ({
-  messages: [{ role: "owner" as const, text: "quiero hacer lasaña para 4" }],
-  products,
-  lastPlan: null,
-});
-
-const shownOf = (lines: PlanLine[], products: CatalogProduct[] = seen): PlanShown => {
-  const output = checkPlan(input(products), {
-    kind: "answer",
-    message: "Acá va la lasaña.",
-    plan: planOf(lines),
-    budget: null,
-  });
-  if (output.kind !== "answer" || output.plan === null) throw new Error("no Plan");
-  return output.plan;
-};
+const shownOf = (lines: PlanLine[], products: CatalogProduct[] = seen): PlanShown =>
+  checkPlan(planOf(lines), products, null);
 
 const failure = (lines: PlanLine[]) => () => shownOf(lines);
 
@@ -180,61 +166,9 @@ describe("checkPlan", () => {
     });
   });
 
-  it("keeps an answer with no Plan as its message", () => {
-    assert.deepEqual(
-      checkPlan(input(), {
-        kind: "answer",
-        message: "¿Con carne o verdura?",
-        plan: null,
-        budget: null,
-      }),
-      { kind: "answer", message: "¿Con carne o verdura?", plan: null, budget: null },
-    );
-  });
-
-  it("keeps the Owner's budget of an answer", () => {
-    const output = checkPlan(input(), {
-      kind: "answer",
-      message: "Un asado para 10.",
-      plan: planOf([line("p1", 1)]),
-      budget: 50000,
-    });
-    assert.equal(output.kind === "answer" && output.budget, 50000);
-  });
-
   it("rejects a budget that is not positive", () => {
-    assert.throws(
-      () =>
-        checkPlan(input(), {
-          kind: "answer",
-          message: "Un asado para 10.",
-          plan: null,
-          budget: 0,
-        }),
-      { message: "plan answer breaks a rule: budget 0 is not positive" },
-    );
-  });
-
-  it("keeps a search of up to 8 queries", () => {
-    const queries = ["tapas lasaña", "carne picada", "mozzarella"];
-    assert.deepEqual(checkPlan(input(), { kind: "search", queries }), { kind: "search", queries });
-  });
-
-  it("rejects a search of more than 8 queries", () => {
-    const queries = Array.from({ length: 9 }, (_, index) => `producto ${String(index)}`);
-    assert.throws(() => checkPlan(input(), { kind: "search", queries }), {
-      message: "plan answer breaks a rule: 9 queries, more than 8",
-    });
-  });
-
-  it("keeps a confirm once a Plan was shown", () => {
-    const shown = { ...input(), lastPlan: planOf([line("p1", 1)]) };
-    assert.deepEqual(checkPlan(shown, { kind: "confirm" }), { kind: "confirm" });
-  });
-
-  it("rejects a confirm when no Plan was shown", () => {
-    assert.throws(() => checkPlan(input(), { kind: "confirm" }), {
-      message: "plan answer breaks a rule: a confirm with no Plan shown",
+    assert.throws(() => checkPlan(planOf([line("p1", 1)]), seen, 0), {
+      message: "plan answer breaks a rule: budget 0 is not positive",
     });
   });
 

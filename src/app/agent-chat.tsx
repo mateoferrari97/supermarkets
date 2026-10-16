@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { ChatMessage } from "../../core/agent-chat/chat.ts";
-import type { Cart, Idea, OrderLine, Proposal } from "../../core/agent-chat/order.ts";
-import { optionLetter, type Round } from "../../core/agent-chat/round.ts";
+import type { ChatMessage } from "../core/agent-chat/chat.ts";
+import type { Cart, Idea, OrderLine, Proposal } from "../core/agent-chat/order.ts";
+import { optionLetter, type Round } from "../core/agent-chat/round.ts";
 
 const money = new Intl.NumberFormat("es-AR", {
   style: "currency",

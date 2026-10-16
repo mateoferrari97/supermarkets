@@ -1,8 +1,7 @@
 import { z } from "zod";
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import type { CatalogSearch } from "../order-matching/catalog-search.ts";
-import { PLAN_MATCHES_LIMIT, SEARCH_ROUNDS_LIMIT } from "../planning/plan-searches.ts";
-import { PLAN_QUERIES_LIMIT } from "../planning/plan.ts";
+import { PLAN_MATCHES_LIMIT, PLAN_QUERIES_LIMIT, SEARCH_ROUNDS_LIMIT } from "../planning/plan.ts";
 import { openOrder, seenRow } from "./order.ts";
 import type { OrdersStore } from "./orders-store.ts";
 import type { PlanTurn } from "./plan-turn.ts";

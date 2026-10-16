@@ -11,7 +11,7 @@ const words = args.filter(
   (_, index) => brandFlag === -1 || (index !== brandFlag && index !== brandFlag + 1),
 );
 if (words.length === 0 || (brandFlag !== -1 && brand === null)) {
-  fail(["Usage: pnpm order:label <words> [--brand <brand>]"]);
+  fail(["Usage: pnpm agent:label <words> [--brand <brand>]"]);
 }
 
 const search = valueOf(createCatalogSearch());

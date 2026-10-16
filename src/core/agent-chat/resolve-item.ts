@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { stepsFrom } from "../order-conversation/steps.ts";
+import { stepsFrom } from "../order-matching/steps.ts";
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import { MATCHES_LIMIT, type CatalogSearch } from "../order-matching/catalog-search.ts";
 import { parseLine, type Item } from "../order-matching/item.ts";

@@ -105,6 +105,83 @@
       }
     },
     {
+      "id": "size-words-pick-the-biggest",
+      "covers": ["precise-product", "confirm-first"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero dos cocas grandes",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Coca-Cola sabor original 2,25 l",
+            "fits": ["30138"],
+            "quantity": 2
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "id": "preferences-are-ignored",
+      "covers": ["precise-product", "confirm-first"],
+      "expectedToFail": "In 1 of 2 runs and 1 of 3 runs on 2026-10-16 the agent answered the first message in text, explaining it does not handle payment and asking \"¿Confirmás el pedido así?\", instead of calling proposeOrder, so the Owner confirmed a proposal that did not exist yet",
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero aceite de girasol, nada de Marolio, y pago con visa",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Aceite de girasol",
+            "fits": [
+              "6307",
+              "6309",
+              "244757",
+              "253384",
+              "255169",
+              "332888",
+              "664054",
+              "664061",
+              "680457",
+              "699030",
+              "700951",
+              "700952",
+              "757629"
+            ],
+            "quantity": 1
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
       "id": "repeat-last-order",
       "covers": ["repeat-order"],
       "setup": {

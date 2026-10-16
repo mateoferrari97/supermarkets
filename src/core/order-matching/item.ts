@@ -24,15 +24,6 @@ export type ItemLine = {
 
 export type LineParse = { ok: true; item: Item } | { ok: false; failure: string };
 
-export type ParseOrderOutput = {
-  items: Item[];
-  ignoredPreference: boolean;
-};
-
-export type ParseOrderLlm = {
-  parseOrder(orderText: string, signal: AbortSignal): Promise<ParseOrderOutput>;
-};
-
 const AMOUNT = String.raw`\d+(\.\d+)?`;
 
 export const SIZE_PATTERN = new RegExp(`^(common|biggest|smallest|${AMOUNT} (ml|l|g|kg))$`);
