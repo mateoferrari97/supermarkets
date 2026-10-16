@@ -14,6 +14,13 @@ describe("stepTurnEvent", () => {
     );
   });
 
+  it("says it is understanding the Owner's message while route-message runs", () => {
+    assert.deepEqual(
+      stepTurnEvent({ status: "started", id: 1, step: { kind: "understand-message" } }),
+      { type: "step-started", id: 1, text: "Entendiendo tu mensaje" },
+    );
+  });
+
   it("turns a done step into its id and seconds", () => {
     assert.deepEqual(
       stepTurnEvent({

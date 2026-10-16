@@ -3,6 +3,8 @@ import type { TurnEvent } from "./turn-events.ts";
 
 export function stepText(step: Step): string {
   switch (step.kind) {
+    case "understand-message":
+      return "Entendiendo tu mensaje";
     case "understand-order":
       return "Entendiendo el pedido";
     case "understand-answer":

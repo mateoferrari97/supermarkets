@@ -2,6 +2,7 @@ import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import type { ParseOrderLlm } from "../order-matching/item.ts";
 import { matchItems, type FitProductsLlm } from "../order-matching/match-items.ts";
 import { checkedReadReply, type ReadReplyLlm } from "../order-matching/read-reply.ts";
+import type { RouteMessageLlm } from "../planning/route-message.ts";
 import { simulateCart } from "../product-selection/cart.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
 import { postalCodeFrom } from "../product-selection/postal-code.ts";
@@ -24,6 +25,9 @@ export type { AskedQuestion, Cart, CartLineShown, Mark };
 
 export const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
 export const ORDER_QUESTION = "¿Qué necesitás del súper?";
+export const OFF_TOPIC_TEXT =
+  "Puedo ayudarte con compras del súper: pedidos, recetas, comidas de la semana, eventos y regalos de Carrefour. ¿Qué necesitás?";
+
 export type ConversationState =
   | { stage: "postal-code" }
   | { stage: "order"; postalCode: string }
@@ -40,7 +44,7 @@ export type Reply =
 export type Turn = { state: ConversationState; reply: Reply };
 
 export type ConversationDependencies = {
-  llm: ParseOrderLlm & FitProductsLlm & ReadReplyLlm;
+  llm: RouteMessageLlm & ParseOrderLlm & FitProductsLlm & ReadReplyLlm;
   search: CatalogSearch;
   store: OnlineStore;
   signal?: AbortSignal;
@@ -71,7 +75,7 @@ async function turnFor(
       return postalCodeTurn(reply, deps.store, steps.signal);
     case "order":
       if (!reply) return ask(state, ORDER_QUESTION);
-      return orderTurn(state, reply, deps, steps);
+      return firstMessageTurn(state, reply, deps, steps);
     case "questions":
     case "cart": {
       const { stage: _stage, ...order } = state;
@@ -95,6 +99,19 @@ async function postalCodeTurn(reply: string, store: OnlineStore, signal: AbortSi
       ? `Carrefour no entrega en el código postal ${postalCode}.`
       : `"${reply}" no es un código postal válido.`;
   return ask(state, `${refusal} ${POSTAL_CODE_QUESTION}`);
+}
+
+async function firstMessageTurn(
+  state: { stage: "order"; postalCode: string },
+  reply: string,
+  deps: ConversationDependencies,
+  steps: Steps,
+): Promise<Turn> {
+  const { topic } = await steps.run({ kind: "understand-message" }, () =>
+    deps.llm.routeMessage(reply, steps.signal),
+  );
+  if (topic !== "order") return ask(state, OFF_TOPIC_TEXT);
+  return orderTurn(state, reply, deps, steps);
 }
 
 async function orderTurn(

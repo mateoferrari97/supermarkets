@@ -5,6 +5,7 @@ import {
   QUANTITY_PATTERN,
   SIZE_PATTERN,
 } from "../../core/order-matching/item.ts";
+import { TOPICS } from "../../core/planning/route-message.ts";
 
 export const lineSchema = z.strictObject({
   original: z.string().min(1),
@@ -23,6 +24,10 @@ export const lineSchema = z.strictObject({
 });
 
 export type LineOutput = z.infer<typeof lineSchema>;
+
+export const routeMessageOutputSchema = z.strictObject({
+  topic: z.enum(TOPICS),
+});
 
 export const parseOrderOutputSchema = z.strictObject({
   lines: z.array(lineSchema).min(1),
