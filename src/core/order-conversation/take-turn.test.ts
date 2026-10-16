@@ -5,6 +5,7 @@ import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import type { Item } from "../order-matching/item.ts";
 import type { FitProductsInput, FitProductsOutput } from "../order-matching/match-items.ts";
 import type { ReadReplyInput, ReadReplyOutput } from "../order-matching/read-reply.ts";
+import type { PlanInput, PlanOutput } from "../planning/plan.ts";
 import type { Topic } from "../planning/route-message.ts";
 import type {
   Delivery,
@@ -90,6 +91,7 @@ type Script = {
   answers?: Record<string, (input: FitProductsInput) => Partial<FitProductsOutput>>;
   replies?: Partial<ReadReplyOutput>[];
   deliveries?: Record<string, Delivery>;
+  plans?: PlanOutput[];
 };
 
 const conversation = ({
@@ -98,6 +100,7 @@ const conversation = ({
   answers = {},
   replies = [],
   deliveries = {},
+  plans = [],
 }: Script = {}) => {
   const calls: string[] = [];
   const routed: string[] = [];
@@ -107,6 +110,8 @@ const conversation = ({
   const readInputs: ReadReplyInput[] = [];
   const fitted: string[] = [];
   const pendingReplies = [...replies];
+  const pendingPlans = [...plans];
+  const planInputs: PlanInput[] = [];
   const seen = (name: string, signal: AbortSignal) => {
     calls.push(name);
     signals.push(signal);
@@ -135,6 +140,13 @@ const conversation = ({
           question: null,
           ...answers[input.item.product]?.(input),
         });
+      },
+      plan: (input, signal) => {
+        seen("plan", signal);
+        planInputs.push(input);
+        return Promise.resolve(
+          pendingPlans.shift() ?? { kind: "answer", message: "¿Algo más?", plan: null },
+        );
       },
       readReply: (input, signal) => {
         seen("readReply", signal);
@@ -170,7 +182,7 @@ const conversation = ({
         `cart:${cart.map(({ itemId, quantity }) => `${itemId}x${quantity}`).join(",")}`,
     } satisfies OnlineStore,
   };
-  return { deps, calls, signals, simulations, readInputs, fitted, routed, parsed };
+  return { deps, calls, signals, simulations, readInputs, fitted, routed, parsed, planInputs };
 };
 
 const ordering: ConversationState = { stage: "order", postalCode: "1425" };
@@ -323,13 +335,6 @@ describe("takeTurn", () => {
       assert.deepEqual(calls, ["routeMessage"]);
     });
 
-    it("answers a plan message with the fixed text and stays in stage order", async () => {
-      const { deps, calls } = conversation({ topic: "plan" });
-      const turn = await takeTurn(ordering, "quiero hacer lasaña para 4", deps);
-      assert.deepEqual(turn, { state: ordering, reply: { kind: "ask", text: OFF_TOPIC_TEXT } });
-      assert.deepEqual(calls, ["routeMessage"]);
-    });
-
     it("lets the Owner write again after an off-topic message and reads the order", async () => {
       const fake = conversation({ topic: "off-topic", items: [item("yerba", "yerba")] });
       const first = await takeTurn(ordering, "hola", fake.deps);
@@ -363,6 +368,105 @@ describe("takeTurn", () => {
         ["yerba", "agregá un vino"],
       );
       assert.deepEqual(routed, ["yerba"]);
+    });
+  });
+
+  describe("planning", () => {
+    const toPlan = (texts: string[], plans: PlanOutput[]) => run({ topic: "plan", plans }, texts);
+
+    const lasagna = (servings: number, packages: number): PlanOutput => ({
+      kind: "answer",
+      message: `Acá va la lasaña para ${String(servings)}.`,
+      plan: {
+        title: `Lasaña para ${String(servings)}`,
+        idea: [{ heading: "Pasos", text: "Armá capas y horneá 40 minutos." }],
+        lines: [
+          { productId: "p4", quantity: packages, purpose: "para la lasaña", reason: "Queso" },
+        ],
+      },
+    });
+
+    const searchQueso: PlanOutput = { kind: "search", queries: ["queso"] };
+
+    it("starts stage planning for a plan message and shows the Plan the planner answers", async () => {
+      const { last, planInputs, calls } = await toPlan(
+        ["quiero hacer lasaña para 4"],
+        [searchQueso, lasagna(4, 2)],
+      );
+      assert.deepEqual(calls, ["routeMessage", "plan", "plan"]);
+      assert.deepEqual(planInputs[0], {
+        messages: [{ role: "owner", text: "quiero hacer lasaña para 4" }],
+        products: [],
+        lastPlan: null,
+      });
+      assert.deepEqual(
+        planInputs[1]!.products.map(({ productId }) => productId),
+        ["p4", "p5"],
+      );
+      assert.equal(last.reply.kind, "plan");
+      if (last.reply.kind !== "plan") return;
+      assert.equal(last.reply.message, "Acá va la lasaña para 4.");
+      assert.equal(last.reply.plan.title, "Lasaña para 4");
+      assert.deepEqual(
+        last.reply.plan.lines.map(({ product, quantity, purpose, total }) => [
+          product.name,
+          quantity,
+          purpose,
+          total,
+        ]),
+        [["Queso Port Salut Sancor 500 g", 2, "para la lasaña", 8000]],
+      );
+      assert.equal(last.reply.plan.total, 8000);
+      assert.equal(last.state.stage, "planning");
+    });
+
+    it("sends a revision to the planner with the conversation, the products seen and the last Plan shown", async () => {
+      const { last, planInputs, routed } = await toPlan(
+        ["quiero hacer lasaña para 4", "que sea para 6"],
+        [searchQueso, lasagna(4, 2), lasagna(6, 3)],
+      );
+      assert.deepEqual(routed, ["quiero hacer lasaña para 4"]);
+      const revision = planInputs[2]!;
+      assert.deepEqual(revision.messages, [
+        { role: "owner", text: "quiero hacer lasaña para 4" },
+        { role: "planner", text: "Acá va la lasaña para 4." },
+        { role: "owner", text: "que sea para 6" },
+      ]);
+      assert.deepEqual(
+        revision.products.map(({ productId }) => productId),
+        ["p4", "p5"],
+      );
+      assert.equal(revision.lastPlan?.title, "Lasaña para 4");
+      assert.equal(last.reply.kind === "plan" && last.reply.plan.total, 12000);
+      assert.equal(last.state.stage, "planning");
+    });
+
+    it("shows an answer with no Plan as a message and stays in planning with the last Plan", async () => {
+      const question: PlanOutput = { kind: "answer", message: "¿Con bechamel?", plan: null };
+      const { last, planInputs } = await toPlan(
+        ["quiero hacer lasaña para 4", "no sé", "dale"],
+        [searchQueso, lasagna(4, 2), question],
+      );
+      assert.deepEqual(planInputs[2]!.lastPlan?.title, "Lasaña para 4");
+      assert.deepEqual(planInputs[3]!.lastPlan?.title, "Lasaña para 4");
+      assert.equal(planInputs[3]!.messages.at(-2)?.text, "¿Con bechamel?");
+      assert.equal(last.state.stage, "planning");
+    });
+
+    it("answers a clarifying question as a message", async () => {
+      const { last } = await toPlan(
+        ["quiero cocinar algo rico"],
+        [{ kind: "answer", message: "¿Para cuántas personas?", plan: null }],
+      );
+      assert.deepEqual(last.reply, { kind: "ask", text: "¿Para cuántas personas?" });
+      assert.equal(last.state.stage, "planning");
+    });
+
+    it("ends the turn with an error when the planner proposes a product it did not see", async () => {
+      await assert.rejects(toPlan(["quiero hacer lasaña para 4"], [lasagna(4, 2)]), {
+        message:
+          "plan answer breaks a rule: product p4 was not returned by a search of this conversation",
+      });
     });
   });
 

@@ -11,17 +11,19 @@ import type {
   ReadReplyOutput,
   ReplyEntry,
 } from "../../core/order-matching/read-reply.ts";
-import type { CatalogProduct } from "../../core/order-matching/catalog-product.ts";
+import type { CatalogProduct, Sale } from "../../core/order-matching/catalog-product.ts";
+import type { Plan, PlanInput, PlanOutput } from "../../core/planning/plan.ts";
 import {
   fitProductsOutputSchema,
   parseOrderOutputSchema,
+  planOutputSchema,
   readReplyOutputSchema,
   routeMessageOutputSchema,
   type LineOutput,
 } from "./llm-output-schemas.ts";
 import type { Llm } from "../../core/order-matching/llm.ts";
 
-export type LlmTask = "route-message" | "parse-order" | "fit-products" | "read-reply";
+export type LlmTask = "route-message" | "parse-order" | "fit-products" | "read-reply" | "plan";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type TaskModel = { model: string; effort: Effort | null };
 
@@ -30,6 +32,7 @@ export const TASK_MODELS: Record<LlmTask, TaskModel> = {
   "parse-order": { model: "claude-sonnet-5-5", effort: "low" },
   "fit-products": { model: "claude-sonnet-5-5", effort: null },
   "read-reply": { model: "claude-sonnet-5-5", effort: "low" },
+  plan: { model: "claude-sonnet-5-5", effort: null },
 };
 
 export const TASK_BUDGETS_USD: Record<LlmTask, number> = {
@@ -37,6 +40,7 @@ export const TASK_BUDGETS_USD: Record<LlmTask, number> = {
   "parse-order": 0.25,
   "fit-products": 0.25,
   "read-reply": 0.25,
+  plan: 1,
 };
 
 const PROMPT_FILES: Record<LlmTask, string> = {
@@ -44,6 +48,7 @@ const PROMPT_FILES: Record<LlmTask, string> = {
   "parse-order": "order-matching/parse-order.md",
   "fit-products": "order-matching/fit-products.md",
   "read-reply": "order-matching/read-reply.md",
+  plan: "planning/plan.md",
 };
 
 export type ProcessResult = { exitCode: number; stdout: string; stderr: string };
@@ -187,7 +192,59 @@ export function createClaudeCodeLlm({
           signal,
         ),
       ),
+    plan: async (input, signal) =>
+      readPlan(await ask("plan", prompt("plan"), planOutputSchema, renderPlan(input), signal)),
   };
+}
+
+function readPlan({ kind, queries, message, plan }: z.infer<typeof planOutputSchema>): PlanOutput {
+  return kind === "search" ? { kind, queries } : { kind, message: message!, plan };
+}
+
+export function renderPlan({ messages, products, lastPlan }: PlanInput): string {
+  return [
+    "<conversation>",
+    ...messages.map(({ role, text }) => `<${role}>${text}</${role}>`),
+    "</conversation>",
+    "<products>",
+    ...products.map(
+      (product) =>
+        `${product.productId} | ${product.name} | ${product.brand ?? "sin marca"} | ${product.department} | ${product.tipo ?? "sin tipo"} | ${priceText(product)} | ${saleText(product.sale)}`,
+    ),
+    "</products>",
+    ...(lastPlan === null ? ["<last-plan>none</last-plan>"] : renderLastPlan(lastPlan)),
+  ].join("\n");
+}
+
+function renderLastPlan({ title, idea, lines }: Plan): string[] {
+  return [
+    "<last-plan>",
+    `<title>${title}</title>`,
+    "<idea>",
+    ...idea.flatMap(({ heading, text }) => [`## ${heading}`, text]),
+    "</idea>",
+    "<lines>",
+    ...lines.map(
+      ({ productId, quantity, purpose, reason }) =>
+        `${productId} | ${String(quantity)} | ${purpose} | ${reason}`,
+    ),
+    "</lines>",
+    "</last-plan>",
+  ];
+}
+
+function priceText({ price, sale }: CatalogProduct): string {
+  if (price === null) return "no price";
+  return sale.kind === "by-weight" ? `$${String(price)} per kg` : `$${String(price)}`;
+}
+
+function saleText(sale: Sale): string {
+  if (sale.kind === "by-weight") {
+    return `by weight, Sale Step ${String(Math.round(sale.saleStepKg * 1000))} g`;
+  }
+  if (sale.size === null) return "packaged, size unknown";
+  const units = { volume: "ml", weight: "g", units: "u", length: "m" } as const;
+  return `packaged, ${String(sale.size.amount)} ${units[sale.size.dimension]}`;
 }
 
 function readParseOrder({

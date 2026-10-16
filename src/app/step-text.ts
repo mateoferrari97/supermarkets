@@ -11,6 +11,10 @@ export function stepText(step: Step): string {
       return "Interpretando tu respuesta";
     case "choose-products":
       return `Eligiendo productos para '${step.original}'`;
+    case "plan":
+      return "Armando el plan";
+    case "search":
+      return `Buscando ${step.queries.map((query) => `'${query}'`).join(", ")}`;
     case "simulate-cart":
       return "Carrefour: simulando el carrito";
   }

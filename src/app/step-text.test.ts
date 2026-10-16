@@ -21,6 +21,25 @@ describe("stepTurnEvent", () => {
     );
   });
 
+  it("says it is planning while the plan task runs", () => {
+    assert.deepEqual(stepTurnEvent({ status: "started", id: 2, step: { kind: "plan" } }), {
+      type: "step-started",
+      id: 2,
+      text: "Armando el plan",
+    });
+  });
+
+  it("names every query of a search round", () => {
+    assert.deepEqual(
+      stepTurnEvent({
+        status: "started",
+        id: 4,
+        step: { kind: "search", queries: ["tapas lasaña", "carne picada"] },
+      }),
+      { type: "step-started", id: 4, text: "Buscando 'tapas lasaña', 'carne picada'" },
+    );
+  });
+
   it("turns a done step into its id and seconds", () => {
     assert.deepEqual(
       stepTurnEvent({

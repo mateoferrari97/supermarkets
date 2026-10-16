@@ -2,6 +2,9 @@ import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import type { ParseOrderLlm } from "../order-matching/item.ts";
 import { matchItems, type FitProductsLlm } from "../order-matching/match-items.ts";
 import { checkedReadReply, type ReadReplyLlm } from "../order-matching/read-reply.ts";
+import type { CatalogProduct } from "../order-matching/catalog-product.ts";
+import type { Plan, PlanLlm, PlanMessage, PlanShown } from "../planning/plan.ts";
+import { planWithSearches } from "../planning/plan-searches.ts";
 import type { RouteMessageLlm } from "../planning/route-message.ts";
 import { simulateCart } from "../product-selection/cart.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
@@ -21,7 +24,7 @@ import {
 } from "./order.ts";
 import { stepsFrom, type OnStep, type Steps } from "./steps.ts";
 
-export type { AskedQuestion, Cart, CartLineShown, Mark };
+export type { AskedQuestion, Cart, CartLineShown, Mark, PlanShown };
 
 export const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
 export const ORDER_QUESTION = "¿Qué necesitás del súper?";
@@ -31,20 +34,30 @@ export const OFF_TOPIC_TEXT =
 export type ConversationState =
   | { stage: "postal-code" }
   | { stage: "order"; postalCode: string }
+  | Planning
   | ({ stage: "questions" } & Order)
   | ({ stage: "cart" } & Order);
+
+export type Planning = {
+  stage: "planning";
+  postalCode: string;
+  messages: PlanMessage[];
+  products: CatalogProduct[];
+  lastPlan: Plan | null;
+};
 
 export const NEW_CONVERSATION: ConversationState = { stage: "postal-code" };
 
 export type Reply =
   | { kind: "ask"; text: string }
   | { kind: "questions"; text: string; questions: AskedQuestion[] }
+  | { kind: "plan"; message: string; plan: PlanShown }
   | { kind: "cart"; cart: Cart };
 
 export type Turn = { state: ConversationState; reply: Reply };
 
 export type ConversationDependencies = {
-  llm: RouteMessageLlm & ParseOrderLlm & FitProductsLlm & ReadReplyLlm;
+  llm: RouteMessageLlm & ParseOrderLlm & FitProductsLlm & ReadReplyLlm & PlanLlm;
   search: CatalogSearch;
   store: OnlineStore;
   signal?: AbortSignal;
@@ -76,6 +89,9 @@ async function turnFor(
     case "order":
       if (!reply) return ask(state, ORDER_QUESTION);
       return firstMessageTurn(state, reply, deps, steps);
+    case "planning":
+      if (!reply) return ask(state, ORDER_QUESTION);
+      return planningTurn(state, reply, deps, steps);
     case "questions":
     case "cart": {
       const { stage: _stage, ...order } = state;
@@ -110,8 +126,40 @@ async function firstMessageTurn(
   const { topic } = await steps.run({ kind: "understand-message" }, () =>
     deps.llm.routeMessage(reply, steps.signal),
   );
+  if (topic === "plan") {
+    const planning: Planning = {
+      stage: "planning",
+      postalCode: state.postalCode,
+      messages: [],
+      products: [],
+      lastPlan: null,
+    };
+    return planningTurn(planning, reply, deps, steps);
+  }
   if (topic !== "order") return ask(state, OFF_TOPIC_TEXT);
   return orderTurn(state, reply, deps, steps);
+}
+
+async function planningTurn(
+  state: Planning,
+  reply: string,
+  deps: ConversationDependencies,
+  steps: Steps,
+): Promise<Turn> {
+  const messages: PlanMessage[] = [...state.messages, { role: "owner", text: reply }];
+  const { output, products } = await planWithSearches(
+    { messages, products: state.products, lastPlan: state.lastPlan },
+    deps,
+    steps,
+  );
+  const next: Planning = {
+    ...state,
+    messages: [...messages, { role: "planner", text: output.message }],
+    products,
+    lastPlan: output.plan?.plan ?? state.lastPlan,
+  };
+  if (output.plan === null) return ask(next, output.message);
+  return { state: next, reply: { kind: "plan", message: output.message, plan: output.plan } };
 }
 
 async function orderTurn(

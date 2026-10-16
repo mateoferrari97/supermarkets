@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { Turn } from "../order-conversation/take-turn.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
+import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import {
+  loggedSearch,
   loggedSteps,
   loggedStore,
   loggedTurn,
@@ -93,6 +95,30 @@ describe("loggedStore", () => {
         input: { postalCode: "1425" },
         output: null,
         error: "Carrefour answered 500",
+        durationMs: 10,
+      },
+    ]);
+  });
+});
+
+describe("loggedSearch", () => {
+  it("records every search with its words, limit, the productIds found and duration", () => {
+    const events: ConversationEvent[] = [];
+    const found = [{ productId: "p1" }, { productId: "p2" }] as CatalogProduct[];
+    const logged = loggedSearch(
+      { findMatches: () => found },
+      (event) => events.push(event),
+      ticking(),
+    );
+
+    assert.equal(logged.findMatches({ product: "carne picada", brand: null }, 20), found);
+    assert.deepEqual(events, [
+      {
+        type: "search-call",
+        product: "carne picada",
+        brand: null,
+        limit: 20,
+        productIds: ["p1", "p2"],
         durationMs: 10,
       },
     ]);

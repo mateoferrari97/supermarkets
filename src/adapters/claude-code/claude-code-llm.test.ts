@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { describe, it } from "vitest";
 import type { CatalogProduct } from "../../core/order-matching/catalog-product.ts";
 import type { FitProductsInput } from "../../core/order-matching/match-items.ts";
+import type { PlanInput } from "../../core/planning/plan.ts";
 import type { ReadReplyInput } from "../../core/order-matching/read-reply.ts";
 import {
   createClaudeCodeLlm,
@@ -20,6 +21,7 @@ const promptsDir = mkdtempSync(join(tmpdir(), "prompts-"));
 mkdirSync(join(promptsDir, "order-matching"));
 mkdirSync(join(promptsDir, "planning"));
 writeFileSync(join(promptsDir, "planning", "route-message.md"), "Route the message.");
+writeFileSync(join(promptsDir, "planning", "plan.md"), "Plan with the catalog.");
 writeFileSync(join(promptsDir, "order-matching", "parse-order.md"), "Parse the order.");
 writeFileSync(join(promptsDir, "order-matching", "fit-products.md"), "Fit the products.");
 writeFileSync(join(promptsDir, "order-matching", "read-reply.md"), "Read the reply.");
@@ -197,6 +199,141 @@ describe("routeMessage", () => {
     await assert.rejects(
       llmWith(topic("recipe")).routeMessage("hola", signal),
       /route-message returned an invalid answer/,
+    );
+  });
+});
+
+describe("plan", () => {
+  const products: CatalogProduct[] = [
+    {
+      productId: "p1",
+      itemId: "1",
+      name: "Tapas para lasaña 500 g",
+      brand: "La Salteña",
+      department: "Almacén",
+      tipo: "Pastas frescas",
+      price: 2500,
+      inStock: true,
+      sale: { kind: "packaged", size: { dimension: "weight", amount: 500 } },
+      teasers: [],
+    },
+    {
+      productId: "p2",
+      itemId: "2",
+      name: "Carne picada especial x kg",
+      brand: null,
+      department: "Carnes",
+      tipo: null,
+      price: 9000,
+      inStock: true,
+      sale: { kind: "by-weight", saleStepKg: 0.5 },
+      teasers: [],
+    },
+    {
+      productId: "p3",
+      itemId: "3",
+      name: "Salsa de tomate",
+      brand: null,
+      department: "Almacén",
+      tipo: null,
+      price: null,
+      inStock: true,
+      sale: { kind: "packaged", size: null },
+      teasers: [],
+    },
+  ];
+  const plan = {
+    title: "Lasaña para 4",
+    idea: [{ heading: "Pasos", text: "Armá capas y horneá." }],
+    lines: [{ productId: "p1", quantity: 2, purpose: "para la lasaña", reason: "La pasta" }],
+  };
+  const input: PlanInput = {
+    messages: [
+      { role: "owner", text: "quiero hacer lasaña para 4" },
+      { role: "planner", text: "Acá va la lasaña." },
+      { role: "owner", text: "que sea para 6" },
+    ],
+    products,
+    lastPlan: plan,
+  };
+  const output = (fields: Record<string, unknown>) =>
+    session({
+      structured_output: { kind: "answer", queries: [], message: null, plan: null, ...fields },
+    });
+
+  it("runs Sonnet at its default effort with its prompt and the conversation it renders", async () => {
+    const calls: LlmCall[] = [];
+    const argsSeen: string[][] = [];
+    const inputsSeen: string[] = [];
+    const llm = llmWith(output({ message: "¿Algo más?" }), calls, argsSeen, [], inputsSeen);
+    await llm.plan(input, signal);
+    const args = argsSeen[0]!;
+    assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
+    assert.equal(args.includes("--effort"), false);
+    assert.equal(args[args.indexOf("--system-prompt") + 1], "Plan with the catalog.");
+    assert.equal(
+      inputsSeen[0],
+      [
+        "<conversation>",
+        "<owner>quiero hacer lasaña para 4</owner>",
+        "<planner>Acá va la lasaña.</planner>",
+        "<owner>que sea para 6</owner>",
+        "</conversation>",
+        "<products>",
+        "p1 | Tapas para lasaña 500 g | La Salteña | Almacén | Pastas frescas | $2500 | packaged, 500 g",
+        "p2 | Carne picada especial x kg | sin marca | Carnes | sin tipo | $9000 per kg | by weight, Sale Step 500 g",
+        "p3 | Salsa de tomate | sin marca | Almacén | sin tipo | no price | packaged, size unknown",
+        "</products>",
+        "<last-plan>",
+        "<title>Lasaña para 4</title>",
+        "<idea>",
+        "## Pasos",
+        "Armá capas y horneá.",
+        "</idea>",
+        "<lines>",
+        "p1 | 2 | para la lasaña | La pasta",
+        "</lines>",
+        "</last-plan>",
+      ].join("\n"),
+    );
+    assert.deepEqual(
+      calls.map(({ task, model, effort }) => ({ task, model, effort })),
+      [{ task: "plan", model: "claude-sonnet-5-5", effort: null }],
+    );
+    assert.deepEqual(TASK_MODELS.plan, { model: "claude-sonnet-5-5", effort: null });
+  });
+
+  it("says when no Plan was shown yet", async () => {
+    const inputsSeen: string[] = [];
+    const llm = llmWith(output({ message: "¿Para cuántos?" }), [], [], [], inputsSeen);
+    await llm.plan({ ...input, products: [], lastPlan: null }, signal);
+    assert.match(inputsSeen[0]!, /<products>\n<\/products>\n<last-plan>none<\/last-plan>$/);
+  });
+
+  it("returns a search with its queries", async () => {
+    const llm = llmWith(output({ kind: "search", queries: ["tapas lasaña", "carne picada"] }));
+    assert.deepEqual(await llm.plan(input, signal), {
+      kind: "search",
+      queries: ["tapas lasaña", "carne picada"],
+    });
+  });
+
+  it("returns an answer with its message and Plan", async () => {
+    const llm = llmWith(output({ message: "Acá va.", plan }));
+    assert.deepEqual(await llm.plan(input, signal), { kind: "answer", message: "Acá va.", plan });
+  });
+
+  it("fails on a search with no queries", async () => {
+    await assert.rejects(
+      llmWith(output({ kind: "search" })).plan(input, signal),
+      /plan returned an invalid answer/,
+    );
+  });
+
+  it("fails on an answer with no message", async () => {
+    await assert.rejects(
+      llmWith(output({ plan })).plan(input, signal),
+      /plan returned an invalid answer/,
     );
   });
 });

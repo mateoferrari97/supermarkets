@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AskedQuestion, Cart, Mark, TurnEvent, TurnRequest } from "./turn-events.ts";
+import type {
+  AskedQuestion,
+  Cart,
+  Mark,
+  PlanShown,
+  TurnEvent,
+  TurnRequest,
+} from "./turn-events.ts";
 
 type Step = { id: number; text: string; seconds: number | null };
 
@@ -9,6 +16,7 @@ type Message =
   | { role: "owner"; text: string }
   | { role: "bot"; text: string; questions: AskedQuestion[] }
   | { role: "steps"; steps: Step[] }
+  | { role: "plan"; text: string; plan: PlanShown }
   | { role: "cart"; cart: Cart }
   | { role: "error"; text: string };
 
@@ -56,6 +64,8 @@ function withEvent(messages: Message[], event: TurnEvent): Message[] {
       );
     case "questions":
       return [...messages, { role: "bot", text: event.text, questions: event.questions }];
+    case "plan":
+      return [...messages, { role: "plan", text: event.message, plan: event.plan }];
     case "cart":
       return [...messages, { role: "cart", cart: event.cart }];
     case "error":
@@ -215,6 +225,12 @@ function MessageView({
           ))}
         </div>
       );
+    case "plan":
+      return (
+        <div className="msg bot wide">
+          <PlanView text={message.text} plan={message.plan} />
+        </div>
+      );
     case "cart":
       return (
         <div className="msg bot wide">
@@ -249,6 +265,64 @@ function QuestionChips({
         Tocá una opción o escribí la respuesta. Podés contestar todo en un solo mensaje.
       </div>
     </div>
+  );
+}
+
+const grams = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
+
+function planQuantityText({ product, quantity }: PlanShown["lines"][number]): string {
+  if (product.sale.kind === "packaged") return String(quantity);
+  return quantity < 1000 ? `${grams.format(quantity)} g` : `${grams.format(quantity / 1000)} kg`;
+}
+
+function PlanView({ text, plan }: { text: string; plan: PlanShown }) {
+  return (
+    <>
+      <div className="text">{text}</div>
+      <h2 className="plan-title">{plan.title}</h2>
+      {plan.idea.map((section) => (
+        <div key={section.heading} className="block">
+          <strong>{section.heading}</strong>
+          <div className="text">{section.text}</div>
+        </div>
+      ))}
+      <table className="block">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th className="num">Cant.</th>
+            <th>Para</th>
+            <th className="num">Precio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plan.lines.map((line, index) => (
+            <tr key={index}>
+              <td>
+                <div>{line.product.name}</div>
+                <div className="muted small">{line.reason}</div>
+                {line.notes.map((note) => (
+                  <div key={note} className="notice">
+                    {note}
+                  </div>
+                ))}
+              </td>
+              <td className="num">{planQuantityText(line)}</td>
+              <td>{line.purpose}</td>
+              <td className="num">{line.total === null ? "—" : money.format(line.total)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={3}>
+              <strong>Total</strong> <span className="muted small">precios del catálogo</span>
+            </td>
+            <td className="num">
+              <strong>{money.format(plan.total)}</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </>
   );
 }
 

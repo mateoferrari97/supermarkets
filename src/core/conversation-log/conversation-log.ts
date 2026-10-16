@@ -1,5 +1,6 @@
 import type { Reply, Turn } from "../order-conversation/take-turn.ts";
 import type { OnStep, Step } from "../order-conversation/steps.ts";
+import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
 
 export type LlmCallRecord = {
@@ -31,6 +32,14 @@ export type ConversationEvent =
       input: unknown;
       output: unknown;
       error: string | null;
+      durationMs: number;
+    }
+  | {
+      type: "search-call";
+      product: string;
+      brand: string | null;
+      limit: number | null;
+      productIds: string[];
       durationMs: number;
     }
   | { type: "assistant-reply"; reply: AssistantReply }
@@ -98,6 +107,28 @@ export function loggedStore(
         durationMs: now() - started,
       });
       return output;
+    },
+  };
+}
+
+export function loggedSearch(
+  search: CatalogSearch,
+  write: WriteConversationEvent,
+  now: Clock = monotonic,
+): CatalogSearch {
+  return {
+    findMatches: (item, limit) => {
+      const started = now();
+      const found = search.findMatches(item, limit);
+      write({
+        type: "search-call",
+        product: item.product,
+        brand: item.brand,
+        limit: limit ?? null,
+        productIds: found.map(({ productId }) => productId),
+        durationMs: now() - started,
+      });
+      return found;
     },
   };
 }

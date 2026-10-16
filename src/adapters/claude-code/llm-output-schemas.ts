@@ -29,6 +29,33 @@ export const routeMessageOutputSchema = z.strictObject({
   topic: z.enum(TOPICS),
 });
 
+const planSchema = z.strictObject({
+  title: z.string().min(1),
+  idea: z.array(z.strictObject({ heading: z.string().min(1), text: z.string().min(1) })),
+  lines: z.array(
+    z.strictObject({
+      productId: z.string().min(1),
+      quantity: z.number(),
+      purpose: z.string().min(1),
+      reason: z.string().min(1),
+    }),
+  ),
+});
+
+export const planOutputSchema = z
+  .strictObject({
+    kind: z.enum(["search", "answer"]),
+    queries: z.array(z.string().min(1)),
+    message: z.string().min(1).nullable(),
+    plan: planSchema.nullable(),
+  })
+  .refine((output) => output.kind !== "search" || output.queries.length > 0, {
+    message: "A search has no queries",
+  })
+  .refine((output) => output.kind !== "answer" || output.message !== null, {
+    message: "An answer has no message",
+  });
+
 export const parseOrderOutputSchema = z.strictObject({
   lines: z.array(lineSchema).min(1),
   ignoredPreference: z.boolean(),

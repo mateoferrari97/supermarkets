@@ -8,6 +8,7 @@ import {
 } from "./adapters/claude-code/claude-code-llm.ts";
 import { createDataFiles, type Checked } from "./adapters/files/data-files.ts";
 import {
+  loggedSearch,
   loggedStore,
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
@@ -111,6 +112,7 @@ export function openConversationLog(
     dependencies: {
       ...dependencies,
       llm: createLlm({ onCall: (call) => write({ type: "llm-call", ...call }) }),
+      search: loggedSearch(dependencies.search, write),
       store: loggedStore(dependencies.store, write),
     },
   };
