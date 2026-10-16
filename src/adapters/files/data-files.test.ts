@@ -422,3 +422,41 @@ describe("the Chat messages", () => {
     assert.match(loaded.errors[1] ?? "", /line 3 is not a message \(at "role"/);
   });
 });
+
+describe("the Profile", () => {
+  it("is null before the postal code is told", () => {
+    assert.deepEqual(createDataFiles(root).loadProfile(), { ok: true, value: null });
+  });
+
+  it("reads back the Profile saved from another instance, the last one winning", () => {
+    createDataFiles(root).saveProfile({ postalCode: "1425" });
+    createDataFiles(root).saveProfile({ postalCode: "5000" });
+    assert.deepEqual(createDataFiles(root).loadProfile(), {
+      ok: true,
+      value: { postalCode: "5000" },
+    });
+  });
+
+  it("refuses to save an invalid Profile and keeps the saved one", () => {
+    createDataFiles(root).saveProfile({ postalCode: "1425" });
+    assert.throws(() => createDataFiles(root).saveProfile({ postalCode: "abc" }));
+    assert.deepEqual(createDataFiles(root).loadProfile(), {
+      ok: true,
+      value: { postalCode: "1425" },
+    });
+  });
+
+  it("fails naming the file when it is not JSON or not a Profile", () => {
+    mkdirSync(join(root, ".data/chat"), { recursive: true });
+    writeFileSync(join(root, ".data/chat/profile.json"), "{bad");
+    const notJson = createDataFiles(root).loadProfile();
+    assert.equal(notJson.ok, false);
+    if (!notJson.ok) assert.match(notJson.errors[0] ?? "", /profile\.json is not JSON/);
+    writeFileSync(join(root, ".data/chat/profile.json"), JSON.stringify({ postalCode: 1425 }));
+    const notProfile = createDataFiles(root).loadProfile();
+    assert.equal(notProfile.ok, false);
+    if (!notProfile.ok) {
+      assert.match(notProfile.errors[0] ?? "", /profile\.json is not a profile \(at "postalCode"/);
+    }
+  });
+});

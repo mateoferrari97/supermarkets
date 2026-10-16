@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { ChatAgent } from "./agent.ts";
+import type { AgentTurn, ChatAgent } from "./agent.ts";
 import { CONTEXT_MESSAGES, chatMessageSchema, type ChatMessage } from "./chat.ts";
+import type { Profile } from "./profile.ts";
+import type { AgentTools } from "./tools.ts";
 import { takeAgentTurn } from "./take-agent-turn.ts";
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 16, 12, minute)).toISOString();
@@ -12,20 +14,32 @@ const message = (index: number): ChatMessage => ({
   text: `message ${index}`,
 });
 
+const noTools: AgentTools = {};
+
 function fakeAgent(answer = "Hola, ¿qué necesitás?") {
   const seen: ChatMessage[][] = [];
+  const turns: AgentTurn[] = [];
   const agent: ChatAgent = {
-    reply: (messages) => {
-      seen.push(messages);
+    reply: (turn) => {
+      turns.push(turn);
+      seen.push(turn.messages);
       return Promise.resolve(answer);
     },
   };
-  return { agent, seen };
+  return { agent, seen, turns };
 }
 
-const turn = (history: ChatMessage[], text: string, agent: ChatAgent, saved: ChatMessage[] = []) =>
+const turn = (
+  history: ChatMessage[],
+  text: string,
+  agent: ChatAgent,
+  saved: ChatMessage[] = [],
+  profile: Profile | null = null,
+) =>
   takeAgentTurn(history, text, {
     agent,
+    profile,
+    tools: noTools,
     save: (saved_) => saved.push(saved_),
     now: () => new Date(at(30)),
     signal: new AbortController().signal,
@@ -52,6 +66,13 @@ describe("takeAgentTurn", () => {
     assert.equal(sent?.length, CONTEXT_MESSAGES);
     assert.equal(sent?.[0]?.text, "message 61");
     assert.equal(sent?.at(-1)?.text, "agregá yogur");
+  });
+
+  it("gives the agent the Profile and the tools of the turn", async () => {
+    const { agent, turns } = fakeAgent();
+    await turn([], "hola", agent, [], { postalCode: "1425" });
+    assert.deepEqual(turns[0]?.profile, { postalCode: "1425" });
+    assert.equal(turns[0]?.tools, noTools);
   });
 
   it("keeps the Owner message saved when the agent fails", async () => {

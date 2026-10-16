@@ -14,6 +14,7 @@ import {
   loggedStore,
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
+import { agentTools, type AgentTools } from "./core/agent-chat/tools.ts";
 import type { ChatAgent } from "./core/agent-chat/agent.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
 import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
@@ -50,6 +51,8 @@ const files = createDataFiles();
 export const {
   loadChatMessages,
   appendChatMessage,
+  loadProfile,
+  saveProfile,
   loadCatalogProducts,
   loadSnapshotFetchedAt,
   loadEvalSet,
@@ -65,6 +68,10 @@ export function createLlm(options: LlmOptions): Llm {
 
 export function createChatAgent(): ChatAgent {
   return createClaudeCodeAgent({ promptsDir: files.promptsDir });
+}
+
+export function createAgentTools(): AgentTools {
+  return agentTools({ store: createOnlineStore(), saveProfile: files.saveProfile });
 }
 
 export function createOnlineStore(): OnlineStore {

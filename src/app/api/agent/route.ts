@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { appendChatMessage, createChatAgent, loadChatMessages } from "../../../compose.ts";
+import {
+  appendChatMessage,
+  createAgentTools,
+  createChatAgent,
+  loadChatMessages,
+  loadProfile,
+} from "../../../compose.ts";
 import { takeAgentTurn } from "../../../core/agent-chat/take-agent-turn.ts";
 
 const requestSchema = z.object({ text: z.string().trim().min(1) });
@@ -18,10 +24,14 @@ export async function POST(request: Request): Promise<Response> {
   if (held.agentTurnRunning) return failure(409, ["Todavía estoy trabajando en tu mensaje."]);
   const history = loadChatMessages();
   if (!history.ok) return failure(500, history.errors);
+  const profile = loadProfile();
+  if (!profile.ok) return failure(500, profile.errors);
   held.agentTurnRunning = true;
   try {
     const message = await takeAgentTurn(history.value, parsed.data.text, {
       agent,
+      profile: profile.value,
+      tools: createAgentTools(),
       save: appendChatMessage,
       now: () => new Date(),
       signal: request.signal,

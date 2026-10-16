@@ -10,6 +10,7 @@ import {
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { chatMessageSchema, type ChatMessage } from "../../core/agent-chat/chat.ts";
+import { profileSchema, type Profile } from "../../core/agent-chat/profile.ts";
 import type { ConversationEvent } from "../../core/conversation-log/conversation-log.ts";
 import {
   catalogProductsFrom,
@@ -41,6 +42,7 @@ export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
 export const CHAT_DIR = ".data/chat";
 export const CHAT_MESSAGES_PATH = `${CHAT_DIR}/messages.jsonl`;
+export const CHAT_PROFILE_PATH = `${CHAT_DIR}/profile.json`;
 
 const catalogSchema = z.object({
   products: z.array(
@@ -225,6 +227,28 @@ export function createDataFiles(root = ".") {
     appendFileSync(at(CHAT_MESSAGES_PATH), `${JSON.stringify(chatMessageSchema.parse(message))}\n`);
   };
 
+  const loadProfile = (): Checked<Profile | null> => {
+    if (!exists(CHAT_PROFILE_PATH)) return ok(null);
+    let json: unknown;
+    try {
+      json = JSON.parse(readFileSync(at(CHAT_PROFILE_PATH), "utf8"));
+    } catch {
+      return failed([`${CHAT_PROFILE_PATH} is not JSON.`]);
+    }
+    const profile = profileSchema.safeParse(json);
+    if (profile.success) return ok(profile.data);
+    const [issue] = profile.error.issues;
+    return failed([
+      `${CHAT_PROFILE_PATH} is not a profile ` +
+        `(at "${issue?.path.join(".") ?? ""}": ${issue?.message ?? ""}).`,
+    ]);
+  };
+
+  const saveProfile = (profile: Profile): void => {
+    mkdirSync(at(CHAT_DIR), { recursive: true });
+    writeFileSync(at(CHAT_PROFILE_PATH), `${JSON.stringify(profileSchema.parse(profile))}\n`);
+  };
+
   const headCommit = (): string | null => {
     try {
       return execFileSync("git", ["rev-parse", "HEAD"], {
@@ -261,6 +285,8 @@ export function createDataFiles(root = ".") {
     openConversationLog,
     loadChatMessages,
     appendChatMessage,
+    loadProfile,
+    saveProfile,
     loadCatalogProducts,
     loadSnapshotFetchedAt,
     loadEvalSet,

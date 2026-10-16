@@ -37,6 +37,10 @@ Nothing in the provider ends the session when a tool is called. After `askQuesti
 
 `eslint.config.js` lets `src/app/**` import any package except adapters, and keeps `ai` out of `src/core/` (core imports only core and zod). A route handler or client component in `src/app/` can therefore import `ai` and `@ai-sdk/react` today; the agent itself (`ToolLoopAgent`, the provider, the MCP server) belongs in an adapter reached through a port from `src/compose.ts`.
 
+## A real tool in the repo
+
+Checked on 2026-10-16 with the agent chat of the repo: the small session with one `createAiSdkMcpServer("chat", ...)` tool (`updateProfile`) and `allowedTools: ["mcp__chat__updateProfile"]` called the tool on each message that stated a postal code, 2.8 to 7.0 s per turn including the Carrefour regions call, and did not call it when the Owner only asked for the saved one. The tool's `execute` ran in the Next.js process and its zod input was parsed before our function ran.
+
 ## Not verified
 
 - Whether a Claude subscription may serve people other than its owner.

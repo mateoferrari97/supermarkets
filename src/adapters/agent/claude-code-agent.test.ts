@@ -5,7 +5,10 @@ import { join } from "node:path";
 import { MockLanguageModelV4 } from "ai/test";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import type { ChatMessage } from "../../core/agent-chat/chat.ts";
-import { createClaudeCodeAgent } from "./claude-code-agent.ts";
+import { z } from "zod";
+import type { AgentTurn } from "../../core/agent-chat/agent.ts";
+import { defineTool, renderProfile } from "../../core/agent-chat/tools.ts";
+import { createClaudeCodeAgent, createClaudeCodeModel } from "./claude-code-agent.ts";
 
 const at = "2026-10-16T12:00:00.000Z";
 
@@ -27,6 +30,13 @@ const answering = (text: string) =>
       warnings: [],
     },
   });
+
+const turn = (overrides: Partial<AgentTurn> = {}): AgentTurn => ({
+  messages,
+  profile: null,
+  tools: {},
+  ...overrides,
+});
 
 let promptsDir: string;
 
@@ -51,9 +61,9 @@ describe("createClaudeCodeAgent", () => {
         return model;
       },
     });
-    const reply = await agent.reply(messages, new AbortController().signal);
+    const reply = await agent.reply(turn(), new AbortController().signal);
     assert.equal(reply, "Puedo charlar por ahora.");
-    assert.deepEqual(prompts, ["You are the Assistant.\n"]);
+    assert.deepEqual(prompts, ["You are the Assistant.\n\n" + renderProfile(null) + "\n"]);
     const sent = model.doGenerateCalls[0]?.prompt ?? [];
     assert.deepEqual(
       sent.map((message) => message.role),
@@ -70,14 +80,53 @@ describe("createClaudeCodeAgent", () => {
         return answering("ok");
       },
     });
-    await agent.reply(messages, new AbortController().signal);
+    await agent.reply(turn(), new AbortController().signal);
     writeFileSync(join(promptsDir, "agent", "system.md"), "Changed.\n");
-    await agent.reply(messages, new AbortController().signal);
-    assert.deepEqual(prompts, ["You are the Assistant.\n", "Changed.\n"]);
+    await agent.reply(turn(), new AbortController().signal);
+    assert.deepEqual(prompts, [
+      "You are the Assistant.\n\n" + renderProfile(null) + "\n",
+      "Changed.\n\n" + renderProfile(null) + "\n",
+    ]);
+  });
+
+  it("puts the Profile in the system prompt and hands the tools to the model factory", async () => {
+    const prompts: string[] = [];
+    const toolNames: string[][] = [];
+    const agent = createClaudeCodeAgent({
+      promptsDir,
+      createModel: (systemPrompt, tools) => {
+        prompts.push(systemPrompt);
+        toolNames.push(Object.keys(tools));
+        return answering("ok");
+      },
+    });
+    const tools = {
+      updateProfile: defineTool("Saves.", z.object({ postalCode: z.string() }), () =>
+        Promise.resolve({ kind: "saved" }),
+      ),
+    };
+    await agent.reply(
+      turn({ profile: { postalCode: "1425" }, tools }),
+      new AbortController().signal,
+    );
+    assert.match(prompts[0] ?? "", /^You are the Assistant\.\n\n<profile>\npostalCode: 1425\n/);
+    assert.deepEqual(toolNames, [["updateProfile"]]);
+  });
+
+  it("builds a session whose MCP server holds the tools and allows only them", () => {
+    const tools = {
+      updateProfile: defineTool("Saves.", z.object({ postalCode: z.string() }), () =>
+        Promise.resolve({ kind: "saved" }),
+      ),
+    };
+    const model = createClaudeCodeModel("prompt", tools, new AbortController().signal);
+    const settings = (model as unknown as { settings: Record<string, unknown> }).settings;
+    assert.deepEqual(settings.allowedTools, ["mcp__chat__updateProfile"]);
+    assert.deepEqual(Object.keys(settings.mcpServers as object), ["chat"]);
   });
 
   it("fails when the model answers with no text", async () => {
     const agent = createClaudeCodeAgent({ promptsDir, createModel: () => answering("  ") });
-    await assert.rejects(agent.reply(messages, new AbortController().signal), /no text/);
+    await assert.rejects(agent.reply(turn(), new AbortController().signal), /no text/);
   });
 });
