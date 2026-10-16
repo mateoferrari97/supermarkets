@@ -258,7 +258,14 @@ describe("plan", () => {
   };
   const output = (fields: Record<string, unknown>) =>
     session({
-      structured_output: { kind: "answer", queries: [], message: null, plan: null, ...fields },
+      structured_output: {
+        kind: "answer",
+        queries: [],
+        message: null,
+        plan: null,
+        budget: null,
+        ...fields,
+      },
     });
 
   it("runs Sonnet at its default effort with its prompt and the conversation it renders", async () => {
@@ -318,9 +325,30 @@ describe("plan", () => {
     });
   });
 
-  it("returns an answer with its message and Plan", async () => {
+  it("returns an answer with its message, Plan and budget", async () => {
+    const llm = llmWith(output({ message: "Acá va.", plan, budget: 50000 }));
+    assert.deepEqual(await llm.plan(input, signal), {
+      kind: "answer",
+      message: "Acá va.",
+      plan,
+      budget: 50000,
+    });
+  });
+
+  it("returns an answer with no budget", async () => {
     const llm = llmWith(output({ message: "Acá va.", plan }));
-    assert.deepEqual(await llm.plan(input, signal), { kind: "answer", message: "Acá va.", plan });
+    const answer = await llm.plan(input, signal);
+    assert.equal(answer.kind === "answer" && answer.budget, null);
+  });
+
+  it("renders the Owner's budget and the total of a Plan sent back over it", async () => {
+    const inputsSeen: string[] = [];
+    const llm = llmWith(output({ message: "Acá va." }), [], [], [], inputsSeen);
+    await llm.plan({ ...input, overBudget: { budget: 50000, total: 58000.5 } }, signal);
+    assert.match(
+      inputsSeen[0]!,
+      /<\/last-plan>\n<over-budget>\nbudget: \$50000\ntotal: \$58000\.5\nover by: \$8000\.5\n<\/over-budget>$/,
+    );
   });
 
   it("returns a confirm of the last Plan shown", async () => {

@@ -24,7 +24,12 @@ function replyEvent(reply: Reply): TurnEvent {
     case "questions":
       return { type: "questions", text: reply.text, questions: reply.questions };
     case "plan":
-      return { type: "plan", message: reply.message, plan: reply.plan };
+      return {
+        type: "plan",
+        message: reply.message,
+        plan: reply.plan,
+        overBudget: reply.overBudget,
+      };
     case "cart":
       return { type: "cart", cart: reply.cart };
   }

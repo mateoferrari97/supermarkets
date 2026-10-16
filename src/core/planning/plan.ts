@@ -16,15 +16,18 @@ export type PlanIdea = { title: string; sections: IdeaSection[] };
 
 export type PlanMessage = { role: "owner" | "planner"; text: string };
 
+export type OverBudget = { budget: number; total: number };
+
 export type PlanInput = {
   messages: PlanMessage[];
   products: CatalogProduct[];
   lastPlan: Plan | null;
+  overBudget?: OverBudget;
 };
 
 export type PlanOutput =
   | { kind: "search"; queries: string[] }
-  | { kind: "answer"; message: string; plan: Plan | null }
+  | { kind: "answer"; message: string; plan: Plan | null; budget: number | null }
   | { kind: "confirm" };
 
 export type PlanLlm = {
@@ -50,7 +53,7 @@ export type PlanShown = {
 
 export type CheckedPlanOutput =
   | { kind: "search"; queries: string[] }
-  | { kind: "answer"; message: string; plan: PlanShown | null }
+  | { kind: "answer"; message: string; plan: PlanShown | null; budget: number | null }
   | { kind: "confirm" };
 
 export async function checkedPlan(
@@ -72,18 +75,31 @@ export function checkPlan(input: PlanInput, output: PlanOutput): CheckedPlanOutp
     if (input.lastPlan === null) fail("a confirm with no Plan shown");
     return output;
   }
+  if (output.budget !== null && !(output.budget > 0)) {
+    fail(`budget ${String(output.budget)} is not positive`);
+  }
   return {
     kind: "answer",
     message: output.message,
     plan: output.plan === null ? null : shownPlan(output.plan, input.products),
+    budget: output.budget,
   };
+}
+
+export function overBudget({ total }: PlanShown, budget: number | null): number | null {
+  return budget !== null && total > budget ? amountOver({ budget, total }) : null;
+}
+
+export function amountOver({ budget, total }: OverBudget): number {
+  return Math.round((total - budget) * 100) / 100;
 }
 
 function shownPlan(plan: Plan, seen: CatalogProduct[]): PlanShown {
   if (plan.lines.length > PLAN_LINES_LIMIT) {
     fail(`${String(plan.lines.length)} lines, more than ${String(PLAN_LINES_LIMIT)}`);
   }
-  const lines = plan.lines.map((line) => shownLine(line, seen));
+  const merged = mergedLines(plan.lines.map((line) => checkedLine(line, seen)));
+  const lines = merged.map((line) => shownLine(line, seen));
   return {
     title: plan.title,
     idea: plan.idea,
@@ -91,13 +107,13 @@ function shownPlan(plan: Plan, seen: CatalogProduct[]): PlanShown {
     total: lines.reduce((sum, { total }) => sum + (total ?? 0), 0),
     plan: {
       ...plan,
-      lines: plan.lines.map((line, index) => ({ ...line, quantity: lines[index]!.quantity })),
+      lines: merged.map((line, index) => ({ ...line, quantity: lines[index]!.quantity })),
     },
   };
 }
 
-function shownLine(line: PlanLine, seen: CatalogProduct[]): PlanLineShown {
-  const { productId, quantity, purpose, reason } = line;
+function checkedLine(line: PlanLine, seen: CatalogProduct[]): PlanLine {
+  const { productId, quantity } = line;
   const product = seen.find((known) => known.productId === productId);
   if (!product) fail(`product ${productId} was not returned by a search of this conversation`);
   if (!(quantity > 0)) fail(`quantity ${String(quantity)} of product ${productId} is not positive`);
@@ -108,6 +124,29 @@ function shownLine(line: PlanLine, seen: CatalogProduct[]): PlanLineShown {
         : `quantity ${String(quantity)} of by-weight product ${productId} is not in whole grams`,
     );
   }
+  return line;
+}
+
+function mergedLines(lines: PlanLine[]): PlanLine[] {
+  const byProduct = new Map<string, PlanLine[]>();
+  for (const line of lines) {
+    byProduct.set(line.productId, [...(byProduct.get(line.productId) ?? []), line]);
+  }
+  return [...byProduct.values()].map((same) => ({
+    productId: same[0]!.productId,
+    quantity: same.reduce((sum, { quantity }) => sum + quantity, 0),
+    purpose: joined(same.map(({ purpose }) => purpose)),
+    reason: joined(same.map(({ reason }) => reason)),
+  }));
+}
+
+function joined(texts: string[]): string {
+  return [...new Set(texts)].join(", ");
+}
+
+function shownLine(line: PlanLine, seen: CatalogProduct[]): PlanLineShown {
+  const { productId, purpose, reason } = line;
+  const product = seen.find((known) => known.productId === productId)!;
   const candidate = candidateOf(itemOfPlanLine(line, product), product);
   return {
     product,

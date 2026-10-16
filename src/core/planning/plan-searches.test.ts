@@ -38,7 +38,12 @@ const search: CatalogSearch = {
   },
 };
 
-const answer: PlanOutput = { kind: "answer", message: "¿Para cuántos?", plan: null };
+const answer: PlanOutput = {
+  kind: "answer",
+  message: "¿Para cuántos?",
+  plan: null,
+  budget: null,
+};
 
 const planner = (outputs: PlanOutput[]) => {
   const inputs: PlanInput[] = [];
@@ -143,6 +148,7 @@ describe("planWithSearches", () => {
           idea: [],
           lines: [{ productId: "p1", quantity: 1, purpose: "para la lasaña", reason: "pasta" }],
         },
+        budget: null,
       },
     ]);
     await assert.rejects(result, {

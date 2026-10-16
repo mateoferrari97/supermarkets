@@ -12,7 +12,13 @@ import type {
   ReplyEntry,
 } from "../../core/order-matching/read-reply.ts";
 import type { CatalogProduct, Sale } from "../../core/order-matching/catalog-product.ts";
-import type { Plan, PlanInput, PlanOutput } from "../../core/planning/plan.ts";
+import {
+  amountOver,
+  type OverBudget,
+  type Plan,
+  type PlanInput,
+  type PlanOutput,
+} from "../../core/planning/plan.ts";
 import {
   fitProductsOutputSchema,
   parseOrderOutputSchema,
@@ -197,12 +203,18 @@ export function createClaudeCodeLlm({
   };
 }
 
-function readPlan({ kind, queries, message, plan }: z.infer<typeof planOutputSchema>): PlanOutput {
+function readPlan({
+  kind,
+  queries,
+  message,
+  plan,
+  budget,
+}: z.infer<typeof planOutputSchema>): PlanOutput {
   if (kind === "confirm") return { kind };
-  return kind === "search" ? { kind, queries } : { kind, message: message!, plan };
+  return kind === "search" ? { kind, queries } : { kind, message: message!, plan, budget };
 }
 
-export function renderPlan({ messages, products, lastPlan }: PlanInput): string {
+export function renderPlan({ messages, products, lastPlan, overBudget }: PlanInput): string {
   return [
     "<conversation>",
     ...messages.map(({ role, text }) => `<${role}>${text}</${role}>`),
@@ -214,7 +226,19 @@ export function renderPlan({ messages, products, lastPlan }: PlanInput): string 
     ),
     "</products>",
     ...(lastPlan === null ? ["<last-plan>none</last-plan>"] : renderLastPlan(lastPlan)),
+    ...(overBudget === undefined ? [] : renderOverBudget(overBudget)),
   ].join("\n");
+}
+
+function renderOverBudget(overBudget: OverBudget): string[] {
+  const { budget, total } = overBudget;
+  return [
+    "<over-budget>",
+    `budget: $${String(budget)}`,
+    `total: $${String(total)}`,
+    `over by: $${String(amountOver(overBudget))}`,
+    "</over-budget>",
+  ];
 }
 
 function renderLastPlan({ title, idea, lines }: Plan): string[] {

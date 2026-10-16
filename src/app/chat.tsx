@@ -17,7 +17,7 @@ type Message =
   | { role: "owner"; text: string }
   | { role: "bot"; text: string; questions: AskedQuestion[] }
   | { role: "steps"; steps: Step[] }
-  | { role: "plan"; text: string; plan: PlanShown }
+  | { role: "plan"; text: string; plan: PlanShown; overBudget: number | null }
   | { role: "cart"; cart: Cart }
   | { role: "error"; text: string };
 
@@ -66,7 +66,10 @@ function withEvent(messages: Message[], event: TurnEvent): Message[] {
     case "questions":
       return [...messages, { role: "bot", text: event.text, questions: event.questions }];
     case "plan":
-      return [...messages, { role: "plan", text: event.message, plan: event.plan }];
+      return [
+        ...messages,
+        { role: "plan", text: event.message, plan: event.plan, overBudget: event.overBudget },
+      ];
     case "cart":
       return [...messages, { role: "cart", cart: event.cart }];
     case "error":
@@ -231,7 +234,7 @@ function MessageView({
     case "plan":
       return (
         <div className="msg bot wide">
-          <PlanView text={message.text} plan={message.plan} />
+          <PlanView text={message.text} plan={message.plan} overBudget={message.overBudget} />
           {chips ? (
             <div className="chips">
               <button className="chip" type="button" onClick={onConfirm}>
@@ -301,7 +304,15 @@ function planQuantityText({ product, quantity }: PlanShown["lines"][number]): st
   return quantity < 1000 ? `${grams.format(quantity)} g` : `${grams.format(quantity / 1000)} kg`;
 }
 
-function PlanView({ text, plan }: { text: string; plan: PlanShown }) {
+function PlanView({
+  text,
+  plan,
+  overBudget,
+}: {
+  text: string;
+  plan: PlanShown;
+  overBudget: number | null;
+}) {
   return (
     <>
       <div className="text">{text}</div>
@@ -342,6 +353,11 @@ function PlanView({ text, plan }: { text: string; plan: PlanShown }) {
           </tr>
         </tbody>
       </table>
+      {overBudget !== null && (
+        <div className="notice">
+          Este plan se pasa de tu presupuesto por {money.format(overBudget)}.
+        </div>
+      )}
     </>
   );
 }
