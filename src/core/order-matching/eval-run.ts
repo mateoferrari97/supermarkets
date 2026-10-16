@@ -1,3 +1,4 @@
+import { stepsFrom } from "../order-conversation/steps.ts";
 import { candidatesFor, snapshotTotal, type Candidate } from "../product-selection/candidates.ts";
 import { rankBySelectionPolicy } from "../product-selection/selection-policy.ts";
 import type { Llm } from "./llm.ts";
@@ -79,7 +80,10 @@ export async function matchOrder(
   signal: AbortSignal = new AbortController().signal,
 ): Promise<MatchedOrder> {
   const { items, ignoredPreference } = await llm.parseOrder(orderText, signal);
-  return { items: await matchItems(items, { search, llm }, { signal }), ignoredPreference };
+  return {
+    items: await matchItems(items, { search, llm }, stepsFrom({ signal })),
+    ignoredPreference,
+  };
 }
 
 export function orderRunOf({ items, ignoredPreference }: MatchedOrder): OrderRun {

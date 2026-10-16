@@ -69,7 +69,7 @@ export async function takeTurn(
   const signal = deps.signal ?? new AbortController().signal;
   signal.throwIfAborted();
   const reply = replyText.trim();
-  const turn = await turnFor(state, reply, deps, stepsFrom({ signal, onStep }), onStep);
+  const turn = await turnFor(state, reply, deps, stepsFrom({ signal, onStep }));
   signal.throwIfAborted();
   return turn;
 }
@@ -79,19 +79,18 @@ async function turnFor(
   reply: string,
   deps: ConversationDependencies,
   steps: Steps,
-  onStep: OnStep | undefined,
 ): Promise<Turn> {
   switch (state.stage) {
     case "postal-code":
       return postalCodeTurn(reply, deps.store, steps.signal);
     case "order":
       if (!reply) return ask(state, ORDER_QUESTION);
-      return orderTurn(state, reply, deps, steps, onStep);
+      return orderTurn(state, reply, deps, steps);
     case "questions":
     case "cart": {
       const { stage: _stage, ...order } = state;
       if (!reply) return nextTurn(order, deps, steps);
-      return replyTurn(order, reply, deps, steps, onStep);
+      return replyTurn(order, reply, deps, steps);
     }
   }
 }
@@ -148,12 +147,11 @@ async function orderTurn(
   reply: string,
   deps: ConversationDependencies,
   steps: Steps,
-  onStep: OnStep | undefined,
 ): Promise<Turn> {
   const { items, ignoredPreference } = await steps.run({ kind: "understand-order" }, () =>
     deps.llm.parseOrder(reply, steps.signal),
   );
-  const matched = await matchItems(items, deps, { signal: steps.signal, onStep });
+  const matched = await matchItems(items, deps, steps);
   const order: Order = {
     postalCode: state.postalCode,
     items: matched.map((match) => turnItemOf(match, 0, null)),
@@ -174,7 +172,6 @@ async function replyTurn(
   reply: string,
   deps: ConversationDependencies,
   steps: Steps,
-  onStep: OnStep | undefined,
 ): Promise<Turn> {
   const listed = order.items.filter((entry) => entry.kind !== "ready");
   const read = await steps.run({ kind: "understand-answer" }, () =>
@@ -261,7 +258,7 @@ async function replyTurn(
   const matched = await matchItems(
     queued.map(({ item }) => item),
     deps,
-    { signal: steps.signal, onStep },
+    steps,
   );
   const fromMatch = (from: number, count: number) =>
     matched.slice(from, from + count).flatMap((match, offset): TurnItem[] => {

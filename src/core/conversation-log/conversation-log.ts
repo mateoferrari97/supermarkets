@@ -102,19 +102,13 @@ export function loggedStore(
   };
 }
 
-export function loggedSteps(write: WriteConversationEvent, now: Clock = monotonic): OnStep {
-  const running = new Map<string, number[]>();
-  return ({ status, step }) => {
-    const key = JSON.stringify(step);
-    const queue = running.get(key) ?? [];
-    running.set(key, queue);
-    if (status === "started") {
-      queue.push(now());
-      write({ type: "step-started", step });
+export function loggedSteps(write: WriteConversationEvent): OnStep {
+  return (event) => {
+    if (event.status === "started") {
+      write({ type: "step-started", step: event.step });
       return;
     }
-    const started = queue.shift();
-    write({ type: "step-done", step, durationMs: started === undefined ? 0 : now() - started });
+    write({ type: "step-done", step: event.step, durationMs: event.durationMs });
   };
 }
 

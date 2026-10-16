@@ -100,20 +100,21 @@ describe("loggedStore", () => {
 });
 
 describe("loggedSteps", () => {
-  it("records each step started and done with its duration", () => {
+  it("records each step started and done with the duration the done event carries", () => {
     const events: ConversationEvent[] = [];
-    const onStep = loggedSteps((event) => events.push(event), ticking());
+    const onStep = loggedSteps((event) => events.push(event));
+    const yerba = { kind: "choose-products", original: "yerba" } as const;
 
-    onStep({ status: "started", step: { kind: "understand-order" } });
-    onStep({ status: "started", step: { kind: "choose-products", original: "yerba" } });
-    onStep({ status: "done", step: { kind: "choose-products", original: "yerba" } });
-    onStep({ status: "done", step: { kind: "understand-order" } });
+    onStep({ status: "started", id: 1, step: yerba });
+    onStep({ status: "started", id: 2, step: yerba });
+    onStep({ status: "done", id: 2, step: yerba, durationMs: 300 });
+    onStep({ status: "done", id: 1, step: yerba, durationMs: 1000 });
 
     assert.deepEqual(events, [
-      { type: "step-started", step: { kind: "understand-order" } },
-      { type: "step-started", step: { kind: "choose-products", original: "yerba" } },
-      { type: "step-done", step: { kind: "choose-products", original: "yerba" }, durationMs: 10 },
-      { type: "step-done", step: { kind: "understand-order" }, durationMs: 30 },
+      { type: "step-started", step: yerba },
+      { type: "step-started", step: yerba },
+      { type: "step-done", step: yerba, durationMs: 300 },
+      { type: "step-done", step: yerba, durationMs: 1000 },
     ]);
   });
 });

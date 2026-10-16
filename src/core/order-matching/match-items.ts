@@ -1,4 +1,4 @@
-import { stepsFrom, type StepOptions } from "../order-conversation/steps.ts";
+import { stepsFrom, type Steps } from "../order-conversation/steps.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import { MATCHES_LIMIT, type CatalogSearch } from "./catalog-search.ts";
 import { inParallel } from "./in-parallel.ts";
@@ -39,9 +39,8 @@ export type MatchItemsDependencies = { search: CatalogSearch; llm: FitProductsLl
 export async function matchItems(
   items: Item[],
   { search, llm }: MatchItemsDependencies,
-  options: StepOptions = {},
+  steps: Steps = stepsFrom(),
 ): Promise<ItemMatch[]> {
-  const steps = stepsFrom(options);
   return inParallel(items, FIT_PRODUCTS_CONCURRENCY, steps.signal, (item, index) =>
     steps.run({ kind: "choose-products", original: item.original }, async () => {
       const matches = search.findMatches(item, MATCHES_LIMIT);

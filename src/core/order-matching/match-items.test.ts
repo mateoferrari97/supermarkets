@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { StepEvent } from "../order-conversation/steps.ts";
+import { stepsFrom, type StepEvent } from "../order-conversation/steps.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import type { CatalogSearch } from "./catalog-search.ts";
 import type { Item } from "./item.ts";
@@ -202,7 +202,7 @@ describe("matchItems", () => {
     await matchItems(
       [item("1 bolsa de carbon", "Carbón para asado"), item("birra", "Cerveza")],
       { search: watched, llm },
-      { onStep },
+      stepsFrom({ onStep }),
     );
     assert.deepEqual(log, [
       "started 1 bolsa de carbon",
@@ -239,11 +239,19 @@ describe("matchItems", () => {
         return Promise.resolve({ fits: [1], closest: [], note: null, question: null });
       },
     };
-    await matchItems([item("birra", "Cerveza")], { search, llm }, { signal: controller.signal });
+    await matchItems(
+      [item("birra", "Cerveza")],
+      { search, llm },
+      stepsFrom({ signal: controller.signal }),
+    );
     assert.deepEqual(signals, [controller.signal]);
     controller.abort();
     await assert.rejects(
-      matchItems([item("birra", "Cerveza")], { search, llm }, { signal: controller.signal }),
+      matchItems(
+        [item("birra", "Cerveza")],
+        { search, llm },
+        stepsFrom({ signal: controller.signal }),
+      ),
       { name: "AbortError" },
     );
     assert.equal(signals.length, 1);
