@@ -4,6 +4,8 @@
 
 The LLM turns the Owner's words into fixed forms; plain code makes every choice that must be repeatable (ADR 0002, ADR 0011). It reads an order into Items, keeps the Fits of an Item among the Matches code found for it, and reads the Owner's reply to questions or a cart (ADR 0012). Code searches the Catalog Snapshot for the Matches, checks every number the LLM returns is among them, applies the size and quantity rule, and picks the products from checkout simulation with the fixed rules of the Selection Policy (ADR 0011). Never let the LLM choose a price, compute a quantity or invent a product.
 
+Plans are the one exception ([ADR 0013](adr/0013-in-a-plan-the-llm-proposes-seen-products-and-the-owner-confirms.md)). In a Plan the LLM proposes the products and their quantities, under three rules: every product is one a code search of this conversation returned, every quantity is valid for its product (whole units for a packaged product, grams rounded up to its Sale Step for one sold by weight), and code checks both in core. Code still computes every price and total. Nothing reaches the cart until the Owner confirms the Plan, and a confirmed Plan Line counts as the Owner's own choice, so it skips matching and the Selection Policy. Orders keep the rule above.
+
 ## The port and its adapter
 
 - `Llm` in `src/core/order-matching/llm.ts` is the port: one method per task (`parseOrder`, `fitProducts`, `readReply`) with the input and output types of each call.

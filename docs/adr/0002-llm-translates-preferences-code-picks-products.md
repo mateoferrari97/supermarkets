@@ -8,6 +8,8 @@ The same Items on the same Catalog Snapshot must give the same cart, for any Own
 
 ADR 0005 supersedes how the products are picked: from live search and checkout simulation instead of the Catalog Snapshot. The rest of this decision stands.
 
+ADR 0013 amends this decision for Plans: the products of a Plan the Owner confirms are chosen by the planner and the Owner, not by the Selection Policy. Orders keep this rule.
+
 The translation itself is not repeatable: Claude Haiku 5.5 takes no `temperature` (Anthropic says to omit it), and in the first version nothing is stored between orders (ADR 0004), so the same text sent twice may resolve to different Product Types or questions. What is repeatable is everything after it: once the Product Types and the Selection Policy of an order are settled, the products are a function of them and the Catalog Snapshot.
 
 ## Considered Options

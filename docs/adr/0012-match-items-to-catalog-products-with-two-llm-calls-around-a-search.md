@@ -30,6 +30,8 @@ It amends ADR 0005: products are no longer listed by Carrefour's live search. Th
 
 It amends ADR 0006: the search is a third port, `CatalogSearch`, with one in-memory adapter built from the Catalog Snapshot. It is a port because the search is planned to move to Postgres (`pg_trgm` and full text search with the same fusion), not because two adapters exist today.
 
+ADR 0013 amends this decision for Plans: a Plan is built by a planning call that may run several searches over every in-stock department, and its confirmed Plan Lines enter the cart without calls 1 and 2 or the Selection Policy. Orders are matched as here.
+
 ## Considered Options
 
 - **Keep ADR 0003 and fix its prompts.** The failures came from its shape, not its wording: any word the LLM writes as a term must then appear in product names, and the LLM cannot know which words do.
