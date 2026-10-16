@@ -1,6 +1,10 @@
 import { stepsFrom } from "../order-conversation/steps.ts";
-import { candidatesFor, snapshotTotal, type Candidate } from "../product-selection/candidates.ts";
-import { rankBySelectionPolicy } from "../product-selection/selection-policy.ts";
+import {
+  candidatesFor,
+  rankCandidates,
+  snapshotPrices,
+  type Candidate,
+} from "../product-selection/selection.ts";
 import type { Llm } from "./llm.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import type { CatalogSearch } from "./catalog-search.ts";
@@ -66,12 +70,12 @@ export type EvalRun = {
   answers: AnswerCaseRecord[];
 };
 
-export function pickOnSnapshot(item: Item, fits: CatalogProduct[]): Candidate | null {
-  const priced = candidatesFor(item, fits).flatMap((candidate) => {
-    const total = snapshotTotal(candidate);
-    return total === null ? [] : [{ candidate, total, savings: 0 }];
-  });
-  return rankBySelectionPolicy(priced)[0]?.candidate ?? null;
+export async function pickOnSnapshot(
+  item: Item,
+  fits: CatalogProduct[],
+): Promise<Candidate | null> {
+  const [ranked] = await rankCandidates([candidatesFor(item, fits)], snapshotPrices);
+  return ranked![0]?.candidate ?? null;
 }
 
 export async function matchOrder(
@@ -86,13 +90,13 @@ export async function matchOrder(
   };
 }
 
-export function orderRunOf({ items, ignoredPreference }: MatchedOrder): OrderRun {
-  return { items: items.map(itemRunOf), ignoredPreference };
+export async function orderRunOf({ items, ignoredPreference }: MatchedOrder): Promise<OrderRun> {
+  return { items: await Promise.all(items.map(itemRunOf)), ignoredPreference };
 }
 
-function itemRunOf(matched: ItemMatch): ItemRun {
+async function itemRunOf(matched: ItemMatch): Promise<ItemRun> {
   const ids = (products: CatalogProduct[]) => products.map(({ productId }) => productId);
-  const pick = matched.question === null ? pickOnSnapshot(matched.item, matched.fits) : null;
+  const pick = matched.question === null ? await pickOnSnapshot(matched.item, matched.fits) : null;
   return {
     item: matched.item,
     matches: ids(matched.matches),

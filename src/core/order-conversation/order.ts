@@ -1,7 +1,7 @@
 import type { Item } from "../order-matching/item.ts";
 import type { ItemMatch, Question } from "../order-matching/match-items.ts";
 import type { ReadReplyOutput, ReplyEntry, ReplyItem } from "../order-matching/read-reply.ts";
-import { candidateOf, candidatesFor, type Candidate } from "../product-selection/candidates.ts";
+import { candidateOf, candidatesFor, type Candidate } from "../product-selection/selection.ts";
 import {
   CART_WARNING,
   money,

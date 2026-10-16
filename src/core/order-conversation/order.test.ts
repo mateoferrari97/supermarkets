@@ -4,7 +4,7 @@ import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import type { Item } from "../order-matching/item.ts";
 import type { ItemMatch } from "../order-matching/match-items.ts";
 import { checkReadReply, type ReadReplyOutput } from "../order-matching/read-reply.ts";
-import { candidateOf, candidatesFor, type Candidate } from "../product-selection/candidates.ts";
+import { candidateOf, candidatesFor, type Candidate } from "../product-selection/selection.ts";
 import {
   CART_WARNING,
   type Bought,

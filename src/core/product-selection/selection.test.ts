@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CatalogProduct, PackageSize } from "../order-matching/catalog-product.ts";
 import type { Item, Quantity, Size } from "../order-matching/item.ts";
-import { candidatesFor, snapshotTotal, type Candidate } from "./candidates.ts";
+import type { OnlineStore } from "./online-store.ts";
+import {
+  candidatesFor,
+  rankCandidates,
+  simulatedPrice,
+  simulatedPrices,
+  snapshotPrices,
+  snapshotTotal,
+  type Candidate,
+  type PriceSource,
+} from "./selection.ts";
 
 const packaged = (
   itemId: string,
@@ -310,5 +320,123 @@ describe("snapshotTotal", () => {
       [packaged("1", 2000, ml(2250))],
     );
     assert.equal(snapshotTotal(candidate!), 6000);
+  });
+});
+
+const storeOf = (catalog: CatalogProduct[], savings: Record<string, number> = {}): OnlineStore => ({
+  checkDelivery: () => Promise.resolve("delivers"),
+  simulate: ({ items }) => {
+    const lines = items.map(({ itemId, quantity }) => {
+      const product = catalog.find((candidate) => candidate.itemId === itemId)!;
+      const total =
+        snapshotTotal({ product, quantity, measured: 1, notes: [] }) ?? Number.POSITIVE_INFINITY;
+      return {
+        itemId,
+        quantity,
+        available: product.price !== null,
+        total,
+        savings: savings[itemId] ?? 0,
+        promotions: [],
+      };
+    });
+    return Promise.resolve({ lines, total: lines.reduce((sum, line) => sum + line.total, 0) });
+  },
+  cartLink: () => "https://carrefour.test/cart",
+});
+
+const simulatedFrom = (catalog: CatalogProduct[], savings: Record<string, number> = {}) => {
+  const signal = new AbortController().signal;
+  return simulatedPrices(simulatedPrice("1414", storeOf(catalog, savings), signal), signal);
+};
+
+const ranked = async (asked: Item, fits: CatalogProduct[], prices: PriceSource) => {
+  const [perItem] = await rankCandidates([candidatesFor(asked, fits)], prices);
+  return perItem!.map(({ candidate }) => candidate.product.itemId);
+};
+
+const priceSources: [string, (catalog: CatalogProduct[]) => PriceSource][] = [
+  ["snapshot prices", () => snapshotPrices],
+  ["simulated prices", (catalog) => simulatedFrom(catalog)],
+];
+
+describe.each(priceSources)("Selection Policy with %s", (_, pricesFor) => {
+  it.each<[string, Item, CatalogProduct[], string[]]>([
+    [
+      "compares price per unit of measure across sizes and by weight",
+      item("queso", { kind: "common" }, { kind: "weight", grams: 1000 }),
+      [packaged("1", 3000, grams(500)), packaged("2", 1400, grams(250)), byWeight("3", 5800, 0.5)],
+      ["2", "3", "1"],
+    ],
+    [
+      "breaks a tie between the most common sizes by the lowest price per unit",
+      item("agua", { kind: "common" }),
+      [
+        packaged("1", 1000, ml(500)),
+        packaged("2", 1100, ml(500)),
+        packaged("3", 1900, ml(1000)),
+        packaged("4", 1800, ml(1000)),
+      ],
+      ["4", "3"],
+    ],
+    [
+      "breaks a tie by the lowest itemId",
+      item("agua", { kind: "common" }),
+      [
+        packaged("10", 1000, ml(1000)),
+        packaged("9", 1000, ml(1000)),
+        packaged("11", 1000, ml(1000)),
+      ],
+      ["9", "10", "11"],
+    ],
+    [
+      "leaves out a Candidate without a price",
+      item("agua", { kind: "common" }),
+      [packaged("1", null, ml(1000)), packaged("2", 1200, ml(1000))],
+      ["2"],
+    ],
+    ["ranks nothing without Fits", item("agua", { kind: "common" }), [], []],
+  ])("%s", async (_, asked, fits, expected) => {
+    assert.deepEqual(await ranked(asked, fits, pricesFor(fits)), expected);
+  });
+});
+
+describe("Selection Policy with simulated savings", () => {
+  it("puts savings before a lower price per unit", async () => {
+    const fits = [packaged("1", 900, ml(1000)), packaged("2", 1200, ml(1000))];
+    assert.deepEqual(
+      await ranked(item("agua", { kind: "common" }), fits, simulatedFrom(fits, { "2": 100 })),
+      ["2", "1"],
+    );
+  });
+
+  it("compares price per unit among Candidates with savings", async () => {
+    const fits = [packaged("1", 1000, ml(1000)), packaged("2", 900, ml(1000))];
+    assert.deepEqual(
+      await ranked(
+        item("agua", { kind: "common" }),
+        fits,
+        simulatedFrom(fits, { "1": 50, "2": 10 }),
+      ),
+      ["2", "1"],
+    );
+  });
+});
+
+describe("rankCandidates", () => {
+  it("ranks the Candidates of each Item apart", async () => {
+    const water = [packaged("1", 1200, ml(1000)), packaged("2", 1000, ml(1000))];
+    const juice = [packaged("3", 900, ml(1000))];
+    const perItem = await rankCandidates(
+      [
+        candidatesFor(item("agua", { kind: "common" }), water),
+        [],
+        candidatesFor(item("jugo", { kind: "common" }), juice),
+      ],
+      snapshotPrices,
+    );
+    assert.deepEqual(
+      perItem.map((candidates) => candidates.map(({ candidate }) => candidate.product.itemId)),
+      [["2", "1"], [], ["3"]],
+    );
   });
 });

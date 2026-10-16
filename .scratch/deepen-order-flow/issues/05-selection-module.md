@@ -4,12 +4,16 @@
 
 **Blocked by:** 04 (Cart returns the Candidate bought per Item)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A single price-per-unit function replaces the three that exist today
-- [ ] Selection takes a price source: simulated or snapshot
-- [ ] The cart uses Selection with simulated prices; the eval set's pick uses it with snapshot prices
-- [ ] One table of Selection Policy cases runs with both price sources (prior art: `candidates.test.ts`, `selection-policy.test.ts`)
-- [ ] ADR 0012's cut of ten Candidates is unchanged
-- [ ] The Owner's cart is unchanged for the same Carrefour answers
-- [ ] `pnpm check` is green
+- [x] A single price-per-unit function replaces the three that exist today
+- [x] Selection takes a price source: simulated or snapshot
+- [x] The cart uses Selection with simulated prices; the eval set's pick uses it with snapshot prices
+- [x] One table of Selection Policy cases runs with both price sources (prior art: `candidates.test.ts`, `selection-policy.test.ts`)
+- [x] ADR 0012's cut of ten Candidates is unchanged
+- [x] The Owner's cart is unchanged for the same Carrefour answers
+- [x] `pnpm check` is green
+
+## Comments
+
+- `candidates.ts` and `selection-policy.ts` merged into `src/core/product-selection/selection.ts`. `pricePerUnit` is the one rule: the size rule's tie between common sizes, the cut of ten and the Selection Policy all use it. `rankCandidates(candidatesPerItem, prices)` takes a `PriceSource`: `simulatedPrices` (the cart, still at most 10 simulations at a time across the order) or `snapshotPrices` (`pickOnSnapshot`, now async, and `orderRunOf`). The Selection Policy table in `selection.test.ts` runs with both sources; savings cases run with the simulated source only, since the snapshot has none. `cart.test.ts` passes unchanged.

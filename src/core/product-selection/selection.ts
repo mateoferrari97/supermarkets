@@ -3,9 +3,13 @@ import type {
   PackageSize,
   SizeDimension,
 } from "../order-matching/catalog-product.ts";
+import { inParallel } from "../order-matching/in-parallel.ts";
 import { roundMeasure, type Item, type Quantity, type Size } from "../order-matching/item.ts";
+import type { OnlineStore } from "./online-store.ts";
 
 export const CANDIDATES_LIMIT = 10;
+
+export const SIMULATIONS_CONCURRENCY = 10;
 
 export type Candidate = {
   product: CatalogProduct;
@@ -13,6 +17,12 @@ export type Candidate = {
   measured: number;
   notes: string[];
 };
+
+export type Priced = { candidate: Candidate; total: number; savings: number };
+
+export type PriceSource = (candidates: Candidate[]) => Promise<(Priced | null)[]>;
+
+export type PriceAlone = (candidate: Candidate, quantity: number) => Promise<Priced | null>;
 
 type Sized = CatalogProduct & { sale: { kind: "packaged"; size: PackageSize } };
 
@@ -43,6 +53,60 @@ export function candidatesFor(item: Item, fits: CatalogProduct[]): Candidate[] {
     .slice(0, CANDIDATES_LIMIT);
 }
 
+export async function rankCandidates(
+  candidatesPerItem: Candidate[][],
+  prices: PriceSource,
+): Promise<Priced[][]> {
+  const queue = candidatesPerItem.flatMap((candidates, index) =>
+    candidates.map((candidate) => ({ index, candidate })),
+  );
+  const priced = await prices(queue.map(({ candidate }) => candidate));
+  return candidatesPerItem.map((_, index) =>
+    rankBySelectionPolicy(
+      queue.flatMap((queued, position) => {
+        const found = priced[position];
+        return queued.index === index && found ? [found] : [];
+      }),
+    ),
+  );
+}
+
+export function rankBySelectionPolicy(priced: Priced[]): Priced[] {
+  return [...priced].sort(
+    (a, b) =>
+      Number(b.savings > 0) - Number(a.savings > 0) ||
+      pricePerUnit(a) - pricePerUnit(b) ||
+      compareItemIds(a.candidate.product.itemId, b.candidate.product.itemId),
+  );
+}
+
+export function pricePerUnit({ candidate, total }: Priced): number {
+  return total / candidate.measured;
+}
+
+export const snapshotPrices: PriceSource = (candidates) =>
+  Promise.resolve(candidates.map(snapshotPriced));
+
+export function simulatedPrice(
+  postalCode: string,
+  store: OnlineStore,
+  signal: AbortSignal,
+): PriceAlone {
+  return async (candidate, quantity) => {
+    const { itemId } = candidate.product;
+    const { lines } = await store.simulate({ postalCode, items: [{ itemId, quantity }] }, signal);
+    const line = lines.find((simulated) => simulated.itemId === itemId);
+    return line?.available ? { candidate, total: line.total, savings: line.savings } : null;
+  };
+}
+
+export function simulatedPrices(priceAlone: PriceAlone, signal: AbortSignal): PriceSource {
+  return (candidates) =>
+    inParallel(candidates, SIMULATIONS_CONCURRENCY, signal, (candidate) =>
+      priceAlone(candidate, candidate.quantity),
+    );
+}
+
 export function candidateOf(item: Item, product: CatalogProduct): Candidate {
   const option =
     optionFor(item, product) ?? optionFor({ ...item, quantity: { kind: "minimum" } }, product)!;
@@ -64,9 +128,14 @@ export function compareItemIds(a: string, b: string): number {
   return Number.isNaN(byNumber) || byNumber === 0 ? a.localeCompare(b) : byNumber;
 }
 
-function snapshotPricePerUnit(candidate: Candidate): number | null {
+function snapshotPriced(candidate: Candidate): Priced | null {
   const total = snapshotTotal(candidate);
-  return total === null ? null : total / candidate.measured;
+  return total === null ? null : { candidate, total, savings: 0 };
+}
+
+function snapshotPricePerUnit(candidate: Candidate): number | null {
+  const priced = snapshotPriced(candidate);
+  return priced === null ? null : pricePerUnit(priced);
 }
 
 function compareNullable(a: number | null, b: number | null): number {
@@ -97,8 +166,14 @@ function keepCommon(fits: CatalogProduct[], sized: Sized[]): Kept {
   const mostFits = Math.max(...[...groups.values()].map((group) => group.length));
   const cheapestPerUnit = (group: Sized[]) =>
     Math.min(
-      ...group.map(({ price, sale }) =>
-        price === null ? Number.POSITIVE_INFINITY : price / sale.size.amount,
+      ...group.map(
+        (product) =>
+          snapshotPricePerUnit({
+            product,
+            quantity: 1,
+            measured: product.sale.size.amount,
+            notes: [],
+          }) ?? Number.POSITIVE_INFINITY,
       ),
     );
   const [mode] = [...groups.values()]

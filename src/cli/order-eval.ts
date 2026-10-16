@@ -82,7 +82,7 @@ for (const evalCase of cases) {
     const started = Date.now();
     let scored: ScoredRun;
     try {
-      const result = orderRunOf(await matcher.matchOrder(evalCase.order));
+      const result = await orderRunOf(await matcher.matchOrder(evalCase.order));
       scored = { error: null, result, score: scoreRun(evalCase, result, isLive) };
     } catch (error) {
       scored = { error: error instanceof Error ? error.message : String(error) };

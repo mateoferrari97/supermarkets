@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CatalogProduct, Sale, Teaser } from "../order-matching/catalog-product.ts";
 import type { Item } from "../order-matching/item.ts";
-import { candidatesFor, type Candidate } from "./candidates.ts";
+import { candidatesFor, type Candidate } from "./selection.ts";
 import { simulateCart, type Bought, type ItemToBuy } from "./cart.ts";
 import type { OnlineStore, SimulationRequest } from "./online-store.ts";
 
