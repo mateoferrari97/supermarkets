@@ -1,3 +1,4 @@
+import { createClaudeCodeAgent } from "./adapters/agent/claude-code-agent.ts";
 import { downloadCatalog as downloadCarrefourCatalog } from "./adapters/carrefour/catalog-download.ts";
 import { createCarrefourStore } from "./adapters/carrefour/carrefour-store.ts";
 import { createInMemoryCatalogSearch } from "./adapters/catalog-search/in-memory-catalog-search.ts";
@@ -13,6 +14,7 @@ import {
   loggedStore,
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
+import type { ChatAgent } from "./core/agent-chat/agent.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
 import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
 import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
@@ -46,6 +48,8 @@ export type OrderMatcherOptions = { onCall?: (call: LlmCall) => void };
 const files = createDataFiles();
 
 export const {
+  loadChatMessages,
+  appendChatMessage,
   loadCatalogProducts,
   loadSnapshotFetchedAt,
   loadEvalSet,
@@ -57,6 +61,10 @@ export const {
 
 export function createLlm(options: LlmOptions): Llm {
   return createClaudeCodeLlm({ ...options, promptsDir: files.promptsDir });
+}
+
+export function createChatAgent(): ChatAgent {
+  return createClaudeCodeAgent({ promptsDir: files.promptsDir });
 }
 
 export function createOnlineStore(): OnlineStore {

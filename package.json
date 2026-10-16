@@ -37,6 +37,8 @@
     "vitest": "^5.0.4"
   },
   "dependencies": {
+    "ai": "7.0.143",
+    "ai-sdk-provider-claude-code": "4.3.3",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

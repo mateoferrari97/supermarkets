@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
+import { chatMessageSchema, type ChatMessage } from "../../core/agent-chat/chat.ts";
 import type { ConversationEvent } from "../../core/conversation-log/conversation-log.ts";
 import {
   catalogProductsFrom,
@@ -38,6 +39,8 @@ export const PLANNING_EVAL_SET_PATH = "evals/planning.json";
 export const PLANNING_EVAL_RUNS_DIR = ".data/planning/eval-runs";
 export const PROMPTS_DIR = "prompts";
 export const CONVERSATIONS_DIR = ".data/conversations";
+export const CHAT_DIR = ".data/chat";
+export const CHAT_MESSAGES_PATH = `${CHAT_DIR}/messages.jsonl`;
 
 const catalogSchema = z.object({
   products: z.array(
@@ -188,6 +191,40 @@ export function createDataFiles(root = ".") {
       : null;
   };
 
+  const loadChatMessages = (): Checked<ChatMessage[]> => {
+    if (!exists(CHAT_MESSAGES_PATH)) return ok([]);
+    const messages: ChatMessage[] = [];
+    const errors: string[] = [];
+    readFileSync(at(CHAT_MESSAGES_PATH), "utf8")
+      .split("\n")
+      .forEach((line, index) => {
+        if (line.trim() === "") return;
+        let json: unknown;
+        try {
+          json = JSON.parse(line);
+        } catch {
+          errors.push(`${CHAT_MESSAGES_PATH} line ${index + 1} is not JSON.`);
+          return;
+        }
+        const message = chatMessageSchema.safeParse(json);
+        if (message.success) {
+          messages.push(message.data);
+          return;
+        }
+        const [issue] = message.error.issues;
+        errors.push(
+          `${CHAT_MESSAGES_PATH} line ${index + 1} is not a message ` +
+            `(at "${issue?.path.join(".") ?? ""}": ${issue?.message ?? ""}).`,
+        );
+      });
+    return errors.length > 0 ? failed(errors) : ok(messages);
+  };
+
+  const appendChatMessage = (message: ChatMessage): void => {
+    mkdirSync(at(CHAT_DIR), { recursive: true });
+    appendFileSync(at(CHAT_MESSAGES_PATH), `${JSON.stringify(chatMessageSchema.parse(message))}\n`);
+  };
+
   const headCommit = (): string | null => {
     try {
       return execFileSync("git", ["rev-parse", "HEAD"], {
@@ -222,6 +259,8 @@ export function createDataFiles(root = ".") {
     promptsDir: at(PROMPTS_DIR),
     headCommit,
     openConversationLog,
+    loadChatMessages,
+    appendChatMessage,
     loadCatalogProducts,
     loadSnapshotFetchedAt,
     loadEvalSet,

@@ -384,3 +384,41 @@ describe("headCommit", () => {
     assert.equal(createDataFiles(root).headCommit(), null);
   });
 });
+
+describe("the Chat messages", () => {
+  const owner = { role: "owner", at: "2026-10-16T12:00:00.000Z", text: "hola" } as const;
+  const assistant = { role: "assistant", at: "2026-10-16T12:00:05.000Z", text: "Hola" } as const;
+
+  it("is empty before the first message", () => {
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [] });
+  });
+
+  it("reads back the messages saved, oldest first, from another instance", () => {
+    createDataFiles(root).appendChatMessage(owner);
+    createDataFiles(root).appendChatMessage(assistant);
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), {
+      ok: true,
+      value: [owner, assistant],
+    });
+  });
+
+  it("refuses to save an invalid message", () => {
+    assert.throws(() => createDataFiles(root).appendChatMessage({ ...owner, text: "" }));
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [] });
+  });
+
+  it("fails naming the line of a line that is not JSON or not a message", () => {
+    const valid = JSON.stringify(owner);
+    mkdirSync(join(root, ".data/chat"), { recursive: true });
+    writeFileSync(
+      join(root, ".data/chat/messages.jsonl"),
+      `${valid}\nnot json\n${JSON.stringify({ ...owner, role: "system" })}\n`,
+    );
+    const loaded = createDataFiles(root).loadChatMessages();
+    assert.equal(loaded.ok, false);
+    if (loaded.ok) return;
+    assert.equal(loaded.errors.length, 2);
+    assert.match(loaded.errors[0] ?? "", /messages\.jsonl line 2 is not JSON/);
+    assert.match(loaded.errors[1] ?? "", /line 3 is not a message \(at "role"/);
+  });
+});

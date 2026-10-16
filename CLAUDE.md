@@ -45,7 +45,7 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 
 ## Commands
 
-- `pnpm dev`: runs `next dev`, the Owner's chat at http://localhost:3000, where every order is placed. It needs the Catalog Snapshot in `.data/carrefour/` (`pnpm carrefour:catalog`).
+- `pnpm dev`: runs `next dev`, the Owner's chat at http://localhost:3000, where every order is placed, and the agent chat at http://localhost:3000/agent, whose Chat is kept in `.data/chat/`. It needs the Catalog Snapshot in `.data/carrefour/` (`pnpm carrefour:catalog`).
 - `pnpm check`: every check, in the order above.
 - `pnpm test`: Vitest over `src/` and `scripts/`.
 - `pnpm docs:check`: checks the knowledge base (ADR 0010) and prints file, line and rule for each finding.
