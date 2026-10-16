@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { cartSchema, proposalSchema } from "./order.ts";
+import { roundSchema } from "./round.ts";
 
 export const CONTEXT_MESSAGES = 40;
 
 export const messagePartSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("proposal"), proposal: proposalSchema }),
   z.object({ type: z.literal("cart"), cart: cartSchema }),
+  z.object({ type: z.literal("round"), round: roundSchema }),
 ]);
 
 export type MessagePart = z.infer<typeof messagePartSchema>;

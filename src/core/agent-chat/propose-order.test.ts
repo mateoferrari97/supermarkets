@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { memoryOrders } from "./agent-chat-fixtures.ts";
+import { memoryOrders, product } from "./agent-chat-fixtures.ts";
 import type { ChatOrder, OrderLine } from "./order.ts";
 import { proposeOrder } from "./propose-order.ts";
 import type { TurnOutcome } from "./tool.ts";
@@ -94,5 +94,32 @@ describe("proposeOrder", () => {
     });
     assert.deepEqual(open.current(), [draft()]);
     assert.equal(turn.ended, null);
+  });
+
+  it("refuses an Item that still waits for the Owner's choice and saves nothing", async () => {
+    const waiting = draft();
+    waiting.items.push({
+      kind: "choose",
+      ref: "4",
+      description: "yogur",
+      brand: null,
+      size: "common",
+      quantity: "minimum",
+      alternatives: [product("11", "Yogur frutilla Ilolay", 500)],
+      shown: ["11"],
+    });
+    const { orders, current } = memoryOrders([waiting]);
+    const turn = outcome();
+    const output = await proposeOrder({ refs: ["1", "4"] }, { orders, outcome: turn });
+    assert.deepEqual(output, { kind: "refused", reason: "needs-choice", ref: "4" });
+    assert.equal(turn.ended, null);
+    assert.deepEqual(current(), [waiting]);
+    const left = outcome();
+    const proposed = await proposeOrder({ refs: ["1"] }, { orders, outcome: left });
+    assert.equal(proposed.kind, "proposed");
+    assert.deepEqual(current()[0]?.proposal?.notes, [
+      'No elegiste una opción para "yogur", así que la dejé afuera.',
+    ]);
+    assert.match(left.ended?.text ?? "", /No elegiste una opción para "yogur"/);
   });
 });

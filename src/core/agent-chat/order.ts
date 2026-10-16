@@ -1,5 +1,30 @@
 import { z } from "zod";
+import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import { money } from "../product-selection/cart.ts";
+
+const catalogProductSchema: z.ZodType<CatalogProduct> = z.object({
+  productId: z.string(),
+  itemId: z.string(),
+  name: z.string(),
+  brand: z.string().nullable(),
+  department: z.string(),
+  tipo: z.string().nullable(),
+  price: z.number().nullable(),
+  inStock: z.boolean(),
+  sale: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("by-weight"), saleStepKg: z.number() }),
+    z.object({
+      kind: z.literal("packaged"),
+      size: z
+        .object({
+          dimension: z.enum(["volume", "weight", "units", "length"]),
+          amount: z.number(),
+        })
+        .nullable(),
+    }),
+  ]),
+  teasers: z.array(z.object({ name: z.string(), minimumQuantity: z.number() })),
+});
 
 export const orderLineSchema = z.object({
   description: z.string(),
@@ -23,6 +48,16 @@ export const resolvedItemSchema = z.discriminatedUnion("kind", [
     ref: z.string(),
     description: z.string(),
     note: z.string(),
+  }),
+  z.object({
+    kind: z.literal("choose"),
+    ref: z.string(),
+    description: z.string(),
+    brand: z.string().nullable(),
+    size: z.string(),
+    quantity: z.string(),
+    alternatives: z.array(catalogProductSchema).min(1),
+    shown: z.array(z.string()),
   }),
 ]);
 
@@ -85,17 +120,27 @@ export function proposalOf(
   refs: string[],
 ):
   | { kind: "proposal"; proposal: Proposal }
-  | { kind: "refused"; reason: "unknown-ref" | "nothing-to-buy"; ref: string | null } {
+  | {
+      kind: "refused";
+      reason: "unknown-ref" | "needs-choice" | "nothing-to-buy";
+      ref: string | null;
+    } {
   const wanted = [...new Set(refs)];
   const chosen: ResolvedItem[] = [];
   for (const ref of wanted) {
     const found = order.items.find((item) => item.ref === ref);
     if (!found) return { kind: "refused", reason: "unknown-ref", ref };
+    if (found.kind === "choose") return { kind: "refused", reason: "needs-choice", ref };
     chosen.push(found);
   }
   const lines = chosen.flatMap((item) => (item.kind === "picked" ? [item.line] : []));
   if (lines.length === 0) return { kind: "refused", reason: "nothing-to-buy", ref: null };
-  const notes = chosen.flatMap((item) => (item.kind === "none" ? [item.note] : []));
+  const left = order.items.flatMap((item) =>
+    item.kind === "choose" && !wanted.includes(item.ref)
+      ? [`No elegiste una opción para "${item.description}", así que la dejé afuera.`]
+      : [],
+  );
+  const notes = [...chosen.flatMap((item) => (item.kind === "none" ? [item.note] : [])), ...left];
   const total = lines.reduce((sum, line) => sum + line.total, 0);
   return {
     kind: "proposal",
@@ -132,11 +177,16 @@ export function renderCart({ lines, notes, total, warning, cartLink }: Cart): st
 
 export function renderOrder(order: ChatOrder | null): string {
   if (order === null) return "<order>\nThere is no open Order.\n</order>";
-  const items = order.items.map((item) =>
-    item.kind === "picked"
-      ? `- ref ${item.ref}: "${item.line.description}" is product ${item.line.productId} "${item.line.name}", quantity ${String(item.line.quantity)}, ${money(item.line.total)}`
-      : `- ref ${item.ref}: "${item.description}" was not found`,
-  );
+  const items = order.items.map((item) => {
+    if (item.kind === "picked") {
+      return `- ref ${item.ref}: "${item.line.description}" is product ${item.line.productId} "${item.line.name}", quantity ${String(item.line.quantity)}, ${money(item.line.total)}`;
+    }
+    if (item.kind === "none") return `- ref ${item.ref}: "${item.description}" was not found`;
+    const options = item.alternatives
+      .map((product) => `${product.productId} "${product.name}" ${money(product.price ?? 0)}`)
+      .join("; ");
+    return `- ref ${item.ref}: "${item.description}" has no product that fits; the Owner has to choose among: ${options}; shown so far: ${item.shown.join(", ")}`;
+  });
   const proposal =
     order.proposal === null
       ? "proposal: none yet"

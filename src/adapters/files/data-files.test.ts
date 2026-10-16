@@ -581,3 +581,97 @@ describe("a message with a cart and an Order that holds it", () => {
     assert.deepEqual(createDataFiles(root).loadOrders(), { ok: true, value: [order] });
   });
 });
+
+describe("a message with a round and an Order that waits for a choice", () => {
+  it("are saved and read back", () => {
+    const round = {
+      questions: [
+        {
+          number: 1,
+          ref: "1",
+          text: "¿Qué yogur querés?",
+          options: [
+            { label: "Yogur frutilla Ilolay", productId: "11", price: 500 },
+            { label: "Otro", productId: null, price: null },
+          ],
+          recommended: 1,
+        },
+      ],
+    };
+    const message = {
+      role: "assistant" as const,
+      at: "2026-10-16T12:00:00.000Z",
+      text: "Necesito que me confirmes algunas cosas",
+      parts: [{ type: "round" as const, round }],
+    };
+    const order = {
+      id: "order-1",
+      status: "draft" as const,
+      openedAt: "2026-10-16T12:00:00.000Z",
+      items: [
+        {
+          kind: "choose" as const,
+          ref: "1",
+          description: "yogur",
+          brand: null,
+          size: "common",
+          quantity: "minimum",
+          alternatives: [
+            {
+              productId: "11",
+              itemId: "110",
+              name: "Yogur frutilla Ilolay",
+              brand: "Ilolay",
+              department: "Lácteos",
+              tipo: null,
+              price: 500,
+              inStock: true,
+              sale: {
+                kind: "packaged" as const,
+                size: { dimension: "weight" as const, amount: 190 },
+              },
+              teasers: [{ name: "2x1", minimumQuantity: 2 }],
+            },
+          ],
+          shown: ["11"],
+        },
+      ],
+      proposals: 0,
+      proposal: null,
+    };
+    const files = createDataFiles(root);
+    files.appendChatMessage(message);
+    files.saveOrders([order]);
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [message] });
+    assert.deepEqual(createDataFiles(root).loadOrders(), { ok: true, value: [order] });
+  });
+
+  it("rejects a round whose recommended option does not exist", () => {
+    write(
+      ".data/chat/messages.jsonl",
+      `${JSON.stringify({
+        role: "assistant",
+        at: "2026-10-16T12:00:00.000Z",
+        text: "x",
+        parts: [
+          {
+            type: "round",
+            round: {
+              questions: [
+                {
+                  number: 1,
+                  ref: null,
+                  text: "¿Hoy?",
+                  options: [{ label: "Sí", productId: null, price: null }],
+                  recommended: 2,
+                },
+              ],
+            },
+          },
+        ],
+      })}\n`,
+    );
+    const loaded = createDataFiles(root).loadChatMessages();
+    assert.equal(loaded.ok, false);
+  });
+});

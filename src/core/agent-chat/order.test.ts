@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import { product } from "./agent-chat-fixtures.ts";
 import { chatMessageSchema } from "./chat.ts";
 import {
   chatOrderSchema,
@@ -104,5 +105,31 @@ describe("the schemas", () => {
       chatMessageSchema.safeParse({ ...message, parts: [{ type: "cart" }] }).success,
       false,
     );
+  });
+});
+
+describe("an Order that waits for the Owner's choice", () => {
+  const waiting: ChatOrder = {
+    ...order("order-1", "draft"),
+    items: [
+      {
+        kind: "choose",
+        ref: "1",
+        description: "yogur",
+        brand: null,
+        size: "common",
+        quantity: "minimum",
+        alternatives: [product("11", "Yogur frutilla Ilolay", 500)],
+        shown: ["11", "12"],
+      },
+    ],
+  };
+
+  it("is valid and says which products were offered and shown", () => {
+    assert.ok(chatOrderSchema.safeParse(waiting).success);
+    const text = renderOrder(waiting);
+    assert.match(text, /ref 1: "yogur" has no product that fits/);
+    assert.match(text, /11 "Yogur frutilla Ilolay" \$500\.00/);
+    assert.match(text, /shown so far: 11, 12/);
   });
 });

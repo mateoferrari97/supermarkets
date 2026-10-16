@@ -5,7 +5,14 @@ import { matchItems } from "../order-matching/match-items.ts";
 import { parseLine } from "../order-matching/item.ts";
 import { simulateCart } from "../product-selection/cart.ts";
 import { candidatesFor } from "../product-selection/selection.ts";
-import { catalog, llmFitting, memoryOrders, searchOf, storeOf } from "./agent-chat-fixtures.ts";
+import {
+  catalog,
+  llmFitting,
+  memoryOrders,
+  product,
+  searchOf,
+  storeOf,
+} from "./agent-chat-fixtures.ts";
 import type { ChatOrder } from "./order.ts";
 import { resolveItem, type ResolveItemDependencies } from "./resolve-item.ts";
 
@@ -79,9 +86,10 @@ describe("resolveItem", () => {
     if (output.kind === "picked") assert.equal(output.quantity, 3);
   });
 
-  it("answers none when no product fits, without simulating", async () => {
+  it("answers none when no product fits and nothing else was found, without simulating", async () => {
     const { dependencies, simulated } = setup({
-      llm: llmFitting(() => ({ fits: [], closest: [1], question: "¿Cuál?" })),
+      llm: llmFitting(() => ({ fits: [], closest: [], question: "¿Cuál?" })),
+      search: searchOf([]).search,
     });
     const output = await resolveItem({ description: "leche" }, dependencies, signal);
     assert.deepEqual(output, { kind: "none", ref: "1", note: 'No encontré "leche".' });
@@ -196,5 +204,130 @@ describe("resolveItem", () => {
       signal,
     );
     assert.equal(output.kind === "picked" && output.quantity, 2);
+  });
+});
+
+const yogurts = [
+  product("11", "Yogur frutilla Ilolay", 500),
+  product("12", "Yogur vainilla Ilolay", 520),
+  product("13", "Yogur durazno Ilolay", 540),
+  product("14", "Yogur natural Ilolay", 560),
+  product("15", "Yogur de coco Ilolay", 580),
+  product("16", "Yogur de banana Ilolay", 600),
+  product("17", "Yogur de limón Ilolay", 620),
+];
+
+function setupNothingFits(orders: ChatOrder[] = [], closest: number[] = []) {
+  const { search } = searchOf(yogurts);
+  const { store, simulated } = storeOf(yogurts);
+  const memory = memoryOrders(orders);
+  const dependencies: ResolveItemDependencies = {
+    search,
+    llm: llmFitting(() => ({ fits: [], closest, question: "¿Cuál?" })),
+    store,
+    orders: memory.orders,
+    loadProfile: () => ({ postalCode: "1425" }),
+    now,
+  };
+  return { dependencies, simulated, current: memory.current };
+}
+
+const choose = (output: Awaited<ReturnType<typeof resolveItem>>) => {
+  assert.equal(output.kind, "choose");
+  return output.kind === "choose" ? output : { ref: "", alternatives: [] };
+};
+
+describe("resolveItem when nothing fits", () => {
+  it("returns 3 Alternatives, the closest first, and keeps them in the Order", async () => {
+    const { dependencies, simulated, current } = setupNothingFits([], [3, 1]);
+    const output = choose(await resolveItem({ description: "yogur" }, dependencies, signal));
+    assert.equal(output.ref, "1");
+    assert.deepEqual(
+      output.alternatives.map((each) => each.productId),
+      ["13", "11", "12"],
+    );
+    assert.deepEqual(simulated, []);
+    const [entry] = current()[0]?.items ?? [];
+    assert.equal(entry?.kind, "choose");
+    if (entry?.kind === "choose") {
+      assert.deepEqual(entry.shown, ["13", "11", "12"]);
+      assert.equal(entry.description, "yogur");
+    }
+  });
+
+  it("returns the next 3 and never an excluded product when asked for more options", async () => {
+    const { dependencies, current } = setupNothingFits();
+    const first = choose(await resolveItem({ description: "yogur" }, dependencies, signal));
+    const shown = first.alternatives.map((each) => each.productId);
+    const second = choose(
+      await resolveItem({ description: "yogur", excludeProductIds: shown }, dependencies, signal),
+    );
+    assert.deepEqual(
+      second.alternatives.map((each) => each.productId),
+      ["14", "15", "16"],
+    );
+    for (const each of second.alternatives) assert.ok(!shown.includes(each.productId));
+    assert.equal(second.ref, first.ref);
+    assert.equal(current()[0]?.items.length, 1);
+    const third = choose(
+      await resolveItem(
+        { description: "yogur", excludeProductIds: [...shown, "14", "15", "16"] },
+        dependencies,
+        signal,
+      ),
+    );
+    assert.deepEqual(
+      third.alternatives.map((each) => each.productId),
+      ["17"],
+    );
+  });
+
+  it("never repeats a product shown before even when the agent forgets to exclude it", async () => {
+    const { dependencies } = setupNothingFits();
+    const first = choose(await resolveItem({ description: "yogur" }, dependencies, signal));
+    const second = choose(
+      await resolveItem({ description: "yogur", excludeProductIds: ["99"] }, dependencies, signal),
+    );
+    const shown = first.alternatives.map((each) => each.productId);
+    for (const each of second.alternatives) assert.ok(!shown.includes(each.productId));
+  });
+
+  it("answers none once every product was shown", async () => {
+    const { dependencies } = setupNothingFits();
+    const output = await resolveItem(
+      {
+        description: "yogur",
+        excludeProductIds: yogurts.map((each) => each.productId),
+      },
+      dependencies,
+      signal,
+    );
+    assert.deepEqual(output, { kind: "none", ref: "1", note: 'No encontré "yogur".' });
+  });
+
+  it("picks when a product fits among the ones not excluded", async () => {
+    const { dependencies } = setupNothingFits();
+    const { search } = searchOf(yogurts);
+    const output = await resolveItem(
+      { description: "yogur", excludeProductIds: ["11", "12", "13", "14", "15", "16"] },
+      { ...dependencies, search, llm: llmFitting() },
+      signal,
+    );
+    assert.equal(output.kind, "picked");
+    if (output.kind === "picked") assert.equal(output.product.productId, "17");
+  });
+
+  it("opens an Order and moves a proposed one back to draft", async () => {
+    const proposed: ChatOrder = {
+      id: "order-1",
+      status: "proposed",
+      openedAt: "2026-10-16T12:00:00.000Z",
+      items: [],
+      proposals: 1,
+      proposal: null,
+    };
+    const { dependencies, current } = setupNothingFits([proposed]);
+    await resolveItem({ description: "yogur" }, dependencies, signal);
+    assert.equal(current()[0]?.status, "draft");
   });
 });

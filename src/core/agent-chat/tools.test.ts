@@ -3,7 +3,14 @@ import { describe, it } from "vitest";
 import type { Delivery, OnlineStore } from "../product-selection/online-store.ts";
 import type { ChatMessage } from "./chat.ts";
 import type { Profile } from "./profile.ts";
-import { catalog, llmFitting, memoryOrders, searchOf, storeOf } from "./agent-chat-fixtures.ts";
+import {
+  catalog,
+  llmFitting,
+  memoryOrders,
+  product,
+  searchOf,
+  storeOf,
+} from "./agent-chat-fixtures.ts";
 import type { TurnOutcome } from "./tool.ts";
 import { agentTools, renderProfile, updateProfile } from "./tools.ts";
 
@@ -79,7 +86,7 @@ describe("updateProfile", () => {
 });
 
 describe("agentTools", () => {
-  it("exposes updateProfile, resolveItem and proposeOrder, and only proposeOrder ends the turn", () => {
+  it("exposes the tools, and only askQuestions, proposeOrder and buildCart end the turn", () => {
     const { store } = fakeStore({});
     const { search } = searchOf(catalog);
     const tools = agentTools({
@@ -94,12 +101,14 @@ describe("agentTools", () => {
     assert.deepEqual(Object.keys(tools), [
       "updateProfile",
       "resolveItem",
+      "chooseAlternative",
+      "askQuestions",
       "proposeOrder",
       "buildCart",
     ]);
     assert.deepEqual(
       Object.values(tools).map((tool) => tool.endsTurn),
-      [false, false, true, true],
+      [false, false, false, true, true, true],
     );
   });
 
@@ -145,6 +154,56 @@ describe("agentTools", () => {
     await assert.rejects(
       tools.resolveItem?.execute({ product: "leche" }, signal) ?? Promise.resolve(),
     );
+  });
+});
+
+describe("rounds of questions through the tools", () => {
+  it("takes an Item with no Fit from a round to a proposal", async () => {
+    const options = [
+      product("11", "Yogur frutilla Ilolay 190 g", 500),
+      product("12", "Yogur vainilla Ilolay 190 g", 520),
+      product("13", "Yogur durazno Ilolay 190 g", 540),
+      product("14", "Yogur natural Ilolay 190 g", 560),
+    ];
+    const { store } = storeOf(options);
+    const { search } = searchOf(options);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(() => ({ fits: [], closest: [], question: "¿Cuál?" })),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const asking: TurnOutcome = { ended: null };
+    const tools = agentTools(dependencies)(asking);
+    const resolved = await tools.resolveItem?.execute({ description: "yogur" }, signal);
+    assert.equal((resolved as { kind: string }).kind, "choose");
+    await tools.askQuestions?.execute(
+      {
+        questions: [
+          {
+            ref: "1",
+            text: "¿Qué yogur querés?",
+            options: [{ productId: "11" }, { productId: "12" }, { productId: "13" }],
+            recommended: 1,
+          },
+        ],
+      },
+      signal,
+    );
+    assert.equal(asking.ended?.parts[0]?.type, "round");
+    assert.match(asking.ended?.text ?? "", /1\. ¿Qué yogur querés\?/);
+
+    const answering: TurnOutcome = { ended: null };
+    const next = agentTools(dependencies)(answering);
+    const picked = await next.chooseAlternative?.execute({ ref: "1", productId: "12" }, signal);
+    assert.equal((picked as { kind: string }).kind, "picked");
+    await next.proposeOrder?.execute({ refs: ["1"] }, signal);
+    assert.equal(answering.ended?.parts[0]?.type, "proposal");
+    assert.equal(memory.current()[0]?.status, "proposed");
   });
 });
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage } from "../../core/agent-chat/chat.ts";
 import type { Cart, Proposal } from "../../core/agent-chat/order.ts";
+import { optionLetter, type Round } from "../../core/agent-chat/round.ts";
 
 const money = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -75,6 +76,70 @@ function ProposalCard({
   );
 }
 
+function RoundCard({ round, onSend }: { round: Round; onSend: ((text: string) => void) | null }) {
+  const [chosen, setChosen] = useState<Record<number, number>>({});
+  const answers = round.questions.flatMap((question) => {
+    const index = chosen[question.number];
+    const option = index === undefined ? undefined : question.options[index];
+    return option ? [`${String(question.number)}: ${option.label}`] : [];
+  });
+  return (
+    <div className="msg bot wide">
+      <div className="lead block">Necesito que me confirmes algunas cosas:</div>
+      {round.questions.map((question) => (
+        <div key={question.number} className="block">
+          <div>
+            <strong>{question.number}.</strong> {question.text}
+          </div>
+          {question.options.map((option, index) => (
+            <label key={option.label} className="block">
+              <input
+                type="radio"
+                name={`question-${String(question.number)}`}
+                disabled={onSend === null}
+                checked={chosen[question.number] === index}
+                onChange={() => setChosen((current) => ({ ...current, [question.number]: index }))}
+              />{" "}
+              {optionLetter(index)}) {option.label}
+              {option.price === null ? "" : ` (${money.format(option.price)})`}
+              {index + 1 === question.recommended ? (
+                <span className="muted small"> · recomendada</span>
+              ) : null}
+            </label>
+          ))}
+          {question.ref !== null && question.options.some((option) => option.productId !== null) ? (
+            <div className="block">
+              <button
+                className="btn"
+                type="button"
+                disabled={onSend === null}
+                onClick={() => onSend?.(`Más opciones para la pregunta ${String(question.number)}`)}
+              >
+                Más opciones
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ))}
+      {onSend ? (
+        <div className="block">
+          <button
+            className="btn"
+            type="button"
+            disabled={answers.length === 0}
+            onClick={() => onSend(answers.join("\n"))}
+          >
+            Enviar elegidas
+          </button>{" "}
+          <button className="btn" type="button" onClick={() => onSend("Aceptar las recomendadas")}>
+            Aceptar recomendadas
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CartCard({ cart }: { cart: Cart }) {
   return (
     <div className="msg bot wide">
@@ -137,6 +202,9 @@ const proposalOf = (message: ChatMessage): Proposal | null =>
 
 const cartOf = (message: ChatMessage): Cart | null =>
   message.parts?.find((part) => part.type === "cart")?.cart ?? null;
+
+const roundOf = (message: ChatMessage): Round | null =>
+  message.parts?.find((part) => part.type === "round")?.round ?? null;
 
 type Shown = ChatMessage | { role: "error"; text: string };
 
@@ -210,6 +278,17 @@ export function AgentChat({ initialMessages }: { initialMessages: ChatMessage[] 
                 key={index}
                 proposal={proposal}
                 onConfirm={latest ? () => void sendText("Confirmar") : null}
+              />
+            );
+          }
+          const round = message.role === "assistant" ? roundOf(message) : null;
+          if (round) {
+            const latest = index === messages.length - 1 && !working;
+            return (
+              <RoundCard
+                key={index}
+                round={round}
+                onSend={latest ? (text) => void sendText(text) : null}
               />
             );
           }

@@ -4,7 +4,9 @@ import type { FitProductsLlm } from "../order-matching/match-items.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
 import type { OrdersStore } from "./orders-store.ts";
 import type { Profile } from "./profile.ts";
+import { askQuestions, askQuestionsInput } from "./ask-questions.ts";
 import { buildCart, buildCartInput } from "./build-cart.ts";
+import { chooseAlternative, chooseAlternativeInput } from "./choose-alternative.ts";
 import { proposeOrder, proposeOrderInput } from "./propose-order.ts";
 import { resolveItem, resolveItemInput } from "./resolve-item.ts";
 import { defineTool, type ToolsForTurn } from "./tool.ts";
@@ -56,9 +58,20 @@ export const agentTools =
       (input, signal) => updateProfile(input, dependencies, signal),
     ),
     resolveItem: defineTool(
-      "Finds the product to buy for one Item the Owner asked for, with the Branch's prices. Call it once per Item, in parallel for several Items, after the postal code is known. Returns picked with the product, quantity and price, none when nothing fits, or refused with the reason. The product is already chosen by code: never name any other.",
+      "Finds the product to buy for one Item the Owner asked for, with the Branch's prices. Call it once per Item, in parallel for several Items, after the postal code is known. Returns picked with the product, quantity and price; choose with up to 3 options when nothing fits, which you put to the Owner with askQuestions; none when nothing fits and there are no options; or refused with the reason. The product is already chosen by code: never name any other. When the Owner asks for more options, call it again for the same Item with excludeProductIds.",
       resolveItemInput,
       (input, signal) => resolveItem(input, dependencies, signal),
+    ),
+    chooseAlternative: defineTool(
+      "Records the option the Owner chose for an Item that resolveItem answered choose, and prices it in the Branch. Pass the ref and the productId of the option, or recommended true when the Owner accepts the recommended answers. Returns picked, unavailable when the Branch cannot sell it now, or refused with the reason.",
+      chooseAlternativeInput,
+      (input, signal) => chooseAlternative(input, { ...dependencies, messages }, signal),
+    ),
+    askQuestions: defineTool(
+      "Asks the Owner every open question of this turn in a single round and ends the turn. Each question has its options and the one you recommend. Call it at most once per turn, after every resolveItem of the turn has answered. Write nothing after calling it.",
+      askQuestionsInput,
+      (input) => askQuestions(input, { orders: dependencies.orders, outcome }),
+      true,
     ),
     proposeOrder: defineTool(
       "Shows the Owner the Order for confirmation and ends the turn. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",

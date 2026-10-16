@@ -16,7 +16,7 @@ export type ProposeOrderOutput =
   | { kind: "proposed"; proposalId: string }
   | {
       kind: "refused";
-      reason: "no-open-order" | "unknown-ref" | "nothing-to-buy";
+      reason: "no-open-order" | "unknown-ref" | "needs-choice" | "nothing-to-buy";
       ref: string | null;
     };
 
