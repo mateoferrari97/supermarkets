@@ -56,7 +56,8 @@ export async function buildCart(
   if (proposal.id !== input.proposalId || order.status !== "proposed") {
     return { kind: "refused", reason: "stale-proposal" };
   }
-  if (!isAnswered(messages, proposal.id)) return { kind: "refused", reason: "unanswered" };
+  if (order.reopened !== true && !isAnswered(messages, proposal.id))
+    return { kind: "refused", reason: "unanswered" };
 
   const simulate = (lines: OrderLine[]) =>
     store.simulate(
@@ -89,6 +90,7 @@ export async function buildCart(
   };
   order.status = "closed";
   order.cart = cart;
+  delete order.reopened;
   orders.save(all);
   outcome.ended = { text: renderCart(cart), parts: [{ type: "cart", cart }] };
   return { kind: "built", cartLink: cart.cartLink, total: cart.total };

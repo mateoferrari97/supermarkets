@@ -91,6 +91,7 @@ export const chatOrderSchema = z.object({
   proposals: z.number().int().nonnegative(),
   proposal: proposalSchema.nullable(),
   cart: cartSchema.optional(),
+  reopened: z.boolean().optional(),
 });
 
 export type ChatOrder = z.infer<typeof chatOrderSchema>;
@@ -195,6 +196,9 @@ export function renderOrder(order: ChatOrder | null): string {
     "<order>",
     `id: ${order.id}`,
     `status: ${order.status}`,
+    ...(order.reopened === true
+      ? ["reopened: true (a Correction of an Order whose link was already given)"]
+      : []),
     "items:",
     ...(items.length > 0 ? items : ["- none yet"]),
     proposal,

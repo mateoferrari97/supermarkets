@@ -102,13 +102,14 @@ describe("agentTools", () => {
       "updateProfile",
       "resolveItem",
       "chooseAlternative",
+      "reopenLastOrder",
       "askQuestions",
       "proposeOrder",
       "buildCart",
     ]);
     assert.deepEqual(
       Object.values(tools).map((tool) => tool.endsTurn),
-      [false, false, false, true, true, true],
+      [false, false, false, false, true, true, true],
     );
   });
 
@@ -260,5 +261,76 @@ describe("renderProfile", () => {
     });
     assert.equal(memory.current()[0]?.status, "closed");
     assert.equal(second.ended?.parts[0]?.type, "cart");
+  });
+
+  it("gives a new cart for the same Order when the Owner corrects it after the link, with no question", async () => {
+    const { store, simulated } = storeOf(catalog);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const first: TurnOutcome = { ended: null };
+    const proposing = agentTools(dependencies)(first, []);
+    await proposing.resolveItem?.execute({ description: "leche" }, signal);
+    await proposing.proposeOrder?.execute({ refs: ["1"] }, signal);
+    const proposalMessage: ChatMessage = {
+      role: "assistant",
+      at: "2026-10-16T12:00:01.000Z",
+      text: "",
+      parts: first.ended?.parts,
+    };
+    const confirmation: ChatMessage = {
+      role: "owner",
+      at: "2026-10-16T12:00:02.000Z",
+      text: "Confirmar",
+    };
+    await agentTools(dependencies)({ ended: null }, [
+      proposalMessage,
+      confirmation,
+    ]).buildCart?.execute({ proposalId: "order-1-1" }, signal);
+    assert.equal(memory.current()[0]?.status, "closed");
+
+    const correction: ChatMessage = {
+      role: "owner",
+      at: "2026-10-16T12:00:03.000Z",
+      text: "cambiá la leche por yogur",
+    };
+    const outcome: TurnOutcome = { ended: null };
+    const correcting = agentTools(dependencies)(outcome, [
+      proposalMessage,
+      confirmation,
+      correction,
+    ]);
+    assert.deepEqual(await correcting.reopenLastOrder?.execute({}, signal), {
+      kind: "reopened",
+      orderId: "order-1",
+    });
+    await correcting.resolveItem?.execute({ description: "yogur" }, signal);
+    await correcting.proposeOrder?.execute({ refs: ["2"] }, signal);
+    const endedByProposal = outcome.ended;
+    assert.equal(endedByProposal, null);
+    const built = await correcting.buildCart?.execute({ proposalId: "order-1-2" }, signal);
+    assert.deepEqual(built, {
+      kind: "built",
+      cartLink: "https://example.test/cart",
+      total: 500,
+    });
+    assert.equal(memory.current().length, 1);
+    const [order] = memory.current();
+    assert.equal(order?.status, "closed");
+    assert.equal(order?.reopened, undefined);
+    assert.deepEqual(
+      order?.cart?.lines.map((each) => each.productId),
+      ["4"],
+    );
+    assert.deepEqual(simulated.at(-1)?.items, [{ itemId: "40", quantity: 1 }]);
+    assert.equal(outcome.ended?.parts[0]?.type, "cart");
   });
 });

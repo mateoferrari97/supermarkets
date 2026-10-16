@@ -7,6 +7,7 @@ import type { Profile } from "./profile.ts";
 import { askQuestions, askQuestionsInput } from "./ask-questions.ts";
 import { buildCart, buildCartInput } from "./build-cart.ts";
 import { chooseAlternative, chooseAlternativeInput } from "./choose-alternative.ts";
+import { reopenLastOrder, reopenLastOrderInput } from "./reopen-last-order.ts";
 import { proposeOrder, proposeOrderInput } from "./propose-order.ts";
 import { resolveItem, resolveItemInput } from "./resolve-item.ts";
 import { defineTool, type ToolsForTurn } from "./tool.ts";
@@ -67,6 +68,11 @@ export const agentTools =
       chooseAlternativeInput,
       (input, signal) => chooseAlternative(input, { ...dependencies, messages }, signal),
     ),
+    reopenLastOrder: defineTool(
+      "Reopens the last closed Order so the Owner's Correction (replace, remove or add an Item after the cart link) goes into a new cart. Call it only when the Owner clearly corrects the Order whose link was just given. Then resolveItem for what is new, proposeOrder with the refs the Order should have now and buildCart with that proposal in the same turn, with no question. Returns reopened, or refused with the reason.",
+      reopenLastOrderInput,
+      () => reopenLastOrder({ orders: dependencies.orders }),
+    ),
     askQuestions: defineTool(
       "Asks the Owner every open question of this turn in a single round and ends the turn. Each question has its options and the one you recommend. Call it at most once per turn, after every resolveItem of the turn has answered. Write nothing after calling it.",
       askQuestionsInput,
@@ -74,7 +80,7 @@ export const agentTools =
       true,
     ),
     proposeOrder: defineTool(
-      "Shows the Owner the Order for confirmation and ends the turn. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",
+      "Shows the Owner the Order for confirmation and ends the turn, except for a reopened Order (a Correction), where the turn goes on so you call buildCart right after. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",
       proposeOrderInput,
       (input) => proposeOrder(input, { orders: dependencies.orders, outcome }),
       true,

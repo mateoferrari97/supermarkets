@@ -133,6 +133,17 @@ describe("buildCart", () => {
     assert.deepEqual(output, { kind: "refused", reason: "unanswered" });
   });
 
+  it("builds a reopened Order for a Correction with no Owner answer after the proposal", async () => {
+    const { dependencies, current } = setup(
+      [proposed({ reopened: true })],
+      [owner("cambiá la leche"), proposalMessage()],
+    );
+    const output = await buildCart({ proposalId: "order-1-1" }, dependencies, signal);
+    assert.equal(output.kind, "built");
+    assert.equal(current()[0]?.status, "closed");
+    assert.equal(current()[0]?.reopened, undefined);
+  });
+
   it("refuses a proposal that is not the latest one", async () => {
     const { dependencies, simulated, current } = setup([
       proposed({ proposals: 2, proposal: proposal("order-1-2") }),

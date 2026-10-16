@@ -40,9 +40,11 @@ export function proposeOrder(
   order.proposal = proposal;
   order.status = "proposed";
   orders.save(all);
-  outcome.ended = {
-    text: renderProposal(proposal),
-    parts: [{ type: "proposal", proposal }],
-  };
+  if (order.reopened !== true) {
+    outcome.ended = {
+      text: renderProposal(proposal),
+      parts: [{ type: "proposal", proposal }],
+    };
+  }
   return Promise.resolve({ kind: "proposed", proposalId: proposal.id });
 }
