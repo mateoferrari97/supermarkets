@@ -358,6 +358,36 @@ describe("plan", () => {
     assert.deepEqual(await llm.plan(input, signal), { kind: "confirm" });
   });
 
+  it("renders the searches of this turn with how many products each found", async () => {
+    const inputsSeen: string[] = [];
+    const llm = llmWith(output({ message: "¿Algo más?" }), [], [], [], inputsSeen);
+    await llm.plan(
+      {
+        ...input,
+        searches: [
+          { query: "tapas para lasaña", found: 1 },
+          { query: "vacío", found: 0 },
+        ],
+      },
+      signal,
+    );
+    assert.ok(
+      inputsSeen[0]!.endsWith(
+        ["<searches>", "tapas para lasaña | found 1", "vacío | found 0", "</searches>"].join("\n"),
+      ),
+    );
+  });
+
+  it("tells the session a search takes at most 8 queries", async () => {
+    const argsSeen: string[][] = [];
+    await llmWith(output({ message: "¿Algo más?" }), [], argsSeen).plan(input, signal);
+    const args = argsSeen[0]!;
+    const schema = JSON.parse(args[args.indexOf("--json-schema") + 1]!) as {
+      properties: { queries: { maxItems?: number } };
+    };
+    assert.equal(schema.properties.queries.maxItems, 8);
+  });
+
   it("fails on a search with no queries", async () => {
     await assert.rejects(
       llmWith(output({ kind: "search" })).plan(input, signal),

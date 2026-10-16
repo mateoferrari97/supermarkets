@@ -18,11 +18,14 @@ export type PlanMessage = { role: "owner" | "planner"; text: string };
 
 export type OverBudget = { budget: number; total: number };
 
+export type PlanSearch = { query: string; found: number };
+
 export type PlanInput = {
   messages: PlanMessage[];
   products: CatalogProduct[];
   lastPlan: Plan | null;
   overBudget?: OverBudget;
+  searches?: PlanSearch[];
 };
 
 export type PlanOutput =
