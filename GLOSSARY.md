@@ -52,6 +52,22 @@ _Avoid_: Notice, warning, message
 
 ## Conversation
 
+**Topic**:
+The label the first message of a conversation gets: `order` when it names what to buy, `plan` when it states an intent that becomes a Plan, or `off-topic` when it is not about shopping.
+_Avoid_: Intent, category, route
+
+**Plan**:
+A proposal of products with quantities and the Idea behind them, built by the LLM from products a code search returned. The Owner revises and confirms it before it becomes a cart; until then nothing is bought (ADR 0013).
+_Avoid_: Shopping list, recipe list, suggestion
+
+**Plan Line**:
+One product of a Plan with its quantity and its purpose ("para la lasaña", "regalo para mamá"). Once the Plan is confirmed it becomes an Item whose only Candidate is that product, as if the Owner had chosen it.
+_Avoid_: Ingredient, suggestion, line item
+
+**Idea**:
+What a Plan is for: a recipe with its steps, a menu per day, gift ideas with their reasons, or advice. It is shown with the Plan and with the cart it becomes.
+_Avoid_: Recipe list, suggestion, description
+
 **Order**:
 The Items of one conversation and where each stands (read, asked, in the cart), from the first message to the last cart. It counts the questions spent on each Item and keeps the Notes about Items dropped or removed until the cart is shown.
 _Avoid_: Basket, shopping list, conversation state

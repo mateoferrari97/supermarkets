@@ -10,6 +10,8 @@ Nothing is kept between orders in the first version: no per-Owner memory or defa
 
 ADR 0012 amends this decision: the Owner is asked only when no Match fits an Item, at most twice per Item, with up to 5 Alternatives instead of options built from Product Types; call 1 reads every reply, answers and Corrections alike, and the conversation stays open after the cart. Nothing is kept between conversations.
 
+ADR 0013 amends this decision: the planner left out below now exists. A message labelled `plan` starts a Plan that the Owner revises and confirms before it becomes a cart; an order is read as here.
+
 ## Considered Options
 
 - **Remember answers and preferences per Owner.** Fewer questions after a few orders, but it needs storage, a way to forget or change a default, and rules for when a stored preference applies. Left out to keep the first version small.

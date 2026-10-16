@@ -14,3 +14,4 @@ One file per decision, numbered in order, with a `Status` front matter of `propo
 - [0010](0010-check-the-knowledge-base-mechanically-in-pnpm-check.md): Check the knowledge base mechanically in `pnpm check`
 - [0011](0011-no-payment-card-or-preference-for-now.md): No Payment Card or preference for now; one fixed Selection Policy picks the products
 - [0012](0012-match-items-to-catalog-products-with-two-llm-calls-around-a-search.md): Match Items to catalog products with two LLM calls around a search
+- [0013](0013-in-a-plan-the-llm-proposes-seen-products-and-the-owner-confirms.md): In a Plan the LLM proposes products it saw, code checks them, and the Owner confirms
