@@ -44,6 +44,34 @@ A cart link does not keep each `qty` with its `sku`. Carrefour's checkout sorts 
 - A cart built with `POST /api/checkout/pub/orderForm/<id>/items` keeps its quantities, and opening `/checkout/?orderFormId=<id>` in a logged-in browser shows it, but the page then asks for a delivery method and redirects to the home page, where the account's own cart comes back. In an incognito window the Owner saw an empty cart.
 - Logged in, links opened one after the other each add their lines with the right quantities: `19873`×1 + `249859`×1, then `11324`×4, ended with both links' lines next to the line already in the cart.
 
+## Checkout of the departments orders leave out
+
+Orders do not search Electro y tecnología, Automotor, Indumentaria, Juguetería y Librería and Aire Libre y Ocio (`EXCLUDED_DEPARTMENTS` in `src/adapters/catalog-search/in-memory-catalog-search.ts`). On 2026-10-16 their products were checked with `simulate` and `cartLink` of `src/adapters/carrefour/carrefour-store.ts`, called live from a one-off script, against the Catalog Snapshot of 2026-10-15, and every cart link was opened in a logged-in browser whose address has postal code 1430.
+
+| Department | Products (sku) |
+| --- | --- |
+| Electro y tecnología | Microondas Carrefour Home 20 Lts (`257669`), Freidora Mandine mdf50 (`236762`), Smart TV 43" Noblex (`278330`), Cepillo de aire Remington as15a (`223588`) |
+| Automotor | Par tensores Iael 40x100 cm (`59888`), Chaleco reflectivo Iael (`58807`), Crique carrito hidráulico Carrefour 2 t (`123234`) |
+| Indumentaria | Micromedia Everlast (`154320`), Calza Tex estampada (`196218`), Remera manga corta Minnie (`303519`) |
+| Juguetería y Librería | Bolsa de regalo grande XL (`207419`), Tablero de dibujo y deslizamiento (`246456`), Libro para colorear Juega y Colorea (`261337`) |
+| Aire Libre y Ocio | Cartucho de filtro Bestway (`82686`), Maceta simil 12 cm (`58189`), Inflador Bestway manual (`211635`), Valija tela sydney soft 64 cm (`224554`) |
+
+- Every product answered with seller `1`; no third-party seller appeared, also in samples of 40 in-stock products per department.
+- Simulated alone and together, each product got the same price and availability; the only promotion seen, "PROMO-20% Off -Reg-1-20-Aniv3 Bazar" on `123234`, came through `promotions` as for groceries.
+- With postal code 1430 every product was `available`, and each cart link added every line at quantity 1 with the price the simulation gave.
+- With postal code 1425 some of the same products were `cannotBeDelivered` ("no pudo ser enviado para las coordenadas seleccionadas": `207419`, `261337`, `82686`, `224554`) or `withoutPriceFulfillment` (`303519`). `224554` cost 149000 there and 69990 with 1430. Grocery departments show the same: of 40 in-stock products of Almacén, 4 were `cannotBeDelivered` and 6 `withoutPriceFulfillment` with 1425. Snapshot stock is not stock in the Branch for any department.
+- Some snapshot prices were stale a day later (Microondas `257669` 159000 in the snapshot, 179000 simulated; Freidora `236762` 162900 and 119000).
+- A clothing SKU is one size and colour: the cart names `154320` "Micromedia Everlast algodón y lycra talle 41-45 melange". The snapshot keeps every `skuId` of a product but the stock and price of the first one.
+
+### Two carts in one account
+
+Carrefour's site splits a cart into a "Supermercado" cart and a "Hogar y Electro" cart and asks the Owner to choose one before checkout ("Dividimos tu compra en diferentes carritos para poder completar la entrega correctamente"). Each cart is paid apart, and "Hogar y Electro" has a minimum purchase of $20.000. The regions of 1425 and 1430 both list the seller `carrefourar0899` "Hogar & Electro".
+
+- A cart link with products of both carts adds every line; the site shows them under the two carts (`223588`, `236762`, `257669` and `278330` under "Hogar y Electro", next to a grocery line under "Supermercado").
+- The cart follows the product, not the department: Mouse Logitech USB M90 (`2597`) went to "Supermercado" and Auricular In Ear Motorola (`73902`) to "Hogar y Electro".
+- The simulation tells them apart by `logisticsInfo[].slas[].name`: "Supermercado" products had "Envío a Domicilio", "Hogar y Electro" products had "Envío Domicilio", "Costo regulable Envío Domicilio" and "Retiro en Tienda (…PR)". In a simulation of 50 items at once a "Hogar y Electro" product sometimes lacked "Envío Domicilio" but kept the others.
+- Of the in-stock products with postal code 1430, "Hogar y Electro" held 507 of 545 available in Electro y tecnología, 3 of 150 in Automotor (tyres), 5 of 1,123 in Juguetería y Librería (battery cars), 41 of 284 in Aire Libre y Ocio (garden furniture, bicycles) and none of 44 in Indumentaria. Orders already reach this cart: it held 62 of 1,748 available in Hogar, a department orders search.
+
 ## Catalog search (legacy)
 
 `GET /api/catalog_system/pub/products/search` is what `src/adapters/carrefour/catalog-download.ts` uses to download the Catalog Snapshot.
