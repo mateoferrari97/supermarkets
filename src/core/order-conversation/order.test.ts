@@ -17,6 +17,7 @@ import {
   QUESTIONS_HINT,
   applyReply,
   nextStep,
+  orderFromPlan,
   replyItems,
   startOrder,
   takeCart,
@@ -26,6 +27,7 @@ import {
   type NextStep,
   type Order,
 } from "./order.ts";
+import type { Plan } from "../planning/plan.ts";
 
 const product = (itemId: string, name: string, price: number | null = 1000): CatalogProduct => ({
   productId: `p${itemId}`,
@@ -110,6 +112,7 @@ const inCartOrder = (lines: Item[], products: CatalogProduct[]): Order => ({
   removed: [],
   ignoredPreference: false,
   cartShown: true,
+  idea: null,
 });
 
 const applying = (order: Order, output: Partial<ReadReplyOutput>) =>
@@ -509,6 +512,7 @@ describe("Order", () => {
         notes: [],
         warning: CART_WARNING,
         cartLink: "cart:link",
+        idea: null,
       });
       assert.deepEqual(state, {
         stage: "cart",
@@ -526,6 +530,7 @@ describe("Order", () => {
         removed: [],
         ignoredPreference: false,
         cartShown: true,
+        idea: null,
       });
     });
 
@@ -683,7 +688,58 @@ describe("Order", () => {
         removed: [],
         ignoredPreference: true,
         cartShown: false,
+        idea: null,
       });
+    });
+  });
+
+  describe("a confirmed Plan", () => {
+    const mince: CatalogProduct = {
+      ...product("2", "Carne picada especial x kg", 9000),
+      sale: { kind: "by-weight", saleStepKg: 0.5 },
+    };
+    const plan: Plan = {
+      title: "Lasaña para 4",
+      idea: [{ heading: "Pasos", text: "Armá capas y horneá 40 minutos." }],
+      lines: [
+        { productId: "p4", quantity: 2, purpose: "para gratinar", reason: "Queso" },
+        { productId: "p2", quantity: 1000, purpose: "para la salsa", reason: "Carne" },
+      ],
+    };
+    const confirmed = () => orderFromPlan("1425", plan, [yerba, sancor, mince]);
+
+    it("buys each Plan Line as an Item named by product and purpose, with its product alone at the line's quantity", () => {
+      const step = nextStep(confirmed());
+      if (step.kind !== "buy") throw new Error(`nothing to buy: ${step.kind}`);
+      assert.deepEqual(
+        step.items.map(({ item: wanted, toBuy }) => [
+          wanted.original,
+          toBuy.kind === "choose"
+            ? toBuy.candidates.map(({ product: bought, quantity }) => [bought.itemId, quantity])
+            : null,
+        ]),
+        [
+          ["Queso Port Salut Sancor 500 g — para gratinar", [["4", 2]]],
+          ["Carne picada especial x kg — para la salsa", [["2", 2]]],
+        ],
+      );
+    });
+
+    it("keeps the Plan's title and Idea in the Order", () => {
+      assert.deepEqual(confirmed().idea, {
+        title: "Lasaña para 4",
+        sections: [{ heading: "Pasos", text: "Armá capas y horneá 40 minutos." }],
+      });
+    });
+
+    it("returns the Idea in the Cart shown and keeps it in the cart for Corrections", () => {
+      const { state, cart } = taken(confirmed());
+      assert.deepEqual(cart.idea, confirmed().idea);
+      assert.deepEqual(state.idea, confirmed().idea);
+    });
+
+    it("shows no Idea in the cart of an order", () => {
+      assert.equal(taken(startOrder("1425", [fits(yerbaLine, yerba)], false)).cart.idea, null);
     });
   });
 });

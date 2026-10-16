@@ -5,6 +5,7 @@ import type {
   AskedQuestion,
   Cart,
   Mark,
+  PlanIdea,
   PlanShown,
   TurnEvent,
   TurnRequest,
@@ -88,8 +89,7 @@ export function Chat({ firstQuestion }: { firstQuestion: string }) {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function send() {
-    const text = draft.trim();
+  async function send(text: string) {
     if (!text || working) return;
     setDraft("");
     setWorking(true);
@@ -142,6 +142,7 @@ export function Chat({ firstQuestion }: { firstQuestion: string }) {
             message={message}
             chips={index === lastIndex && !working && !finished}
             onChip={appendChip}
+            onConfirm={() => void send(CONFIRM_TEXT)}
           />
         ))}
         {working && messages.at(-1)?.role !== "steps" ? (
@@ -162,7 +163,7 @@ export function Chat({ firstQuestion }: { firstQuestion: string }) {
           className="input"
           onSubmit={(event) => {
             event.preventDefault();
-            void send();
+            void send(draft.trim());
           }}
         >
           <textarea
@@ -173,7 +174,7 @@ export function Chat({ firstQuestion }: { firstQuestion: string }) {
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                void send();
+                void send(draft.trim());
               }
             }}
           />
@@ -190,10 +191,12 @@ function MessageView({
   message,
   chips,
   onChip,
+  onConfirm,
 }: {
   message: Message;
   chips: boolean;
   onChip: (piece: string) => void;
+  onConfirm: () => void;
 }) {
   switch (message.role) {
     case "owner":
@@ -229,6 +232,13 @@ function MessageView({
       return (
         <div className="msg bot wide">
           <PlanView text={message.text} plan={message.plan} />
+          {chips ? (
+            <div className="chips">
+              <button className="chip" type="button" onClick={onConfirm}>
+                Confirmar
+              </button>
+            </div>
+          ) : null}
         </div>
       );
     case "cart":
@@ -268,6 +278,22 @@ function QuestionChips({
   );
 }
 
+const CONFIRM_TEXT = "Confirmo";
+
+function IdeaView({ idea }: { idea: PlanIdea }) {
+  return (
+    <>
+      <h2 className="plan-title">{idea.title}</h2>
+      {idea.sections.map((section) => (
+        <div key={section.heading} className="block">
+          <strong>{section.heading}</strong>
+          <div className="text">{section.text}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 const grams = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
 
 function planQuantityText({ product, quantity }: PlanShown["lines"][number]): string {
@@ -279,13 +305,7 @@ function PlanView({ text, plan }: { text: string; plan: PlanShown }) {
   return (
     <>
       <div className="text">{text}</div>
-      <h2 className="plan-title">{plan.title}</h2>
-      {plan.idea.map((section) => (
-        <div key={section.heading} className="block">
-          <strong>{section.heading}</strong>
-          <div className="text">{section.text}</div>
-        </div>
-      ))}
+      <IdeaView idea={{ title: plan.title, sections: plan.idea }} />
       <table className="block">
         <thead>
           <tr>
@@ -331,7 +351,8 @@ const MARK_TEXT: Record<Mark, string> = { new: "Nuevo", changed: "Cambiado" };
 function CartView({ cart }: { cart: Cart }) {
   return (
     <>
-      <div className="lead">Listo, este es tu carrito en Carrefour:</div>
+      {cart.idea === null ? null : <IdeaView idea={cart.idea} />}
+      <div className="lead block">Listo, este es tu carrito en Carrefour:</div>
       <table>
         <thead>
           <tr>

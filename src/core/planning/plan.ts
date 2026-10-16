@@ -1,5 +1,5 @@
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
-import { roundMeasure } from "../order-matching/item.ts";
+import { roundMeasure, type Item } from "../order-matching/item.ts";
 import { candidateOf, snapshotTotal } from "../product-selection/selection.ts";
 
 export const PLAN_QUERIES_LIMIT = 8;
@@ -12,6 +12,8 @@ export type PlanLine = { productId: string; quantity: number; purpose: string; r
 
 export type Plan = { title: string; idea: IdeaSection[]; lines: PlanLine[] };
 
+export type PlanIdea = { title: string; sections: IdeaSection[] };
+
 export type PlanMessage = { role: "owner" | "planner"; text: string };
 
 export type PlanInput = {
@@ -21,7 +23,9 @@ export type PlanInput = {
 };
 
 export type PlanOutput =
-  { kind: "search"; queries: string[] } | { kind: "answer"; message: string; plan: Plan | null };
+  | { kind: "search"; queries: string[] }
+  | { kind: "answer"; message: string; plan: Plan | null }
+  | { kind: "confirm" };
 
 export type PlanLlm = {
   plan(input: PlanInput, signal: AbortSignal): Promise<PlanOutput>;
@@ -46,7 +50,8 @@ export type PlanShown = {
 
 export type CheckedPlanOutput =
   | { kind: "search"; queries: string[] }
-  | { kind: "answer"; message: string; plan: PlanShown | null };
+  | { kind: "answer"; message: string; plan: PlanShown | null }
+  | { kind: "confirm" };
 
 export async function checkedPlan(
   llm: PlanLlm,
@@ -61,6 +66,10 @@ export function checkPlan(input: PlanInput, output: PlanOutput): CheckedPlanOutp
     if (output.queries.length > PLAN_QUERIES_LIMIT) {
       fail(`${String(output.queries.length)} queries, more than ${String(PLAN_QUERIES_LIMIT)}`);
     }
+    return output;
+  }
+  if (output.kind === "confirm") {
+    if (input.lastPlan === null) fail("a confirm with no Plan shown");
     return output;
   }
   return {
@@ -99,19 +108,7 @@ function shownLine(line: PlanLine, seen: CatalogProduct[]): PlanLineShown {
         : `quantity ${String(quantity)} of by-weight product ${productId} is not in whole grams`,
     );
   }
-  const candidate = candidateOf(
-    {
-      original: product.name,
-      product: product.name,
-      brand: product.brand,
-      size: { kind: "common" },
-      quantity:
-        product.sale.kind === "by-weight"
-          ? { kind: "weight", grams: quantity }
-          : { kind: "units", count: quantity },
-    },
-    product,
-  );
+  const candidate = candidateOf(itemOfPlanLine(line, product), product);
   return {
     product,
     quantity:
@@ -122,6 +119,19 @@ function shownLine(line: PlanLine, seen: CatalogProduct[]): PlanLineShown {
     reason,
     notes: candidate.notes,
     total: snapshotTotal(candidate),
+  };
+}
+
+export function itemOfPlanLine({ quantity, purpose }: PlanLine, product: CatalogProduct): Item {
+  return {
+    original: `${product.name} — ${purpose}`,
+    product: product.name,
+    brand: product.brand,
+    size: { kind: "common" },
+    quantity:
+      product.sale.kind === "by-weight"
+        ? { kind: "weight", grams: quantity }
+        : { kind: "units", count: quantity },
   };
 }
 

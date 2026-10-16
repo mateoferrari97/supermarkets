@@ -10,7 +10,7 @@ export const SEARCH_ROUNDS_LIMIT = 3;
 export type PlanSearchDependencies = { llm: PlanLlm; search: CatalogSearch };
 
 export type PlannedTurn = {
-  output: CheckedPlanOutput & { kind: "answer" };
+  output: Exclude<CheckedPlanOutput, { kind: "search" }>;
   products: CatalogProduct[];
 };
 
@@ -25,7 +25,7 @@ export async function planWithSearches(
       checkedPlan(llm, { ...input, products }, steps.signal),
     );
     steps.signal.throwIfAborted();
-    if (output.kind === "answer") return { output, products };
+    if (output.kind !== "search") return { output, products };
     if (round === SEARCH_ROUNDS_LIMIT) {
       throw new Error(
         `plan answer breaks a rule: a fourth search in one turn, more than ${String(SEARCH_ROUNDS_LIMIT)}`,
