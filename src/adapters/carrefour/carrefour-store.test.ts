@@ -122,15 +122,34 @@ describe("createCarrefourStore", () => {
     assert.equal(simulation.total, 0);
   });
 
-  it("links a Carrefour cart with every item at its quantity from seller 1", () => {
+  it("links a Carrefour cart with every item from seller 1, skus in text order and quantities padded to keep that order", () => {
     const store = createCarrefourStore(() => Promise.reject(new Error("a link needs no request")));
     assert.equal(
       store.cartLink([
-        { itemId: "217502", quantity: 2 },
         { itemId: "9008", quantity: 1 },
+        { itemId: "217502", quantity: 2 },
       ]),
-      "https://www.carrefour.com.ar/checkout/cart/add?sku=217502&qty=2&seller=1&sku=9008&qty=1&seller=1&sc=1",
+      "https://www.carrefour.com.ar/checkout/cart/add?sku=217502&qty=02&seller=1&sku=9008&qty=1&seller=1&sc=1",
     );
+  });
+
+  it("links a cart that Carrefour reads with every quantity at its sku", () => {
+    const store = createCarrefourStore(() => Promise.reject(new Error("a link needs no request")));
+    const items = [
+      { itemId: "19873", quantity: 1 },
+      { itemId: "57446", quantity: 2 },
+      { itemId: "11324", quantity: 4 },
+      { itemId: "25012", quantity: 1 },
+      { itemId: "156687", quantity: 3 },
+      { itemId: "186506", quantity: 1 },
+      { itemId: "6631", quantity: 1 },
+      { itemId: "57565", quantity: 2 },
+      { itemId: "249859", quantity: 1 },
+      { itemId: "172757", quantity: 1 },
+      { itemId: "294448", quantity: 10 },
+    ];
+    const cart = asCarrefourReadsIt(store.cartLink(items));
+    assert.deepEqual(cart, new Map(items.map(({ itemId, quantity }) => [itemId, quantity])));
   });
 });
 
@@ -179,3 +198,11 @@ describe("createCarrefourStore and its signal", () => {
     assert.deepEqual(signals, [controller.signal]);
   });
 });
+
+function asCarrefourReadsIt(link: string): Map<string, number> {
+  const params = new URL(link).searchParams;
+  const textOrder = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const skus = params.getAll("sku").sort(textOrder);
+  const quantities = params.getAll("qty").sort(textOrder);
+  return new Map(skus.map((sku, index) => [sku, Number(quantities[index])]));
+}

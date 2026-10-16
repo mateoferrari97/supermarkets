@@ -34,6 +34,16 @@ A cart link never sums quantities, and what happens to the cart already there de
 - Logged out (incognito), the link replaces the cart: it ends with only `105933`×1.
 - Logged in, the link adds its lines and sets the quantity of lines already there: it ends with `105933`×1 + `9100`×2, so items of an earlier link stay in the cart.
 
+A cart link does not keep each `qty` with its `sku`. Carrefour's checkout sorts the `sku` values and the `qty` values separately, both as text, and pairs them by position, as observed on 2026-10-15 with a fresh cookie jar and `POST /api/checkout/pub/orderForm` to read the cart:
+
+- `sku=11324&qty=4&sku=19873&qty=1` ends with `11324`×1 and `19873`×4, and so does the same link with its lines in the other order.
+- `sku=11324&qty=4&sku=19873&qty=10` ends with `11324`×10 and `19873`×4, since `"10"` sorts before `"4"`.
+- A link with one line, or with every `qty` equal, gets the right quantities.
+- A `qty` with leading zeros is read as its number: `qty=04` buys 4. So `cartLink` in `src/adapters/carrefour/carrefour-store.ts` writes the lines in the text order of their `sku` and pads each `qty` with one zero fewer than the line before it, which puts the quantities in the same text order. A link of 11 lines built this way got every quantity right, logged out and logged in.
+- The same `sku` repeated with `qty=1` does not add up: four lines of `11324` end with `11324`×1.
+- A cart built with `POST /api/checkout/pub/orderForm/<id>/items` keeps its quantities, and opening `/checkout/?orderFormId=<id>` in a logged-in browser shows it, but the page then asks for a delivery method and redirects to the home page, where the account's own cart comes back. In an incognito window the Owner saw an empty cart.
+- Logged in, links opened one after the other each add their lines with the right quantities: `19873`×1 + `249859`×1, then `11324`×4, ended with both links' lines next to the line already in the cart.
+
 ## Catalog search (legacy)
 
 `GET /api/catalog_system/pub/products/search` is what `src/adapters/carrefour/catalog-download.ts` uses to download the Catalog Snapshot.

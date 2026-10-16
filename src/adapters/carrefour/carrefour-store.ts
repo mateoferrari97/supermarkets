@@ -126,11 +126,13 @@ export function createCarrefourStore(http: HttpClient = fetchJson): OnlineStore 
 
 function cartLink(items: SimulationItem[]): string {
   const params = new URLSearchParams();
-  for (const { itemId, quantity } of items) {
+  const inTextOrder = [...items].sort((a, b) => (a.itemId < b.itemId ? -1 : 1));
+  inTextOrder.forEach(({ itemId, quantity }, index) => {
+    const zeros = "0".repeat(inTextOrder.length - 1 - index);
     params.append("sku", itemId);
-    params.append("qty", String(quantity));
+    params.append("qty", `${zeros}${quantity}`);
     params.append("seller", "1");
-  }
+  });
   params.append("sc", "1");
   return `${CARREFOUR_URL}/checkout/cart/add?${params}`;
 }
