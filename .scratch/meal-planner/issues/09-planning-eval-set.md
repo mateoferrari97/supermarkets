@@ -70,3 +70,9 @@ Time and cost per case (time and cost per run are averages of the 3 runs; routin
 | plan-advice-fondue | yes | 3 | 6.1 s | $0.0052 | $0.0156 |
 | plan-advice-steak-side | yes | 3 | 4.8 s | $0.0052 | $0.0155 |
 | plan-allergy-egg-cake | no | 4 | 9.4 s | $0.0233 | $0.0700 |
+
+### Run after the search fix
+
+The finding above was fixed on branch `meal-planner/plan-queries-limit`: the plan output schema caps `queries` at 8 and the prompt asks for at most 8 per search, splitting longer lists across rounds; each call after a search gets the queries of the turn with how many products each found (`<searches>`); a fourth search answers the Owner with a fixed text instead of failing the turn.
+
+`pnpm plan:eval`, 3 runs per case, 2026-10-16T19:30:49Z: routing 15/15, plan 14/14, 0 errors in 87 runs, Ideas judged sensible 36/42. Total: 165 sessions, 1010.0 s, $2.4155. The judge flagged amounts: too little cake and chips for a birthday of 15 kids (3 runs), more meat per person than the asado's own text says, too much cheese for a pizza for 3 and for a fondue.
