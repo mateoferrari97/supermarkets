@@ -14,3 +14,5 @@
 - [ ] `pnpm check` is green
 
 ## Comments
+
+Decision of 2026-10-16 (Owner): ticket 01 approved all five departments. Products Carrefour puts in the separate "Hogar y Electro" cart are allowed in Plans with no warning and no special handling; detecting or warning about that cart is left to a future ticket.
