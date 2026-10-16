@@ -29,6 +29,11 @@ export const routeMessageOutputSchema = z.strictObject({
   topic: z.enum(TOPICS),
 });
 
+export const judgeIdeaOutputSchema = z.strictObject({
+  sensible: z.boolean(),
+  reason: z.string().min(1),
+});
+
 const planSchema = z.strictObject({
   title: z.string().min(1),
   idea: z.array(z.strictObject({ heading: z.string().min(1), text: z.string().min(1) })),

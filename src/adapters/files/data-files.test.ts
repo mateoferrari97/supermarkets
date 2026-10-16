@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { summarize } from "../../core/order-matching/eval-score.ts";
+import { summarizePlanning } from "../../core/planning/eval-score.ts";
 import { createDataFiles } from "./data-files.ts";
 
 const repoRoot = join(import.meta.dirname, "../../..");
@@ -68,6 +69,7 @@ describe("the committed data", () => {
   it("loads with no errors", () => {
     const files = createDataFiles(repoRoot);
     assert.equal(files.loadEvalSet().ok, true);
+    assert.equal(files.loadPlanningEvalSet().ok, true);
   });
 });
 
@@ -93,6 +95,70 @@ describe("loadEvalSet", () => {
       ok: false,
       errors: ['eval case "yerba" order is an example order of the prompts'],
     });
+  });
+});
+
+describe("loadPlanningEvalSet", () => {
+  const offTopic = { id: "boca", message: "¿juega Boca?", topic: "off-topic" };
+  const lasagna = {
+    id: "lasagna",
+    message: "lasaña para 4",
+    covers: ["recipe", "event", "weekly-menu", "gift", "advice", "constraints", "idea-in-cart"],
+    plan: true,
+  };
+
+  beforeEach(() => {
+    write("evals/planning.json", { routes: [offTopic], plans: [lasagna] });
+    write(
+      "prompts/planning/plan.md",
+      "# Examples\n\n<conversation>\n<owner>quiero hacer ñoquis</owner>\n</conversation>\n",
+    );
+  });
+
+  it("returns the planning eval set when it is valid", () => {
+    assert.deepEqual(createDataFiles(root).loadPlanningEvalSet(), {
+      ok: true,
+      value: { routes: [offTopic], plans: [lasagna] },
+    });
+  });
+
+  it("fails with the validator's errors", () => {
+    write("evals/planning.json", { routes: [offTopic, offTopic], plans: [lasagna] });
+    assert.deepEqual(createDataFiles(root).loadPlanningEvalSet(), {
+      ok: false,
+      errors: ['routing case "boca" id is used more than once'],
+    });
+  });
+
+  it("rejects a message equal to an example message of any prompt", () => {
+    write("evals/planning.json", {
+      routes: [offTopic],
+      plans: [{ ...lasagna, message: "Quiero hacer ñoquis" }],
+    });
+    assert.deepEqual(createDataFiles(root).loadPlanningEvalSet(), {
+      ok: false,
+      errors: ['plan case "lasagna" message is an example message of the prompts'],
+    });
+  });
+
+  it("saves each run under its start time", () => {
+    const run = {
+      startedAt: "2026-10-16T10:00:00.000Z",
+      snapshotFetchedAt: null,
+      models: [],
+      runsPerCase: 1,
+      filters: [],
+      durationMs: 1,
+      costUsd: 0,
+      sessions: 0,
+      stale: [],
+      totals: summarizePlanning([], []),
+      routes: [],
+      plans: [],
+    };
+    const path = createDataFiles(root).savePlanningEvalRun(run);
+    assert.equal(path, ".data/planning/eval-runs/2026-10-16T10-00-00.000Z.json");
+    assert.deepEqual(read(path), run);
   });
 });
 

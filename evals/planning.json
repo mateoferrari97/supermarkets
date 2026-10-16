@@ -1,0 +1,290 @@
+{
+  "routes": [
+    { "id": "route-order-list", "message": "2 leches, un pan lactal y manteca", "topic": "order" },
+    {
+      "id": "route-order-brands",
+      "message": "coca zero 2.25, fernet branca y hielo",
+      "topic": "order"
+    },
+    {
+      "id": "route-order-greeting",
+      "message": "hola! necesito yerba playadito 1 kg y azúcar",
+      "topic": "order"
+    },
+    {
+      "id": "route-order-purpose",
+      "message": "para el asado: 3 kg de vacío, carbón y 6 chorizos",
+      "topic": "order"
+    },
+    {
+      "id": "route-order-cleaning",
+      "message": "lavandina, detergente y un paquete de esponjas",
+      "topic": "order"
+    },
+    { "id": "route-plan-recipe", "message": "quiero hacer ñoquis caseros para 5", "topic": "plan" },
+    {
+      "id": "route-plan-event",
+      "message": "organizo un cumpleaños para 20 chicos, ¿qué compro?",
+      "topic": "plan"
+    },
+    {
+      "id": "route-plan-menu",
+      "message": "armame el menú de la semana para dos, vegetariano",
+      "topic": "plan"
+    },
+    {
+      "id": "route-plan-gift",
+      "message": "busco un regalo para mi hermano que le gusta el fútbol",
+      "topic": "plan"
+    },
+    {
+      "id": "route-plan-advice",
+      "message": "¿qué cerveza va bien con una pizza?",
+      "topic": "plan"
+    },
+    {
+      "id": "route-off-topic-weather",
+      "message": "¿va a llover mañana en Buenos Aires?",
+      "topic": "off-topic"
+    },
+    { "id": "route-off-topic-greeting", "message": "hola, ¿cómo andás?", "topic": "off-topic" },
+    {
+      "id": "route-off-topic-football",
+      "message": "¿quién ganó el superclásico?",
+      "topic": "off-topic"
+    },
+    {
+      "id": "route-off-topic-homework",
+      "message": "ayudame con la tarea de matemática de mi hijo",
+      "topic": "off-topic"
+    },
+    { "id": "route-off-topic-joke", "message": "contame un chiste", "topic": "off-topic" }
+  ],
+  "plans": [
+    {
+      "id": "plan-recipe-lentil-stew",
+      "message": "quiero hacer un guiso de lentejas para 6",
+      "covers": ["recipe", "idea-in-cart"],
+      "plan": true,
+      "quantities": [
+        {
+          "label": "lentejas",
+          "productIds": [
+            "177445",
+            "496089",
+            "718915",
+            "530972",
+            "738618",
+            "582344",
+            "695919",
+            "547327",
+            "704107",
+            "678739",
+            "714216"
+          ],
+          "unit": "g",
+          "min": 400,
+          "max": 1600
+        }
+      ],
+      "idea": { "headings": ["pasos", "preparacion", "como hacerlo"], "min": 1 }
+    },
+    {
+      "id": "plan-recipe-ham-cheese-pie",
+      "message": "una tarta de jamón y queso para 4",
+      "covers": ["recipe", "idea-in-cart"],
+      "plan": true,
+      "idea": { "headings": ["pasos", "preparacion", "como hacerlo"], "min": 1 }
+    },
+    {
+      "id": "plan-recipe-pizza-already-have",
+      "message": "pizza casera para 3, ya tengo harina y levadura",
+      "covers": ["recipe", "constraints"],
+      "plan": true,
+      "forbiddenWords": ["harina", "harinas", "levadura", "levaduras"],
+      "idea": { "headings": ["pasos", "preparacion", "como hacerlo"], "min": 1 }
+    },
+    {
+      "id": "plan-recipe-rice-chicken-already-have",
+      "message": "arroz con pollo para 4; arroz, aceite y sal ya tengo",
+      "covers": ["recipe", "constraints"],
+      "plan": true,
+      "forbiddenWords": ["arroz", "aceite", "aceites", "sal"],
+      "quantities": [
+        {
+          "label": "pollo",
+          "productIds": [
+            "701218",
+            "696971",
+            "704560",
+            "696963",
+            "701217",
+            "699692",
+            "701216",
+            "696940"
+          ],
+          "unit": "g",
+          "min": 600,
+          "max": 3000
+        }
+      ]
+    },
+    {
+      "id": "plan-event-asado",
+      "message": "asado para 12 personas, tengo $150.000",
+      "covers": ["event", "constraints", "idea-in-cart"],
+      "plan": true,
+      "budget": 150000,
+      "quantities": [
+        {
+          "label": "carne",
+          "productIds": [
+            "627284",
+            "627285",
+            "671749",
+            "674621",
+            "680558",
+            "680559",
+            "676006",
+            "627286",
+            "671775",
+            "718756",
+            "724415",
+            "707159",
+            "718753",
+            "720200",
+            "724411",
+            "590093",
+            "720196",
+            "722642",
+            "724400",
+            "720198",
+            "724399",
+            "724413",
+            "718755",
+            "724414",
+            "724416",
+            "724417",
+            "720203",
+            "720205",
+            "724403",
+            "724404",
+            "578679",
+            "720204",
+            "662844",
+            "678586",
+            "687696",
+            "662854",
+            "730434",
+            "671759",
+            "678602",
+            "691385",
+            "578687",
+            "720202",
+            "724406"
+          ],
+          "unit": "g",
+          "min": 3600,
+          "max": 9000
+        }
+      ],
+      "idea": { "min": 1 }
+    },
+    {
+      "id": "plan-event-birthday",
+      "message": "cumpleaños de mi hijo con 15 chicos, hasta $60.000",
+      "covers": ["event", "constraints"],
+      "plan": true,
+      "budget": 60000,
+      "idea": { "min": 1 }
+    },
+    {
+      "id": "plan-event-picada",
+      "message": "una picada para 8 amigos el sábado",
+      "covers": ["event"],
+      "plan": true,
+      "idea": { "min": 1 }
+    },
+    {
+      "id": "plan-weekly-menu-gluten-free",
+      "message": "armame los almuerzos de lunes a viernes para 3, sin TACC",
+      "covers": ["weekly-menu", "constraints", "idea-in-cart"],
+      "plan": true,
+      "forbiddenWords": [
+        "trigo",
+        "fideos",
+        "tallarines",
+        "spaghetti",
+        "pan",
+        "pan rallado",
+        "rebozador",
+        "tapas",
+        "harina 000",
+        "harina 0000",
+        "galletitas"
+      ],
+      "allowedWords": ["sin tacc", "sin gluten", "libre de gluten"],
+      "idea": { "headings": ["lunes", "martes", "miercoles", "jueves", "viernes"], "min": 5 }
+    },
+    {
+      "id": "plan-weekly-menu-vegetarian",
+      "message": "cenas para toda la semana para 4 personas, somos vegetarianos",
+      "covers": ["weekly-menu", "constraints"],
+      "plan": true,
+      "forbiddenWords": [
+        "carne",
+        "pollo",
+        "cerdo",
+        "pescado",
+        "atun",
+        "jamon",
+        "salame",
+        "chorizo",
+        "milanesa de carne",
+        "novillo",
+        "novillito",
+        "merluza"
+      ],
+      "allowedWords": ["de soja", "vegetal", "de planta", "vegana", "vegano", "a base de plantas"],
+      "idea": {
+        "headings": ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"],
+        "min": 5
+      }
+    },
+    {
+      "id": "plan-gift-mate",
+      "message": "un regalo para mi viejo que toma mate todo el día, hasta $25.000",
+      "covers": ["gift", "constraints", "idea-in-cart"],
+      "plan": true,
+      "budget": 25000,
+      "idea": { "min": 1 }
+    },
+    {
+      "id": "plan-gift-niece",
+      "message": "algo para regalarle a mi sobrina de 8 años que le encanta dibujar",
+      "covers": ["gift"],
+      "plan": true,
+      "idea": { "min": 1 }
+    },
+    {
+      "id": "plan-advice-fondue",
+      "message": "¿qué queso conviene para una fondue?",
+      "covers": ["advice"],
+      "plan": false
+    },
+    {
+      "id": "plan-advice-steak-side",
+      "message": "¿con qué puedo acompañar un bife de chorizo?",
+      "covers": ["advice"],
+      "plan": false
+    },
+    {
+      "id": "plan-allergy-egg-cake",
+      "message": "un budín para la merienda, mi hija es alérgica al huevo",
+      "covers": ["recipe", "constraints"],
+      "plan": true,
+      "forbiddenWords": ["huevo", "huevos", "mayonesa"],
+      "idea": { "headings": ["pasos", "preparacion", "como hacerlo"], "min": 1 }
+    }
+  ]
+}

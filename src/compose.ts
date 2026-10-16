@@ -2,6 +2,7 @@ import { downloadCatalog as downloadCarrefourCatalog } from "./adapters/carrefou
 import { createCarrefourStore } from "./adapters/carrefour/carrefour-store.ts";
 import { createInMemoryCatalogSearch } from "./adapters/catalog-search/in-memory-catalog-search.ts";
 import {
+  createClaudeCodeIdeaJudge,
   createClaudeCodeLlm,
   type ClaudeCodeLlmOptions,
   type LlmCall,
@@ -23,6 +24,9 @@ import {
   type ReadReplyOutput,
 } from "./core/order-matching/read-reply.ts";
 import type { OnlineStore } from "./core/product-selection/online-store.ts";
+import { planFirstMessage, type IdeaToJudge } from "./core/planning/eval-run.ts";
+import type { Judgment, PlanRun } from "./core/planning/eval-score.ts";
+import type { Topic } from "./core/planning/route-message.ts";
 
 export type { LlmCall } from "./adapters/claude-code/claude-code-llm.ts";
 export type { Checked, PreviousEvalRun } from "./adapters/files/data-files.ts";
@@ -47,6 +51,8 @@ export const {
   loadEvalSet,
   saveEvalRun,
   loadLatestEvalRun,
+  loadPlanningEvalSet,
+  savePlanningEvalRun,
 } = files;
 
 export function createLlm(options: LlmOptions): Llm {
@@ -82,6 +88,35 @@ export function createOrderMatcher({ onCall }: OrderMatcherOptions = {}): Checke
       snapshotFetchedAt: files.loadSnapshotFetchedAt(),
       matchOrder: (orderText) => matchOrder(orderText, { search, llm }),
       readReply: (input) => checkedReadReply(llm, input, new AbortController().signal),
+    },
+  };
+}
+
+export type PlanningEvaluator = {
+  products: CatalogProduct[];
+  snapshotFetchedAt: string | null;
+  routeMessage(text: string): Promise<Topic>;
+  planFirstMessage(message: string): Promise<PlanRun>;
+  judgeIdea(input: IdeaToJudge): Promise<Judgment>;
+};
+
+export function createPlanningEvaluator({
+  onCall,
+}: OrderMatcherOptions = {}): Checked<PlanningEvaluator> {
+  const products = loadCatalogProducts();
+  if (!products.ok) return products;
+  const search = createInMemoryCatalogSearch(products.value);
+  const llm = createLlm({ onCall });
+  const judge = createClaudeCodeIdeaJudge({ promptsDir: files.promptsDir, onCall });
+  const signal = () => new AbortController().signal;
+  return {
+    ok: true,
+    value: {
+      products: products.value,
+      snapshotFetchedAt: files.loadSnapshotFetchedAt(),
+      routeMessage: async (text) => (await llm.routeMessage(text, signal())).topic,
+      planFirstMessage: (message) => planFirstMessage(message, { llm, search }),
+      judgeIdea: (input) => judge.judgeIdea(input, signal()),
     },
   };
 }

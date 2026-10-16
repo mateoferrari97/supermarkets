@@ -62,12 +62,12 @@ After the checks, `checkPlan` merges the lines with the same `productId` into on
 
 ## Prompts
 
-Each task's system prompt is a Markdown file in `prompts/`, named after the task: `planning/route-message.md`, `planning/plan.md`, `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-matching/read-reply.md`. The adapter reads the file on each call. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
+Each task's system prompt is a Markdown file in `prompts/`, named after the task: `planning/route-message.md`, `planning/plan.md`, `planning/judge-idea.md` (the judge of `pnpm plan:eval`, not an `Llm` task), `order-matching/parse-order.md`, `order-matching/fit-products.md`, and `order-matching/read-reply.md`. The adapter reads the file on each call. Prompts are LLM input, written in English; the Owner's text they receive is Spanish. `pnpm docs:check` does not check them.
 
 ## Changing a prompt
 
 1. Edit the prompt. If the answer's shape changes, change the output type in the port and its schema in the adapter together.
-2. Run `pnpm order:eval` (or `pnpm order:eval <filter>` for the cases whose id or order text contains the filter, and `--runs N` to change the 3 runs per case). It runs each case of the [eval set](#the-eval-set) with real Claude Code sessions and scores the product picked for each Item.
+2. Run `pnpm order:eval` (or `pnpm order:eval <filter>` for the cases whose id or order text contains the filter, and `--runs N` to change the 3 runs per case). It runs each case of the [eval set](#the-eval-set) with real Claude Code sessions and scores the product picked for each Item. For `route-message` and `plan`, run `pnpm plan:eval` instead ([the planning eval set](#the-planning-eval-set)).
 3. Read the report: the totals, each failed case with every run's problems and what each Item came back as, stale ids, the cases that changed since the previous run, and the sessions, time and cost. Each run is saved in `.data/order-matching/eval-runs/` with the Catalog Snapshot's date, so the next run compares against it. The command exits 1 when a case not marked `expectedToFail` fails.
 4. When a change fixes a case marked `expectedToFail`, the report says so; clear the mark in the eval set.
 
@@ -92,3 +92,26 @@ A case passes when, in every run, each expected Item gets a right pick or asks w
 An answer case, under `answers`, runs only `read-reply` (`src/core/order-matching/eval-answers.ts`). It has an `id`, an optional `expectedToFail`, the fixed `items` of the conversation (an asked Item with its `original`, `question` and `alternatives` by `productId`, or an Item in the cart with its `original` and the `productId` it `bought`), the Owner's `reply`, the expected `entries` (`choice` with its Alternative number, `lines` with `product` and `brand`, `drop`, `unanswered`, which for an Item in the cart stands for an ambiguous Correction asked back; every asked Item has one, Items in the cart only when the reply touches them), the expected `newLines` and an optional `ignoredPreference`. The products are read from the Catalog Snapshot to build the input. A line matches when every word of the expected `product` is in the line's `product` and the `brand` is the same, both ignoring case and accents. An answer case passes when every run gives exactly the expected entries, `newLines` and `ignoredPreference`; the report prints how many passed and the differences of each one that failed.
 
 Cases are labelled by hand: `pnpm order:label <words> [--brand <brand>]` lists the search's top 50 products from the Catalog Snapshot for a phrase, with `productId`, name, brand, size, price and stock. Every `productId` is checked in stock on the current snapshot when the set is written. `pnpm order:eval-set` validates the set with zod (unique ids, non-empty `productId`s with no repeats inside an Item, `pick` within `fits`, either `fits` or `alternatives`, no order equal to an example `<order>` of `prompts/`, and for answer cases one expected entry at most per Item, one for every asked Item, Item and Alternative numbers in range, and `choice` only for asked Items) and runs in `pnpm check`; it never reads the Catalog Snapshot. `pnpm order:eval` does not run in `pnpm check`, because it makes live calls and costs money.
+
+## The planning eval set
+
+`evals/planning.json` measures `route-message` and `plan`. Its schema, loader checks and scoring are in `src/core/planning/` (`eval-set.ts`, `eval-score.ts`, `eval-run.ts`), loaded through `loadPlanningEvalSet` of `src/compose.ts`.
+
+- A routing case has an `id`, the Owner's `message`, the expected `topic` (`order`, `plan` or `off-topic`) and an optional `expectedToFail`. A run calls `routeMessage` once and passes when the Topic is the expected one.
+- A plan case has an `id`, the Owner's first `message`, `covers` (the cases of the meal-planner spec it stands for: `recipe`, `event`, `weekly-menu`, `gift`, `advice`, `constraints`, `idea-in-cart`; routing cases with Topic `off-topic` cover `off-topic`), `plan` (whether a Plan must be shown) and optional `expectedToFail`, `budget`, `quantities`, `forbiddenProductIds`, `forbiddenWords`, `allowedWords` and `idea`. A run sends the message as the whole planning conversation through `planWithinBudget`, the chat's search loop and budget retry, and scores the first answer shown after its search rounds.
+
+Code scores each plan run (`scorePlanRun`):
+
+- A Plan is shown when `plan` is true, and none when it is false (advice with no purchase).
+- Every line is in stock in the Catalog Snapshot.
+- The total is within `budget`.
+- Each range of `quantities` sums the lines whose `productId` is in its `productIds`, in its `unit`: `g` (grams of a by-weight product, or units times the size of a packaged one sold by weight), `ml` (units times the size of a packaged one sold by volume) or `unit` (units of a packaged product); the sum is within `min` and `max`, and a line that cannot be measured in that unit is a problem.
+- No line is a product of `forbiddenProductIds`, and no line's name has a word of `forbiddenWords` (a whole word or phrase, ignoring case and accents) unless it also has a word of `allowedWords` ("fideos" is forbidden for "sin TACC", "fideos sin TACC" is allowed).
+- One line per product: the Plan the planner answered has no `productId` twice, before code merges the lines.
+- The Idea has at least `idea.min` sections, counting only those whose heading has a word of `idea.headings` when given ("lunes" ... "viernes" for a weekly menu, "pasos" for a recipe).
+
+A case passes when every run gives no error and keeps every rule. An LLM judge, the `judge-idea` session (`prompts/planning/judge-idea.md`, `claude-sonnet-5-5` at its default effort, `createClaudeCodeIdeaJudge`), reads the request, the message and the Plan of every plan run that answered and returns `{ sensible, reason }` by a fixed rubric. Its judgment is reported apart, as the Ideas judged sensible and the reasons of those that are not, and never fails a run or the command.
+
+`pnpm plan:eval [filter...] [--runs N]` runs the cases whose id or message contains a filter, 3 times each by default, with real Claude Code sessions. The report gives the cases passed, the errors, the Ideas judged sensible, stale `productId`s (missing or out of stock in the current Catalog Snapshot), a table with each case's sessions, time and cost per run and its cost, every failed run with its problems and its Plan, and the totals. Each run is saved in `.data/planning/eval-runs/`. The command exits 1 when a case not marked `expectedToFail` fails.
+
+Cases are labelled by hand with `pnpm order:label <words>`, which lists the `productId`s a range or a forbidden product names. `pnpm plan:eval-set` validates the set with zod (unique ids across both kinds, no message equal to an example `<message>` or first `<owner>` message of `prompts/`, a range's `min` at most its `max`, no Plan rule in a case that expects no Plan, and every case of the spec covered) and runs in `pnpm check`; it never reads the Catalog Snapshot. `pnpm plan:eval` does not run in `pnpm check`, because it makes live calls and costs money.
