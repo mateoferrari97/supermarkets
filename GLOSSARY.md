@@ -43,7 +43,7 @@ A change the Owner asks for on an Item already resolved: another product, brand,
 _Avoid_: Edit, amendment, change request
 
 **Sale Step**:
-The smallest amount of a product sold by weight that an Online Store sells, such as 0.5 kg of banana or 1.25 kg of picanha; every amount bought is a multiple of it. A packaged product has no Sale Step: it is bought by the unit.
+The smallest amount of a product sold by weight that an Online Store sells, such as 0.5 kg of banana or 1.25 kg of picanha; every amount bought is a multiple of it, and a weight the Owner asks for is rounded up to the next multiple, so 2.7 kg at a 0.8 kg Sale Step buys 3.2 kg. A packaged product has no Sale Step: it is bought by the unit.
 _Avoid_: Unit multiplier, increment, minimum quantity
 
 **Note**:

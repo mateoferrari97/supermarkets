@@ -168,7 +168,7 @@ function byWeightOption(item: Item, product: CatalogProduct, stepKg: number) {
   const { quantity } = item;
   if (quantity.kind === "weight") {
     const askedKg = quantity.grams / 1000;
-    const steps = Math.max(1, Math.round(round(askedKg / stepKg)));
+    const steps = Math.max(1, Math.ceil(round(askedKg / stepKg)));
     const boughtKg = round(steps * stepKg);
     const note =
       boughtKg === round(askedKg)

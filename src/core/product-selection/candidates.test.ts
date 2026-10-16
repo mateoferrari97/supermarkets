@@ -212,10 +212,34 @@ describe("candidatesFor", () => {
       [{ itemId: "1", quantity: 1, notes: ["Picaña se vende de a 1,25 kg: llevo 1,25 kg"] }],
     ],
     [
-      "a weight rounds to the nearest Sale Step",
+      "a weight rounds up to the next Sale Step",
       item("banana", { kind: "common" }, { kind: "weight", grams: 1200 }),
       [byWeight("1", 2000, 0.5)],
-      [{ itemId: "1", quantity: 2, notes: ["Banana se vende de a 500 g: llevo 1 kg"] }],
+      [{ itemId: "1", quantity: 3, notes: ["Banana se vende de a 500 g: llevo 1,5 kg"] }],
+    ],
+    [
+      "cuadril 2.7 kg at a 0.8 kg Sale Step buys 3.2 kg, not the nearer 2.4 kg",
+      item("cuadril", { kind: "common" }, { kind: "weight", grams: 2700 }),
+      [byWeight("1", 19800, 0.8)],
+      [{ itemId: "1", quantity: 4, notes: ["Cuadril se vende de a 800 g: llevo 3,2 kg"] }],
+    ],
+    [
+      "colita de cuadril 2.5 kg at a 1.2 kg Sale Step buys 3.6 kg",
+      item("colita de cuadril", { kind: "common" }, { kind: "weight", grams: 2500 }),
+      [byWeight("1", 22900, 1.2)],
+      [
+        {
+          itemId: "1",
+          quantity: 3,
+          notes: ["Colita de cuadril se vende de a 1,2 kg: llevo 3,6 kg"],
+        },
+      ],
+    ],
+    [
+      "a weight that is a multiple of the Sale Step buys it exactly without a Note",
+      item("cuadril", { kind: "common" }, { kind: "weight", grams: 2400 }),
+      [byWeight("1", 19800, 0.8)],
+      [{ itemId: "1", quantity: 3, notes: [] }],
     ],
     [
       "300 g of jamón compares packages and weight by total price",
