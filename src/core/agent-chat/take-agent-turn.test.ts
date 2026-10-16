@@ -39,11 +39,13 @@ const turn = (
   profile: Profile | null = null,
   tools: ToolsForTurn = toolsOf,
   order: ChatOrder | null = null,
+  orders: ChatOrder[] = [],
 ) =>
   takeAgentTurn(history, text, {
     agent,
     profile,
     order,
+    orders,
     tools,
     save: (saved_) => saved.push(saved_),
     now: () => new Date(at(30)),
@@ -140,6 +142,24 @@ describe("takeAgentTurn", () => {
       parts: [{ type: "proposal", proposal }],
     });
     assert.deepEqual(saved.at(-1), reply);
+  });
+
+  it("gives the agent the last 3 closed Orders and nothing older", async () => {
+    const { agent, turns } = fakeAgent();
+    const orders: ChatOrder[] = ["1", "2", "3", "4"].map((number) => ({
+      id: `order-${number}`,
+      status: "closed",
+      openedAt: at(1),
+      items: [],
+      proposals: 1,
+      proposal: null,
+    }));
+    orders.push({ ...orders[0]!, id: "order-5", status: "draft" });
+    await turn([], "lo mismo que la última vez", agent, [], null, toolsOf, orders[4], orders);
+    assert.deepEqual(
+      turns[0]?.pastOrders.map((each) => each.id),
+      ["order-2", "order-3", "order-4"],
+    );
   });
 
   it("keeps the Owner message saved when the agent fails", async () => {

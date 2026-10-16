@@ -101,6 +101,13 @@ export const ordersSchema = z.array(chatOrderSchema);
 export const openOrderOf = (orders: ChatOrder[]): ChatOrder | null =>
   orders.find((order) => order.status !== "closed") ?? null;
 
+export const PAST_ORDERS = 3;
+
+export const lastClosedOrders = (orders: ChatOrder[]): ChatOrder[] =>
+  orders.filter((order) => order.status === "closed").slice(-PAST_ORDERS);
+
+export const boughtLines = (order: ChatOrder): OrderLine[] => order.cart?.lines ?? [];
+
 export function openOrder(orders: ChatOrder[], now: Date): ChatOrder {
   const open = openOrderOf(orders);
   if (open) return open;
@@ -204,4 +211,19 @@ export function renderOrder(order: ChatOrder | null): string {
     proposal,
     "</order>",
   ].join("\n");
+}
+
+export function renderPastOrders(orders: ChatOrder[]): string {
+  if (orders.length === 0) return "<past-orders>\nThere are no closed Orders yet.\n</past-orders>";
+  const blocks = orders.map((order) => {
+    const lines = boughtLines(order).map(
+      (line) =>
+        `- "${line.description}": product ${line.productId} "${line.name}", quantity ${String(line.quantity)}`,
+    );
+    return [
+      `order ${order.id}, opened ${order.openedAt}:`,
+      ...(lines.length > 0 ? lines : ["- nothing bought"]),
+    ].join("\n");
+  });
+  return ["<past-orders>", ...blocks, "</past-orders>"].join("\n");
 }

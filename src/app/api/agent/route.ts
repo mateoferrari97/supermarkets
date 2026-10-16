@@ -47,6 +47,7 @@ export async function POST(request: Request): Promise<Response> {
       agent,
       profile: profile.value,
       order: openOrderOf(orders.value),
+      orders: orders.value,
       tools: held.agentTools.tools,
       save: appendChatMessage,
       now: () => new Date(),

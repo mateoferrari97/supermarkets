@@ -8,7 +8,7 @@ import type { ChatMessage } from "../../core/agent-chat/chat.ts";
 import { z } from "zod";
 import type { AgentTurn } from "../../core/agent-chat/agent.ts";
 import { defineTool, renderProfile } from "../../core/agent-chat/tools.ts";
-import { renderOrder } from "../../core/agent-chat/order.ts";
+import { renderOrder, renderPastOrders } from "../../core/agent-chat/order.ts";
 import { createClaudeCodeAgent, createClaudeCodeModel } from "./claude-code-agent.ts";
 
 const at = "2026-10-16T12:00:00.000Z";
@@ -36,6 +36,7 @@ const turn = (overrides: Partial<AgentTurn> = {}): AgentTurn => ({
   messages,
   profile: null,
   order: null,
+  pastOrders: [],
   tools: {},
   turnEnded: () => true,
   ...overrides,
@@ -67,7 +68,13 @@ describe("createClaudeCodeAgent", () => {
     const reply = await agent.reply(turn(), new AbortController().signal);
     assert.equal(reply, "Puedo charlar por ahora.");
     assert.deepEqual(prompts, [
-      "You are the Assistant.\n\n" + renderProfile(null) + "\n\n" + renderOrder(null) + "\n",
+      "You are the Assistant.\n\n" +
+        renderProfile(null) +
+        "\n\n" +
+        renderOrder(null) +
+        "\n\n" +
+        renderPastOrders([]) +
+        "\n",
     ]);
     const sent = model.doGenerateCalls[0]?.prompt ?? [];
     assert.deepEqual(
@@ -89,8 +96,20 @@ describe("createClaudeCodeAgent", () => {
     writeFileSync(join(promptsDir, "agent", "system.md"), "Changed.\n");
     await agent.reply(turn(), new AbortController().signal);
     assert.deepEqual(prompts, [
-      "You are the Assistant.\n\n" + renderProfile(null) + "\n\n" + renderOrder(null) + "\n",
-      "Changed.\n\n" + renderProfile(null) + "\n\n" + renderOrder(null) + "\n",
+      "You are the Assistant.\n\n" +
+        renderProfile(null) +
+        "\n\n" +
+        renderOrder(null) +
+        "\n\n" +
+        renderPastOrders([]) +
+        "\n",
+      "Changed.\n\n" +
+        renderProfile(null) +
+        "\n\n" +
+        renderOrder(null) +
+        "\n\n" +
+        renderPastOrders([]) +
+        "\n",
     ]);
   });
 

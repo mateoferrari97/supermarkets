@@ -4,9 +4,11 @@ import { product } from "./agent-chat-fixtures.ts";
 import { chatMessageSchema } from "./chat.ts";
 import {
   chatOrderSchema,
+  lastClosedOrders,
   openOrder,
   openOrderOf,
   renderOrder,
+  renderPastOrders,
   type ChatOrder,
   type OrderLine,
 } from "./order.ts";
@@ -131,5 +133,45 @@ describe("an Order that waits for the Owner's choice", () => {
     assert.match(text, /ref 1: "yogur" has no product that fits/);
     assert.match(text, /11 "Yogur frutilla Ilolay" \$500\.00/);
     assert.match(text, /shown so far: 11, 12/);
+  });
+});
+
+describe("the past Orders", () => {
+  const withCart = (id: string, status: ChatOrder["status"]): ChatOrder => ({
+    ...order(id, status),
+    cart: {
+      postalCode: "1425",
+      lines: [line],
+      notes: [],
+      total: 1600,
+      warning: "",
+      cartLink: "https://example.test/cart",
+    },
+  });
+
+  it("are the last 3 closed Orders and nothing older or still open", () => {
+    const orders = [
+      withCart("order-1", "closed"),
+      withCart("order-2", "closed"),
+      withCart("order-3", "closed"),
+      withCart("order-4", "closed"),
+      order("order-5", "proposed"),
+    ];
+    assert.deepEqual(
+      lastClosedOrders(orders).map((each) => each.id),
+      ["order-2", "order-3", "order-4"],
+    );
+    assert.deepEqual(lastClosedOrders([order("order-1", "draft")]), []);
+  });
+
+  it("render the Items and products bought with no prices", () => {
+    const text = renderPastOrders([withCart("order-1", "closed")]);
+    assert.match(text, /order order-1, opened 2026-10-16T12:00:00.000Z/);
+    assert.match(text, /"leche": product 2 "Leche entera Sancor 1 l", quantity 2/);
+    assert.doesNotMatch(text, /1600|800|\$/);
+  });
+
+  it("say there are none yet", () => {
+    assert.match(renderPastOrders([]), /There are no closed Orders yet/);
   });
 });

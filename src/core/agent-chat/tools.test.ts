@@ -103,13 +103,14 @@ describe("agentTools", () => {
       "resolveItem",
       "chooseAlternative",
       "reopenLastOrder",
+      "repeatOrder",
       "askQuestions",
       "proposeOrder",
       "buildCart",
     ]);
     assert.deepEqual(
       Object.values(tools).map((tool) => tool.endsTurn),
-      [false, false, false, false, true, true, true],
+      [false, false, false, false, false, true, true, true],
     );
   });
 
@@ -332,5 +333,97 @@ describe("renderProfile", () => {
     );
     assert.deepEqual(simulated.at(-1)?.items, [{ itemId: "40", quantity: 1 }]);
     assert.equal(outcome.ended?.parts[0]?.type, "cart");
+  });
+});
+
+describe("repeating a past Order through the tools", () => {
+  it("repeats the last Order priced today, adds an Item and proposes both", async () => {
+    const { store } = storeOf(catalog, ["30"]);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders([
+      {
+        id: "order-1",
+        status: "closed",
+        openedAt: "2026-10-12T12:00:00.000Z",
+        items: [],
+        proposals: 1,
+        proposal: null,
+        cart: {
+          postalCode: "1425",
+          lines: [
+            {
+              description: "leche",
+              productId: "2",
+              itemId: "20",
+              name: "Leche entera Sancor 1 l",
+              brand: null,
+              quantity: 1,
+              unitPrice: 700,
+              total: 700,
+              reason: "",
+              notes: [],
+            },
+            {
+              description: "leche verónica",
+              productId: "3",
+              itemId: "30",
+              name: "Leche entera Verónica 1 l",
+              brand: null,
+              quantity: 1,
+              unitPrice: 900,
+              total: 900,
+              reason: "",
+              notes: [],
+            },
+          ],
+          notes: [],
+          total: 1600,
+          warning: "",
+          cartLink: "https://example.test/old",
+        },
+      },
+    ]);
+    const outcome: TurnOutcome = { ended: null };
+    const tools = agentTools({
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    })(outcome, []);
+    const repeated = await tools.repeatOrder?.execute({ orderId: "order-1" }, signal);
+    assert.deepEqual(repeated, {
+      kind: "repeated",
+      items: [
+        {
+          kind: "picked",
+          ref: "1",
+          product: { productId: "2", name: "Leche entera Sancor 1 l", brand: null },
+          quantity: 1,
+          unitPrice: 800,
+          total: 800,
+          reason: "Repetido del pedido order-1",
+          notes: [],
+        },
+        { kind: "none", ref: "2", note: '"Leche entera Verónica 1 l" ya no está disponible.' },
+      ],
+    });
+    const added = await tools.resolveItem?.execute({ description: "yogur" }, signal);
+    assert.equal((added as { ref: string }).ref, "3");
+    await tools.proposeOrder?.execute({ refs: ["1", "2", "3"] }, signal);
+    const proposal = outcome.ended?.parts[0];
+    assert.equal(proposal?.type, "proposal");
+    if (proposal?.type !== "proposal") return;
+    assert.deepEqual(
+      proposal.proposal.lines.map((each) => each.productId),
+      ["2", "4"],
+    );
+    assert.deepEqual(proposal.proposal.notes, [
+      '"Leche entera Verónica 1 l" ya no está disponible.',
+    ]);
+    assert.equal(memory.current()[0]?.status, "closed");
+    assert.equal(memory.current()[1]?.id, "order-2");
   });
 });

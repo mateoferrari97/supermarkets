@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { ToolLoopAgent, type LanguageModel } from "ai";
 import { claudeCode, createAiSdkMcpServer } from "ai-sdk-provider-claude-code";
 import type { AgentTurn, ChatAgent } from "../../core/agent-chat/agent.ts";
-import { renderOrder } from "../../core/agent-chat/order.ts";
+import { renderOrder, renderPastOrders } from "../../core/agent-chat/order.ts";
 import { renderProfile, type AgentTools } from "../../core/agent-chat/tools.ts";
 
 export const AGENT_MODEL = "sonnet";
@@ -55,8 +55,11 @@ export function createClaudeCodeAgent({
   createModel = createClaudeCodeModel,
 }: ClaudeCodeAgentOptions): ChatAgent {
   return {
-    async reply({ messages, profile, order, tools, turnEnded }: AgentTurn, signal: AbortSignal) {
-      const systemPrompt = `${readFileSync(join(promptsDir, AGENT_PROMPT_FILE), "utf8").trimEnd()}\n\n${renderProfile(profile)}\n\n${renderOrder(order)}\n`;
+    async reply(
+      { messages, profile, order, pastOrders, tools, turnEnded }: AgentTurn,
+      signal: AbortSignal,
+    ) {
+      const systemPrompt = `${readFileSync(join(promptsDir, AGENT_PROMPT_FILE), "utf8").trimEnd()}\n\n${renderProfile(profile)}\n\n${renderOrder(order)}\n\n${renderPastOrders(pastOrders)}\n`;
       const turnEnd = new AbortController();
       let ended = false;
       const agent = new ToolLoopAgent({

@@ -8,6 +8,7 @@ import { askQuestions, askQuestionsInput } from "./ask-questions.ts";
 import { buildCart, buildCartInput } from "./build-cart.ts";
 import { chooseAlternative, chooseAlternativeInput } from "./choose-alternative.ts";
 import { reopenLastOrder, reopenLastOrderInput } from "./reopen-last-order.ts";
+import { repeatOrder, repeatOrderInput } from "./repeat-order.ts";
 import { proposeOrder, proposeOrderInput } from "./propose-order.ts";
 import { resolveItem, resolveItemInput } from "./resolve-item.ts";
 import { defineTool, type ToolsForTurn } from "./tool.ts";
@@ -72,6 +73,11 @@ export const agentTools =
       "Reopens the last closed Order so the Owner's Correction (replace, remove or add an Item after the cart link) goes into a new cart. Call it only when the Owner clearly corrects the Order whose link was just given. Then resolveItem for what is new, proposeOrder with the refs the Order should have now and buildCart with that proposal in the same turn, with no question. Returns reopened, or refused with the reason.",
       reopenLastOrderInput,
       () => reopenLastOrder({ orders: dependencies.orders }),
+    ),
+    repeatOrder: defineTool(
+      "Starts a new Order from one of the past Orders in the <past-orders> block, with the same products and quantities priced in today's Branch. Call it when the Owner asks for the same as a past Order, or chooses to repeat it with an addition, and no Order is open. Returns repeated with each product picked or none when it is no longer available, or refused with the reason. Then resolveItem for anything new and proposeOrder with every ref.",
+      repeatOrderInput,
+      (input, signal) => repeatOrder(input, dependencies, signal),
     ),
     askQuestions: defineTool(
       "Asks the Owner every open question of this turn in a single round and ends the turn. Each question has its options and the one you recommend. Call it at most once per turn, after every resolveItem of the turn has answered. Write nothing after calling it.",

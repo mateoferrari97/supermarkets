@@ -7,6 +7,7 @@ export type AgentTurn = {
   messages: ChatMessage[];
   profile: Profile | null;
   order: ChatOrder | null;
+  pastOrders: ChatOrder[];
   tools: AgentTools;
   turnEnded: () => boolean;
 };
