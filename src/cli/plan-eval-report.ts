@@ -1,5 +1,5 @@
 import type { PlanningEvalRun } from "../core/planning/eval-run.ts";
-import type { PlanRun } from "../core/planning/eval-score.ts";
+import { pesos, type PlanRun } from "../core/planning/eval-score.ts";
 
 type CaseCost = {
   id: string;
@@ -85,9 +85,9 @@ function costRow({ id, passed, runs }: CaseCost): string {
 
 function describePlan({ plan, message, overBudget }: PlanRun): string[] {
   if (plan === null) return [`  - no Plan; message: ${message ?? "none"}`];
-  const over = overBudget === null ? "" : `, over the budget by $${String(overBudget)}`;
+  const over = overBudget === null ? "" : `, over the budget by ${pesos(overBudget)}`;
   return [
-    `  - ${plan.title}, total $${String(plan.total)}${over}`,
+    `  - ${plan.title}, total ${pesos(plan.total)}${over}`,
     ...plan.lines.map(
       ({ productId, name, sale, quantity, purpose }) =>
         `  - ${name} (${productId}): ${String(quantity)} ${sale.kind === "by-weight" ? "g" : "u"}, ${purpose}`,

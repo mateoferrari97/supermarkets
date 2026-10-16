@@ -67,7 +67,7 @@ export function scorePlanRun(
     }
   }
   if (planCase.budget !== undefined && plan.total > planCase.budget) {
-    problems.push(`total $${String(plan.total)} is over the budget of $${String(planCase.budget)}`);
+    problems.push(`total ${pesos(plan.total)} is over the budget of ${pesos(planCase.budget)}`);
   }
   for (const range of planCase.quantities ?? []) problems.push(...rangeProblems(range, plan.lines));
   const allowed = planCase.allowedWords ?? [];
@@ -134,6 +134,10 @@ function measure({ sale, quantity }: PlanRunLine, unit: QuantityRange["unit"]): 
 
 function hasWord(text: string, word: string): boolean {
   return ` ${normalize(text)} `.includes(` ${normalize(word)} `);
+}
+
+export function pesos(amount: number): string {
+  return `$${String(Math.round(amount * 100) / 100)}`;
 }
 
 function scored(problems: string[]): Score {

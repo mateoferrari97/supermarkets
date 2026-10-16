@@ -94,6 +94,10 @@ describe("scorePlanRun", () => {
     assert.deepEqual(scorePlanRun(planCase({ budget: 20000 }), run(), inStock).problems, [
       "total $28800 is over the budget of $20000",
     ]);
+    const unrounded = run({ plan: { ...run().plan!, total: 13303.109999999999 } });
+    assert.deepEqual(scorePlanRun(planCase({ budget: 10000 }), unrounded, inStock).problems, [
+      "total $13303.11 is over the budget of $10000",
+    ]);
   });
 
   it("sums the lines of a range in its unit", () => {
