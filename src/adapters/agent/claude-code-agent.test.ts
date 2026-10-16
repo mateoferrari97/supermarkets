@@ -37,6 +37,7 @@ const turn = (overrides: Partial<AgentTurn> = {}): AgentTurn => ({
   profile: null,
   order: null,
   tools: {},
+  turnEnded: () => true,
   ...overrides,
 });
 
@@ -188,6 +189,43 @@ describe("createClaudeCodeAgent", () => {
     const reply = await agent.reply(turn({ tools }), new AbortController().signal);
     assert.equal(reply, "");
     assert.deepEqual(executed, ["look", "propose"]);
+  });
+
+  it("keeps the session going when a tool that may end the turn refused", async () => {
+    const tools = {
+      build: defineTool(
+        "May end the turn.",
+        z.object({}),
+        () => Promise.resolve({ kind: "refused" }),
+        true,
+      ),
+    };
+    let abortedAfterRefusal: boolean | undefined;
+    const agent = createClaudeCodeAgent({
+      promptsDir,
+      createModel: (_prompt, wrapped, signal) =>
+        new MockLanguageModelV4({
+          doGenerate: async (options) => {
+            await wrapped.build?.execute({}, signal);
+            abortedAfterRefusal = options.abortSignal?.aborted;
+            return {
+              content: [{ type: "text", text: "No pude armar el carrito." }],
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: {
+                inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+                outputTokens: { total: 1, text: 1, reasoning: 0 },
+              },
+              warnings: [],
+            };
+          },
+        }),
+    });
+    const reply = await agent.reply(
+      turn({ tools, turnEnded: () => false }),
+      new AbortController().signal,
+    );
+    assert.equal(abortedAfterRefusal, false);
+    assert.equal(reply, "No pude armar el carrito.");
   });
 
   it("rethrows a failure of the session when no tool ended the turn", async () => {

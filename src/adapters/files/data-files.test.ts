@@ -536,3 +536,48 @@ describe("a message with a proposal", () => {
     assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [message] });
   });
 });
+
+describe("a message with a cart and an Order that holds it", () => {
+  it("are saved and read back", () => {
+    const line = {
+      description: "leche",
+      productId: "2",
+      itemId: "20",
+      name: "Leche",
+      brand: null,
+      quantity: 1,
+      unitPrice: 800,
+      total: 800,
+      reason: "Es el más barato.",
+      notes: [],
+    };
+    const cart = {
+      postalCode: "1425",
+      lines: [line],
+      notes: [],
+      total: 800,
+      warning: "Vaciá tu carrito.",
+      cartLink: "https://example.test/cart",
+    };
+    const message = {
+      role: "assistant" as const,
+      at: "2026-10-16T12:00:00.000Z",
+      text: "Listo",
+      parts: [{ type: "cart" as const, cart }],
+    };
+    const order = {
+      id: "order-1",
+      status: "closed" as const,
+      openedAt: "2026-10-16T12:00:00.000Z",
+      items: [],
+      proposals: 1,
+      proposal: { id: "order-1-1", lines: [line], notes: [], total: 800 },
+      cart,
+    };
+    const files = createDataFiles(root);
+    files.appendChatMessage(message);
+    files.saveOrders([order]);
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [message] });
+    assert.deepEqual(createDataFiles(root).loadOrders(), { ok: true, value: [order] });
+  });
+});

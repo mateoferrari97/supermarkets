@@ -37,6 +37,17 @@ export const proposalSchema = z.object({
 
 export type Proposal = z.infer<typeof proposalSchema>;
 
+export const cartSchema = z.object({
+  postalCode: z.string(),
+  lines: z.array(orderLineSchema).min(1),
+  notes: z.array(z.string()),
+  total: z.number(),
+  warning: z.string(),
+  cartLink: z.string(),
+});
+
+export type Cart = z.infer<typeof cartSchema>;
+
 export const chatOrderSchema = z.object({
   id: z.string(),
   status: z.enum(["draft", "proposed", "closed"]),
@@ -44,6 +55,7 @@ export const chatOrderSchema = z.object({
   items: z.array(resolvedItemSchema),
   proposals: z.number().int().nonnegative(),
   proposal: proposalSchema.nullable(),
+  cart: cartSchema.optional(),
 });
 
 export type ChatOrder = z.infer<typeof chatOrderSchema>;
@@ -104,6 +116,20 @@ export function renderProposal({ lines, notes, total }: Proposal): string {
   ].join("\n");
 }
 
+export function renderCart({ lines, notes, total, warning, cartLink }: Cart): string {
+  return [
+    "Listo, este es tu carrito en Carrefour:",
+    ...lines.map(
+      (line, index) =>
+        `${String(index + 1)}. ${line.name} × ${String(line.quantity)}: ${money(line.total)}`,
+    ),
+    `Total: ${money(total)}`,
+    ...notes,
+    warning,
+    cartLink,
+  ].join("\n");
+}
+
 export function renderOrder(order: ChatOrder | null): string {
   if (order === null) return "<order>\nThere is no open Order.\n</order>";
   const items = order.items.map((item) =>
@@ -114,7 +140,7 @@ export function renderOrder(order: ChatOrder | null): string {
   const proposal =
     order.proposal === null
       ? "proposal: none yet"
-      : `proposal ${order.proposal.id}: ${order.proposal.lines.map((line) => line.productId).join(", ")}`;
+      : `proposal ${order.proposal.id}: ${order.proposal.lines.map((line) => line.productId).join(", ")}${order.status === "proposed" ? " (waiting for the Owner's answer)" : " (out of date: an Item changed after it)"}`;
   return [
     "<order>",
     `id: ${order.id}`,

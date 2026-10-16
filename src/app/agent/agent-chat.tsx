@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage } from "../../core/agent-chat/chat.ts";
-import type { Proposal } from "../../core/agent-chat/order.ts";
+import type { Cart, Proposal } from "../../core/agent-chat/order.ts";
 
 const money = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -11,7 +11,13 @@ const money = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 2,
 });
 
-function ProposalCard({ proposal }: { proposal: Proposal }) {
+function ProposalCard({
+  proposal,
+  onConfirm,
+}: {
+  proposal: Proposal;
+  onConfirm: (() => void) | null;
+}) {
   return (
     <div className="msg bot wide">
       <div className="lead block">Armé este pedido:</div>
@@ -58,12 +64,79 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
           {note}
         </div>
       ))}
+      {onConfirm ? (
+        <div className="block">
+          <button className="btn" type="button" onClick={onConfirm}>
+            Confirmar
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CartCard({ cart }: { cart: Cart }) {
+  return (
+    <div className="msg bot wide">
+      <div className="lead block">Listo, este es tu carrito en Carrefour:</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th className="num">Cant.</th>
+            <th className="num">c/u</th>
+            <th className="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cart.lines.map((line) => (
+            <tr key={line.itemId}>
+              <td>
+                <div>{line.name}</div>
+                <div className="muted small">
+                  pediste &quot;{line.description}&quot; · {line.reason}
+                </div>
+                {line.notes.map((note) => (
+                  <div key={note} className="notice">
+                    {note}
+                  </div>
+                ))}
+              </td>
+              <td className="num">{line.quantity}</td>
+              <td className="num">{money.format(line.unitPrice)}</td>
+              <td className="num">{money.format(line.total)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={3}>
+              <strong>Total</strong> <span className="muted small">CP {cart.postalCode}</span>
+            </td>
+            <td className="num">
+              <strong>{money.format(cart.total)}</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {cart.notes.map((note) => (
+        <div key={note} className="notice block">
+          {note}
+        </div>
+      ))}
+      <div className="block">{cart.warning}</div>
+      <div className="block">
+        <a className="btn" href={cart.cartLink} target="_blank" rel="noreferrer">
+          Abrir el carrito en Carrefour
+        </a>
+      </div>
     </div>
   );
 }
 
 const proposalOf = (message: ChatMessage): Proposal | null =>
   message.parts?.find((part) => part.type === "proposal")?.proposal ?? null;
+
+const cartOf = (message: ChatMessage): Cart | null =>
+  message.parts?.find((part) => part.type === "cart")?.cart ?? null;
 
 type Shown = ChatMessage | { role: "error"; text: string };
 
@@ -91,7 +164,11 @@ export function AgentChat({ initialMessages }: { initialMessages: ChatMessage[] 
 
   async function send(event: FormEvent) {
     event.preventDefault();
-    const text = draft.trim();
+    await sendText(draft);
+  }
+
+  async function sendText(written: string) {
+    const text = written.trim();
     if (text === "" || working) return;
     setDraft("");
     setWorking(true);
@@ -126,7 +203,18 @@ export function AgentChat({ initialMessages }: { initialMessages: ChatMessage[] 
         )}
         {messages.map((message, index) => {
           const proposal = message.role === "assistant" ? proposalOf(message) : null;
-          if (proposal) return <ProposalCard key={index} proposal={proposal} />;
+          if (proposal) {
+            const latest = index === messages.length - 1 && !working;
+            return (
+              <ProposalCard
+                key={index}
+                proposal={proposal}
+                onConfirm={latest ? () => void sendText("Confirmar") : null}
+              />
+            );
+          }
+          const cart = message.role === "assistant" ? cartOf(message) : null;
+          if (cart) return <CartCard key={index} cart={cart} />;
           return (
             <div
               key={index}

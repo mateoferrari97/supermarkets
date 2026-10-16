@@ -21,6 +21,8 @@ Turn with `resolveItem` twice and `askQuestions` once, small session, `sonnet`: 
 
 Nothing in the provider ends the session when a tool is called. After `askQuestions` the model went on and wrote text that contradicted the round ("quedó registrada tu elección de yogur"). Aborting the `AbortSignal` passed to the agent from the tool (`setTimeout(() => ac.abort(), 30)` inside `execute`, so its result is emitted first) ends the stream cleanly: the last parts are `tool-output-available` and `{"type":"abort"}`, nothing is thrown, and `onFinish` of the UI stream receives `isAborted: true` with every part so far.
 
+The abort fits a tool that really ends the turn. A tool that may refuse (`buildCart`) must not abort when it refuses, or the Assistant says nothing: the adapter aborts only when `turnEnded()` is true, so after a refusal the model goes on and explains it.
+
 ## Messages and replay
 
 - `createAgentUIStreamResponse({ agent, uiMessages, abortSignal, originalMessages, onFinish })` streams the turn as UI message parts. A provider-executed tool arrives as `tool-input-start`, `tool-input-available` and `tool-output-available` with `providerExecuted: true` and `dynamic: true`, and `useChat` shows it as a part of type `dynamic-tool` with `toolName`, `state` (`output-available`), `input` and `output`.

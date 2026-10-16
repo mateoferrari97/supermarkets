@@ -15,8 +15,10 @@ const requestSchema = z.object({ text: z.string().trim().min(1) });
 
 const held = globalThis as typeof globalThis & {
   agentTurnRunning?: boolean;
-  agentTools?: ToolsForTurn;
+  agentTools?: { module: object; tools: ToolsForTurn };
 };
+
+const thisModule = {};
 
 const agent = createChatAgent();
 
@@ -34,10 +36,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!profile.ok) return failure(500, profile.errors);
   const orders = loadOrders();
   if (!orders.ok) return failure(500, orders.errors);
-  if (!held.agentTools) {
+  if (held.agentTools?.module !== thisModule) {
     const tools = createAgentTools();
     if (!tools.ok) return failure(500, tools.errors);
-    held.agentTools = tools.value;
+    held.agentTools = { module: thisModule, tools: tools.value };
   }
   held.agentTurnRunning = true;
   try {
@@ -45,7 +47,7 @@ export async function POST(request: Request): Promise<Response> {
       agent,
       profile: profile.value,
       order: openOrderOf(orders.value),
-      tools: held.agentTools,
+      tools: held.agentTools.tools,
       save: appendChatMessage,
       now: () => new Date(),
       signal: request.signal,

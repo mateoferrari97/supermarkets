@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { Delivery, OnlineStore } from "../product-selection/online-store.ts";
+import type { ChatMessage } from "./chat.ts";
 import type { Profile } from "./profile.ts";
 import { catalog, llmFitting, memoryOrders, searchOf, storeOf } from "./agent-chat-fixtures.ts";
 import type { TurnOutcome } from "./tool.ts";
@@ -90,10 +91,15 @@ describe("agentTools", () => {
       orders: memoryOrders().orders,
       now: () => new Date(),
     })({ ended: null });
-    assert.deepEqual(Object.keys(tools), ["updateProfile", "resolveItem", "proposeOrder"]);
+    assert.deepEqual(Object.keys(tools), [
+      "updateProfile",
+      "resolveItem",
+      "proposeOrder",
+      "buildCart",
+    ]);
     assert.deepEqual(
       Object.values(tools).map((tool) => tool.endsTurn),
-      [false, false, true],
+      [false, false, true, true],
     );
   });
 
@@ -146,5 +152,54 @@ describe("renderProfile", () => {
   it("says the postal code when known and that it is unknown otherwise", () => {
     assert.match(renderProfile({ postalCode: "1425" }), /postalCode: 1425/);
     assert.match(renderProfile(null), /has not told their postal code/);
+  });
+
+  it("takes an Order from text to a closed Order with a cart link once the Owner confirms", async () => {
+    const { store } = storeOf(catalog);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const first: TurnOutcome = { ended: null };
+    const proposing = agentTools(dependencies)(first, [
+      { role: "owner", at: "2026-10-16T12:00:00.000Z", text: "leche" },
+    ]);
+    await proposing.resolveItem?.execute({ description: "leche" }, signal);
+    await proposing.proposeOrder?.execute({ refs: ["1"] }, signal);
+    const proposalMessage: ChatMessage = {
+      role: "assistant",
+      at: "2026-10-16T12:00:01.000Z",
+      text: first.ended?.text ?? "",
+      parts: first.ended?.parts,
+    };
+    const unanswered: TurnOutcome = { ended: null };
+    const early = agentTools(dependencies)(unanswered, [proposalMessage]);
+    assert.deepEqual(await early.buildCart?.execute({ proposalId: "order-1-1" }, signal), {
+      kind: "refused",
+      reason: "unanswered",
+    });
+    assert.equal(unanswered.ended, null);
+    assert.equal(memory.current()[0]?.status, "proposed");
+
+    const second: TurnOutcome = { ended: null };
+    const confirming = agentTools(dependencies)(second, [
+      proposalMessage,
+      { role: "owner", at: "2026-10-16T12:00:02.000Z", text: "Confirmar" },
+    ]);
+    const built = await confirming.buildCart?.execute({ proposalId: "order-1-1" }, signal);
+    assert.deepEqual(built, {
+      kind: "built",
+      cartLink: "https://example.test/cart",
+      total: 800,
+    });
+    assert.equal(memory.current()[0]?.status, "closed");
+    assert.equal(second.ended?.parts[0]?.type, "cart");
   });
 });

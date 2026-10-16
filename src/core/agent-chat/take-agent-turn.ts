@@ -27,7 +27,8 @@ export async function takeAgentTurn(
       messages: contextMessages([...history, ownerMessage]),
       profile,
       order,
-      tools: tools(outcome),
+      tools: tools(outcome, [...history, ownerMessage]),
+      turnEnded: () => outcome.ended !== null,
     },
     signal,
   );

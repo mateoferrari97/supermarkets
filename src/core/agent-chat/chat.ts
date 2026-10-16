@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { proposalSchema } from "./order.ts";
+import { cartSchema, proposalSchema } from "./order.ts";
 
 export const CONTEXT_MESSAGES = 40;
 
 export const messagePartSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("proposal"), proposal: proposalSchema }),
+  z.object({ type: z.literal("cart"), cart: cartSchema }),
 ]);
 
 export type MessagePart = z.infer<typeof messagePartSchema>;

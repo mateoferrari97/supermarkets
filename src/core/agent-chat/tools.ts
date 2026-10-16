@@ -4,6 +4,7 @@ import type { FitProductsLlm } from "../order-matching/match-items.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
 import type { OrdersStore } from "./orders-store.ts";
 import type { Profile } from "./profile.ts";
+import { buildCart, buildCartInput } from "./build-cart.ts";
 import { proposeOrder, proposeOrderInput } from "./propose-order.ts";
 import { resolveItem, resolveItemInput } from "./resolve-item.ts";
 import { defineTool, type ToolsForTurn } from "./tool.ts";
@@ -48,7 +49,7 @@ export type AgentToolsDependencies = ProfileDependencies & {
 
 export const agentTools =
   (dependencies: AgentToolsDependencies): ToolsForTurn =>
-  (outcome) => ({
+  (outcome, messages = []) => ({
     updateProfile: defineTool(
       "Saves the Owner's postal code in the Profile after checking that the Online Store delivers there. Call it whenever the Owner states or changes their postal code. Returns saved, or refused with the reason.",
       updateProfileInput,
@@ -63,6 +64,12 @@ export const agentTools =
       "Shows the Owner the Order for confirmation and ends the turn. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",
       proposeOrderInput,
       (input) => proposeOrder(input, { orders: dependencies.orders, outcome }),
+      true,
+    ),
+    buildCart: defineTool(
+      "Builds the Carrefour cart for the latest proposal after the Owner answered it, closes the Order and ends the turn with the cart and its link. Pass the proposal id from the <order> block. Refused when the proposal is not the latest or the Owner has not answered it: never call it in the same turn as proposeOrder. Write nothing after calling it.",
+      buildCartInput,
+      (input, signal) => buildCart(input, { ...dependencies, outcome, messages }, signal),
       true,
     ),
   });

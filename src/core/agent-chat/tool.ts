@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MessagePart } from "./chat.ts";
+import type { ChatMessage, MessagePart } from "./chat.ts";
 
 export type AgentTool = {
   description: string;
@@ -14,7 +14,7 @@ export type TurnEnd = { text: string; parts: MessagePart[] };
 
 export type TurnOutcome = { ended: TurnEnd | null };
 
-export type ToolsForTurn = (outcome: TurnOutcome) => AgentTools;
+export type ToolsForTurn = (outcome: TurnOutcome, messages?: ChatMessage[]) => AgentTools;
 
 export function defineTool<Schema extends z.ZodObject, Output>(
   description: string,

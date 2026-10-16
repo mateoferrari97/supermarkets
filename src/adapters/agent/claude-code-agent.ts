@@ -55,14 +55,14 @@ export function createClaudeCodeAgent({
   createModel = createClaudeCodeModel,
 }: ClaudeCodeAgentOptions): ChatAgent {
   return {
-    async reply({ messages, profile, order, tools }: AgentTurn, signal: AbortSignal) {
+    async reply({ messages, profile, order, tools, turnEnded }: AgentTurn, signal: AbortSignal) {
       const systemPrompt = `${readFileSync(join(promptsDir, AGENT_PROMPT_FILE), "utf8").trimEnd()}\n\n${renderProfile(profile)}\n\n${renderOrder(order)}\n`;
       const turnEnd = new AbortController();
       let ended = false;
       const agent = new ToolLoopAgent({
         model: createModel(
           systemPrompt,
-          endingTheTurn(tools, turnEnd, () => (ended = true)),
+          endingTheTurn(tools, turnEnd, turnEnded, () => (ended = true)),
           signal,
         ),
       });
@@ -89,6 +89,7 @@ export function createClaudeCodeAgent({
 function endingTheTurn(
   tools: AgentTools,
   turnEnd: AbortController,
+  turnEnded: () => boolean,
   markEnded: () => void,
 ): AgentTools {
   return Object.fromEntries(
@@ -99,8 +100,10 @@ function endingTheTurn(
             ...tool,
             execute: async (input: unknown, signal: AbortSignal) => {
               const output = await tool.execute(input, signal);
-              markEnded();
-              turnEnd.abort();
+              if (turnEnded()) {
+                markEnded();
+                turnEnd.abort();
+              }
               return output;
             },
           }

@@ -8,6 +8,7 @@ export type AgentTurn = {
   profile: Profile | null;
   order: ChatOrder | null;
   tools: AgentTools;
+  turnEnded: () => boolean;
 };
 
 export type ChatAgent = {
