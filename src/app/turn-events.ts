@@ -7,7 +7,7 @@ export type TurnEvent =
   | { type: "step-started"; id: number; text: string }
   | { type: "step-done"; id: number; seconds: number }
   | { type: "questions"; text: string; questions: AskedQuestion[] }
-  | { type: "plan"; message: string; plan: PlanShown }
+  | { type: "plan"; message: string; plan: PlanShown; overBudget: number | null }
   | { type: "cart"; cart: Cart }
   | { type: "error"; message: string };
 

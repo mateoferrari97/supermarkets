@@ -4,7 +4,7 @@ import { matchItems, type FitProductsLlm } from "../order-matching/match-items.t
 import { checkedReadReply, type ReadReplyLlm } from "../order-matching/read-reply.ts";
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import type { Plan, PlanLlm, PlanMessage, PlanShown } from "../planning/plan.ts";
-import { planWithSearches } from "../planning/plan-searches.ts";
+import { planWithinBudget } from "../planning/plan-budget.ts";
 import type { RouteMessageLlm } from "../planning/route-message.ts";
 import { simulateCart } from "../product-selection/cart.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
@@ -51,7 +51,7 @@ export const NEW_CONVERSATION: ConversationState = { stage: "postal-code" };
 export type Reply =
   | { kind: "ask"; text: string }
   | { kind: "questions"; text: string; questions: AskedQuestion[] }
-  | { kind: "plan"; message: string; plan: PlanShown }
+  | { kind: "plan"; message: string; plan: PlanShown; overBudget: number | null }
   | { kind: "cart"; cart: Cart };
 
 export type Turn = { state: ConversationState; reply: Reply };
@@ -147,7 +147,7 @@ async function planningTurn(
   steps: Steps,
 ): Promise<Turn> {
   const messages: PlanMessage[] = [...state.messages, { role: "owner", text: reply }];
-  const { output, products } = await planWithSearches(
+  const { output, products, overBudget } = await planWithinBudget(
     { messages, products: state.products, lastPlan: state.lastPlan },
     deps,
     steps,
@@ -159,7 +159,10 @@ async function planningTurn(
     lastPlan: output.plan?.plan ?? state.lastPlan,
   };
   if (output.plan === null) return ask(next, output.message);
-  return { state: next, reply: { kind: "plan", message: output.message, plan: output.plan } };
+  return {
+    state: next,
+    reply: { kind: "plan", message: output.message, plan: output.plan, overBudget },
+  };
 }
 
 async function orderTurn(

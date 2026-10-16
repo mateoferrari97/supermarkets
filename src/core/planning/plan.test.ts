@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { CatalogProduct, Sale } from "../order-matching/catalog-product.ts";
-import { checkPlan, type Plan, type PlanLine, type PlanShown } from "./plan.ts";
+import { checkPlan, overBudget, type Plan, type PlanLine, type PlanShown } from "./plan.ts";
 
 const product = (
   productId: string,
@@ -59,6 +59,7 @@ const shownOf = (lines: PlanLine[], products: CatalogProduct[] = seen): PlanShow
     kind: "answer",
     message: "Acá va la lasaña.",
     plan: planOf(lines),
+    budget: null,
   });
   if (output.kind !== "answer" || output.plan === null) throw new Error("no Plan");
   return output.plan;
@@ -110,6 +111,35 @@ describe("checkPlan", () => {
     );
   });
 
+  it("merges lines with the same product into one with the summed quantity and the purposes joined", () => {
+    const shown = shownOf([
+      line("p2", 300, "para la lasaña"),
+      line("p1", 1),
+      line("p2", 400, "para las empanadas"),
+      line("p2", 100, "para la lasaña"),
+    ]);
+    assert.deepEqual(
+      shown.lines.map(({ product, quantity, purpose, total }) => [
+        product.productId,
+        quantity,
+        purpose,
+        total,
+      ]),
+      [
+        ["p2", 1000, "para la lasaña, para las empanadas", 9000],
+        ["p1", 1, "para la lasaña", 2500],
+      ],
+    );
+    assert.equal(shown.total, 11500);
+    assert.deepEqual(
+      shown.plan.lines.map(({ productId, quantity, purpose }) => [productId, quantity, purpose]),
+      [
+        ["p2", 1000, "para la lasaña, para las empanadas"],
+        ["p1", 1, "para la lasaña"],
+      ],
+    );
+  });
+
   it("leaves a product with no snapshot price out of the total", () => {
     const unpriced = product("p4", "Salsa de tomate 520 g", null, {
       kind: "packaged",
@@ -152,8 +182,36 @@ describe("checkPlan", () => {
 
   it("keeps an answer with no Plan as its message", () => {
     assert.deepEqual(
-      checkPlan(input(), { kind: "answer", message: "¿Con carne o verdura?", plan: null }),
-      { kind: "answer", message: "¿Con carne o verdura?", plan: null },
+      checkPlan(input(), {
+        kind: "answer",
+        message: "¿Con carne o verdura?",
+        plan: null,
+        budget: null,
+      }),
+      { kind: "answer", message: "¿Con carne o verdura?", plan: null, budget: null },
+    );
+  });
+
+  it("keeps the Owner's budget of an answer", () => {
+    const output = checkPlan(input(), {
+      kind: "answer",
+      message: "Un asado para 10.",
+      plan: planOf([line("p1", 1)]),
+      budget: 50000,
+    });
+    assert.equal(output.kind === "answer" && output.budget, 50000);
+  });
+
+  it("rejects a budget that is not positive", () => {
+    assert.throws(
+      () =>
+        checkPlan(input(), {
+          kind: "answer",
+          message: "Un asado para 10.",
+          plan: null,
+          budget: 0,
+        }),
+      { message: "plan answer breaks a rule: budget 0 is not positive" },
     );
   });
 
@@ -173,5 +231,22 @@ describe("checkPlan", () => {
     assert.throws(failure(Array.from({ length: 61 }, () => line("p1", 1))), {
       message: "plan answer breaks a rule: 61 lines, more than 60",
     });
+  });
+});
+
+describe("overBudget", () => {
+  const shown = shownOf([line("p1", 2), line("p2", 1000)]);
+
+  it("is how much the Plan's total exceeds the budget", () => {
+    assert.equal(overBudget(shown, 12000), 2000);
+  });
+
+  it("is null when the total fits the budget", () => {
+    assert.equal(overBudget(shown, 14000), null);
+    assert.equal(overBudget(shown, 20000), null);
+  });
+
+  it("is null when the Owner gave no budget", () => {
+    assert.equal(overBudget(shown, null), null);
   });
 });

@@ -145,7 +145,12 @@ const conversation = ({
         seen("plan", signal);
         planInputs.push(input);
         return Promise.resolve(
-          pendingPlans.shift() ?? { kind: "answer", message: "¿Algo más?", plan: null },
+          pendingPlans.shift() ?? {
+            kind: "answer",
+            message: "¿Algo más?",
+            plan: null,
+            budget: null,
+          },
         );
       },
       readReply: (input, signal) => {
@@ -374,7 +379,11 @@ describe("takeTurn", () => {
   describe("planning", () => {
     const toPlan = (texts: string[], plans: PlanOutput[]) => run({ topic: "plan", plans }, texts);
 
-    const lasagna = (servings: number, packages: number): PlanOutput => ({
+    const lasagna = (
+      servings: number,
+      packages: number,
+      budget: number | null = null,
+    ): PlanOutput => ({
       kind: "answer",
       message: `Acá va la lasaña para ${String(servings)}.`,
       plan: {
@@ -384,6 +393,7 @@ describe("takeTurn", () => {
           { productId: "p4", quantity: packages, purpose: "para la lasaña", reason: "Queso" },
         ],
       },
+      budget,
     });
 
     const searchQueso: PlanOutput = { kind: "search", queries: ["queso"] };
@@ -417,7 +427,29 @@ describe("takeTurn", () => {
         [["Queso Port Salut Sancor 500 g", 2, "para la lasaña", 8000]],
       );
       assert.equal(last.reply.plan.total, 8000);
+      assert.equal(last.reply.overBudget, null);
       assert.equal(last.state.stage, "planning");
+    });
+
+    it("sends a Plan over the Owner's budget back to the planner once and shows the revised one", async () => {
+      const { last, planInputs } = await toPlan(
+        ["quiero hacer lasaña para 4 con $10.000"],
+        [searchQueso, lasagna(4, 3, 10000), lasagna(4, 2, 10000)],
+      );
+      assert.equal(planInputs.length, 3);
+      assert.deepEqual(planInputs[2]!.overBudget, { budget: 10000, total: 12000 });
+      assert.equal(last.reply.kind === "plan" && last.reply.plan.total, 8000);
+      assert.equal(last.reply.kind === "plan" && last.reply.overBudget, null);
+      assert.equal(last.state.stage === "planning" && last.state.lastPlan?.lines[0]?.quantity, 2);
+    });
+
+    it("shows a Plan still over the Owner's budget with how much it exceeds it", async () => {
+      const { last } = await toPlan(
+        ["quiero hacer lasaña para 4 con $10.000"],
+        [searchQueso, lasagna(4, 4, 10000), lasagna(4, 3, 10000)],
+      );
+      assert.equal(last.reply.kind === "plan" && last.reply.plan.total, 12000);
+      assert.equal(last.reply.kind === "plan" && last.reply.overBudget, 2000);
     });
 
     it("sends a revision to the planner with the conversation, the products seen and the last Plan shown", async () => {
@@ -442,7 +474,12 @@ describe("takeTurn", () => {
     });
 
     it("shows an answer with no Plan as a message and stays in planning with the last Plan", async () => {
-      const question: PlanOutput = { kind: "answer", message: "¿Con bechamel?", plan: null };
+      const question: PlanOutput = {
+        kind: "answer",
+        message: "¿Con bechamel?",
+        plan: null,
+        budget: null,
+      };
       const { last, planInputs } = await toPlan(
         ["quiero hacer lasaña para 4", "no sé", "dale"],
         [searchQueso, lasagna(4, 2), question],
@@ -456,7 +493,7 @@ describe("takeTurn", () => {
     it("answers a clarifying question as a message", async () => {
       const { last } = await toPlan(
         ["quiero cocinar algo rico"],
-        [{ kind: "answer", message: "¿Para cuántas personas?", plan: null }],
+        [{ kind: "answer", message: "¿Para cuántas personas?", plan: null, budget: null }],
       );
       assert.deepEqual(last.reply, { kind: "ask", text: "¿Para cuántas personas?" });
       assert.equal(last.state.stage, "planning");

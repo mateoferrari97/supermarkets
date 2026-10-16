@@ -48,6 +48,7 @@ export const planOutputSchema = z
     queries: z.array(z.string().min(1)),
     message: z.string().min(1).nullable(),
     plan: planSchema.nullable(),
+    budget: z.number().nullable(),
   })
   .refine((output) => output.kind !== "search" || output.queries.length > 0, {
     message: "A search has no queries",
