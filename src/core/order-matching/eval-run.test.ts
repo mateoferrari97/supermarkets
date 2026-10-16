@@ -29,20 +29,20 @@ const item = (fields: Partial<Item> = {}): Item => ({
 });
 
 describe("pickOnSnapshot", () => {
-  it("picks the Candidate the Selection Policy ranks first on snapshot prices", () => {
+  it("picks the Candidate the Selection Policy ranks first on snapshot prices", async () => {
     const fits = [coca("1", 900, ml(354)), coca("3", 3300, ml(2250)), coca("2", 3200, ml(2250))];
-    assert.equal(pickOnSnapshot(item(), fits)?.product.itemId, "2");
+    assert.equal((await pickOnSnapshot(item(), fits))?.product.itemId, "2");
   });
 
-  it("skips Candidates without a snapshot price and picks nothing without Fits", () => {
+  it("skips Candidates without a snapshot price and picks nothing without Fits", async () => {
     const fits = [coca("1", null, ml(2250)), coca("2", 3200, ml(2250))];
-    assert.equal(pickOnSnapshot(item(), fits)?.product.itemId, "2");
-    assert.equal(pickOnSnapshot(item(), [coca("1", null, ml(2250))]), null);
-    assert.equal(pickOnSnapshot(item(), []), null);
+    assert.equal((await pickOnSnapshot(item(), fits))?.product.itemId, "2");
+    assert.equal(await pickOnSnapshot(item(), [coca("1", null, ml(2250))]), null);
+    assert.equal(await pickOnSnapshot(item(), []), null);
   });
 
-  it("keeps the quantity and the Notes of the size rule", () => {
-    const picked = pickOnSnapshot(
+  it("keeps the quantity and the Notes of the size rule", async () => {
+    const picked = await pickOnSnapshot(
       item({
         size: { kind: "exact", dimension: "volume", amount: 3000 },
         quantity: { kind: "units", count: 2 },
@@ -55,11 +55,11 @@ describe("pickOnSnapshot", () => {
 });
 
 describe("orderRunOf", () => {
-  it("keeps product ids and picks only Items without a question", () => {
+  it("keeps product ids and picks only Items without a question", async () => {
     const small = coca("1", 900, ml(354));
     const big = coca("2", 3200, ml(2250));
     assert.deepEqual(
-      orderRunOf({
+      await orderRunOf({
         ignoredPreference: true,
         items: [
           {
