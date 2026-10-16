@@ -4,11 +4,17 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Started and done events share an id; done carries the duration in milliseconds
-- [ ] The Steps clock is injectable; tests use a fake clock
-- [ ] `matchItems` takes a Steps object from `takeTurn`
-- [ ] The chat's step tracker and the Conversation Log's step recorder have no pairing queues and keep only mapping tests
-- [ ] A test covers two parallel steps of the same kind, each with its own duration
-- [ ] `pnpm check` is green
+- [x] Started and done events share an id; done carries the duration in milliseconds
+- [x] The Steps clock is injectable; tests use a fake clock
+- [x] `matchItems` takes a Steps object from `takeTurn`
+- [x] The chat's step tracker and the Conversation Log's step recorder have no pairing queues and keep only mapping tests
+- [x] A test covers two parallel steps of the same kind, each with its own duration
+- [x] `pnpm check` is green
+
+## Comments
+
+- `stepsFrom` in `src/core/order-conversation/steps.ts` numbers steps from 1 per Steps object and takes an optional `now` clock; a done event carries the started event's id and `durationMs`. `steps.test.ts` covers ids and durations with a fake clock, two parallel `choose-products` steps each with its own duration, and no done event when the work fails.
+- `matchItems` takes `Steps` (default `stepsFrom()`); `takeTurn` passes its own, and the `takeTurn` steps test checks ids 1 to 4 across understanding the order, both Items and the cart. `matchOrder` in `eval-run.ts` passes `stepsFrom({ signal })`.
+- The route's `stepTracker` is gone: `stepTurnEvent` in `src/app/step-text.ts` maps each event (seconds from `durationMs`), tested in `step-text.test.ts`; `loggedSteps` lost its queue and clock and keeps one mapping test.

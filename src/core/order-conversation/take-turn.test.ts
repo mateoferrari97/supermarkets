@@ -1093,7 +1093,7 @@ describe("takeTurn", () => {
   });
 
   describe("steps", () => {
-    it("reports understanding the order, one step per Item and simulating the cart, in order", async () => {
+    it("reports understanding the order, one step per Item and simulating the cart, in order, with ids from one Steps", async () => {
       const { deps } = conversation({
         items: [item("yerba", "yerba"), item("2 quesos", "queso port salut")],
       });
@@ -1106,7 +1106,19 @@ describe("takeTurn", () => {
         { kind: "choose-products", original: "2 quesos" },
         { kind: "simulate-cart" },
       ]);
-      assert.deepEqual(events.at(-1), { status: "done", step: { kind: "simulate-cart" } });
+      assert.deepEqual(
+        events.filter(({ status }) => status === "started").map(({ id }) => id),
+        [1, 2, 3, 4],
+      );
+      assert.deepEqual(
+        events.filter(({ status }) => status === "done").map(({ id, step }) => ({ id, step })),
+        [
+          { id: 1, step: { kind: "understand-order" } },
+          { id: 2, step: { kind: "choose-products", original: "yerba" } },
+          { id: 3, step: { kind: "choose-products", original: "2 quesos" } },
+          { id: 4, step: { kind: "simulate-cart" } },
+        ],
+      );
       assert.equal(events.length, 8);
     });
   });

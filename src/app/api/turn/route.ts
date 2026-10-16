@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { loggedSteps, loggedTurn } from "../../../core/conversation-log/conversation-log.ts";
-import type { StepEvent } from "../../../core/order-conversation/steps.ts";
 import { takeTurn, type Reply } from "../../../core/order-conversation/take-turn.ts";
 import { claimSession, deleteSession, loadDependencies, releaseSession } from "../../sessions.ts";
-import { stepText } from "../../step-text.ts";
+import { stepTurnEvent } from "../../step-text.ts";
 import type { TurnEvent } from "../../turn-events.ts";
 
 const turnRequestSchema = z.object({ sessionId: z.string().nullable(), text: z.string() });
@@ -27,26 +26,6 @@ function replyEvent(reply: Reply): TurnEvent {
     case "cart":
       return { type: "cart", cart: reply.cart };
   }
-}
-
-function stepTracker(send: (event: TurnEvent) => void) {
-  let nextId = 1;
-  const running = new Map<string, { id: number; startedAt: number }[]>();
-  return ({ status, step }: StepEvent) => {
-    const key = JSON.stringify(step);
-    const queue = running.get(key) ?? [];
-    running.set(key, queue);
-    if (status === "started") {
-      const id = nextId++;
-      queue.push({ id, startedAt: performance.now() });
-      send({ type: "step-started", id, text: stepText(step) });
-      return;
-    }
-    const started = queue.shift();
-    if (!started) return;
-    const seconds = (performance.now() - started.startedAt) / 1000;
-    send({ type: "step-done", id: started.id, seconds });
-  };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -83,12 +62,11 @@ export async function POST(request: Request): Promise<Response> {
       };
       if (created) send({ type: "session", sessionId });
       try {
-        const trackStep = stepTracker(send);
         const logStep = loggedSteps(log.write);
         const turn = await loggedTurn(log.write, parsed.data.text, signal, () =>
           takeTurn(state, parsed.data.text, { ...log.dependencies, signal }, (event) => {
             logStep(event);
-            trackStep(event);
+            send(stepTurnEvent(event));
           }),
         );
         releaseSession(sessionId, turn.state);
