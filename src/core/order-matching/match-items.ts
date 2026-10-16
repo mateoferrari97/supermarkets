@@ -48,7 +48,7 @@ export async function matchItems(
       const alsoInThisLine = items
         .filter((other, otherIndex) => otherIndex !== index && other.original === item.original)
         .map((other) => other.product);
-      const output = await llm.fitProducts({ item, alsoInThisLine, matches }, steps.signal);
+      const output = await checkedFitProducts(llm, { item, alsoInThisLine, matches }, steps.signal);
       const products = (numbers: number[]) => numbers.map((number) => matches[number - 1]!);
       return {
         item,
@@ -60,9 +60,42 @@ export async function matchItems(
             ? null
             : {
                 text: output.question,
-                alternatives: products(output.closest.slice(0, ALTERNATIVES_LIMIT)),
+                alternatives: products(output.closest),
               },
       };
     }),
   );
+}
+
+export async function checkedFitProducts(
+  llm: FitProductsLlm,
+  input: FitProductsInput,
+  signal: AbortSignal,
+): Promise<FitProductsOutput> {
+  return checkFitProducts(input, await llm.fitProducts(input, signal));
+}
+
+export function checkFitProducts(
+  { item, matches }: FitProductsInput,
+  output: FitProductsOutput,
+): FitProductsOutput {
+  const fail = (rule: string): never => {
+    throw new Error(`fit-products answer for Item "${item.original}" breaks a rule: ${rule}`);
+  };
+  const outside = [...output.fits, ...output.closest].filter(
+    (number) => !Number.isInteger(number) || number < 1 || number > matches.length,
+  );
+  if (outside.length > 0) {
+    fail(`${outside.join(", ")} not among its ${String(matches.length)} Matches`);
+  }
+  if ((output.question === null) !== output.fits.length > 0) {
+    fail("a question must be set exactly when no product fits");
+  }
+  if (output.closest.length > 0 && output.fits.length > 0) {
+    fail("no Alternatives while products fit");
+  }
+  if (output.closest.length > ALTERNATIVES_LIMIT) {
+    fail(`${String(output.closest.length)} Alternatives, more than ${String(ALTERNATIVES_LIMIT)}`);
+  }
+  return output;
 }

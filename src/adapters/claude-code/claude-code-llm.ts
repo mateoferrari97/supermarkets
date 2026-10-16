@@ -10,11 +10,7 @@ import {
   type Item,
   type ParseOrderOutput,
 } from "../../core/order-matching/item.ts";
-import {
-  ALTERNATIVES_LIMIT,
-  type FitProductsInput,
-  type FitProductsOutput,
-} from "../../core/order-matching/match-items.ts";
+import type { FitProductsInput } from "../../core/order-matching/match-items.ts";
 import type {
   ReadReplyInput,
   ReadReplyOutput,
@@ -162,20 +158,16 @@ export function createClaudeCodeLlm({
           signal,
         ),
       ),
-    fitProducts: async (input, signal) =>
-      checkFitProducts(
-        input,
-        await ask(
-          "fit-products",
-          prompt("fit-products"),
-          fitProductsOutputSchema,
-          renderLine(input),
-          signal,
-        ),
+    fitProducts: (input, signal) =>
+      ask(
+        "fit-products",
+        prompt("fit-products"),
+        fitProductsOutputSchema,
+        renderLine(input),
+        signal,
       ),
     readReply: async (input, signal) =>
       readReadReply(
-        input,
         await ask(
           "read-reply",
           prompt("read-reply"),
@@ -237,46 +229,21 @@ function describeProduct(product: CatalogProduct): string {
   return `${product.name} | ${product.brand ?? "sin marca"}`;
 }
 
-function readReadReply(
-  { items }: ReadReplyInput,
-  { entries, newLines, ignoredPreference }: z.infer<typeof readReplyOutputSchema>,
-): ReadReplyOutput {
-  const fail = (problem: string): never => {
-    throw new Error(`Claude Code session for read-reply returned an invalid answer: ${problem}`);
-  };
-  const seen = new Set<number>();
-  const read = entries.map((entry): ReplyEntry => {
-    const item =
-      items[entry.item - 1] ?? fail(`item ${entry.item} is not among its ${items.length} Items`);
-    if (seen.has(entry.item)) fail(`more than one entry for item ${entry.item}`);
-    seen.add(entry.item);
-    if (item.kind === "bought") {
-      if (entry.kind === "choice") fail(`a choice for item ${entry.item}, which was not asked`);
-      if (entry.kind === "unanswered" && entry.question === null) {
-        fail(`unanswered without a question for item ${entry.item}, which was not asked`);
-      }
-    }
-    if (entry.kind === "choice" && item.kind === "asked") {
-      const count = item.question.alternatives.length;
-      if (entry.alternative > count) {
-        fail(`alternative ${entry.alternative} of item ${entry.item} is not among its ${count}`);
-      }
-    }
-    return entry.kind === "lines"
-      ? {
-          item: entry.item,
-          kind: "lines",
-          lines: entry.lines.map((line) => readLine("read-reply", line)),
-        }
-      : entry;
-  });
-  const unanswered = items.flatMap((item, index): ReplyEntry[] =>
-    item.kind === "asked" && !seen.has(index + 1)
-      ? [{ item: index + 1, kind: "unanswered", question: null }]
-      : [],
-  );
+function readReadReply({
+  entries,
+  newLines,
+  ignoredPreference,
+}: z.infer<typeof readReplyOutputSchema>): ReadReplyOutput {
   return {
-    entries: [...read, ...unanswered].sort((one, other) => one.item - other.item),
+    entries: entries.map((entry): ReplyEntry =>
+      entry.kind === "lines"
+        ? {
+            item: entry.item,
+            kind: "lines",
+            lines: entry.lines.map((line) => readLine("read-reply", line)),
+          }
+        : entry,
+    ),
     newLines: newLines.map((line) => readLine("read-reply", line)),
     ignoredPreference,
   };
@@ -299,27 +266,6 @@ export function renderLine({ item, alsoInThisLine, matches }: FitProductsInput):
     "</candidates>",
     "</line>",
   ].join("\n");
-}
-
-function checkFitProducts(
-  { item, matches }: FitProductsInput,
-  output: FitProductsOutput,
-): FitProductsOutput {
-  const fail = (problem: string) => {
-    throw new Error(
-      `Claude Code session for fit-products returned an invalid answer for "${item.original}": ${problem}`,
-    );
-  };
-  const outside = [...output.fits, ...output.closest].filter((number) => number > matches.length);
-  if (outside.length > 0) fail(`${outside.join(", ")} not among its ${matches.length} Matches`);
-  if ((output.question === null) !== output.fits.length > 0) {
-    fail("a question must be set exactly when no product fits");
-  }
-  if (output.closest.length > 0 && output.fits.length > 0) fail("closest set while products fit");
-  if (output.closest.length > ALTERNATIVES_LIMIT) {
-    fail(`${output.closest.length} closest, more than ${ALTERNATIVES_LIMIT}`);
-  }
-  return output;
 }
 
 function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {

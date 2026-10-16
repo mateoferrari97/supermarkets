@@ -16,7 +16,11 @@ import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
 import type { CatalogSearch } from "./core/order-matching/catalog-search.ts";
 import { matchOrder, type MatchedOrder } from "./core/order-matching/eval-run.ts";
 import type { Llm } from "./core/order-matching/llm.ts";
-import type { ReadReplyInput, ReadReplyOutput } from "./core/order-matching/read-reply.ts";
+import {
+  checkedReadReply,
+  type ReadReplyInput,
+  type ReadReplyOutput,
+} from "./core/order-matching/read-reply.ts";
 import type { OnlineStore } from "./core/product-selection/online-store.ts";
 
 export type { LlmCall } from "./adapters/claude-code/claude-code-llm.ts";
@@ -76,7 +80,7 @@ export function createOrderMatcher({ onCall }: OrderMatcherOptions = {}): Checke
       products: products.value,
       snapshotFetchedAt: files.loadSnapshotFetchedAt(),
       matchOrder: (orderText) => matchOrder(orderText, { search, llm }),
-      readReply: (input) => llm.readReply(input, new AbortController().signal),
+      readReply: (input) => checkedReadReply(llm, input, new AbortController().signal),
     },
   };
 }

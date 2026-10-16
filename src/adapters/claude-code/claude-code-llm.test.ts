@@ -348,13 +348,8 @@ describe("fitProducts", () => {
   });
 
   it.each([
-    ["a fit outside the Matches", { fits: [4] }],
-    ["a closest outside the Matches", { fits: [], closest: [4], question: "¿Cuál?" }],
-    ["a question while products fit", { question: "¿Cuál?" }],
-    ["no question when nothing fits", { fits: [] }],
-    ["closest while products fit", { closest: [2] }],
-    ["more than 5 closest", { fits: [], closest: [1, 2, 3, 1, 2, 3], question: "¿Cuál?" }],
     ["a number that is not a candidate number", { fits: [0] }],
+    ["a question that is empty", { fits: [], question: "" }],
   ])("fails on %s", async (_case, fields) => {
     const llm = llmWith(answer(fields));
     await assert.rejects(
@@ -499,11 +494,6 @@ describe("readReply", () => {
     assert.deepEqual(await llm.readReply(input, signal), {
       entries: [
         {
-          item: 1,
-          kind: "unanswered",
-          question: null,
-        },
-        {
           item: 2,
           kind: "lines",
           lines: [
@@ -516,7 +506,6 @@ describe("readReply", () => {
             },
           ],
         },
-        { item: 3, kind: "unanswered", question: null },
       ],
       newLines: [
         {
@@ -529,14 +518,6 @@ describe("readReply", () => {
       ],
       ignoredPreference: false,
     });
-  });
-
-  it("adds an unanswered entry for each asked Item the answer leaves out, in Item order", async () => {
-    const llm = llmWith(answer([{ item: 3, kind: "drop" }]));
-    assert.deepEqual((await llm.readReply(input, signal)).entries, [
-      { item: 1, kind: "unanswered", question: null },
-      { item: 3, kind: "drop" },
-    ]);
   });
 
   it("keeps a question for an ambiguous Correction of an Item in the cart", async () => {
@@ -555,21 +536,7 @@ describe("readReply", () => {
   });
 
   it.each([
-    ["an Item outside the list", [{ item: 4, kind: "drop" }]],
-    [
-      "two entries for one Item",
-      [
-        { item: 1, kind: "drop" },
-        { item: 1, kind: "choice", alternative: 1 },
-      ],
-    ],
-    ["an alternative outside the question", [{ item: 1, kind: "choice", alternative: 3 }]],
     ["an alternative of zero", [{ item: 1, kind: "choice", alternative: 0 }]],
-    ["a choice for an Item in the cart", [{ item: 2, kind: "choice", alternative: 1 }]],
-    [
-      "an unanswered Item in the cart without a question",
-      [{ item: 2, kind: "unanswered", question: null }],
-    ],
     ["lines without a line", [{ item: 2, kind: "lines", lines: [] }]],
     [
       "a line with a size it cannot read",

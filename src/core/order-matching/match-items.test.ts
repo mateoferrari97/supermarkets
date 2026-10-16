@@ -5,6 +5,8 @@ import type { CatalogProduct } from "./catalog-product.ts";
 import type { CatalogSearch } from "./catalog-search.ts";
 import type { Item } from "./item.ts";
 import {
+  ALTERNATIVES_LIMIT,
+  checkFitProducts,
   FIT_PRODUCTS_CONCURRENCY,
   matchItems,
   type FitProductsInput,
@@ -247,5 +249,72 @@ describe("matchItems", () => {
       { name: "AbortError" },
     );
     assert.equal(signals.length, 1);
+  });
+});
+
+describe("checkFitProducts", () => {
+  const input: FitProductsInput = {
+    item: item("una cerveza", "Cerveza"),
+    alsoInThisLine: [],
+    matches: catalog.slice(0, 6),
+  };
+  const answer = (fields: Partial<FitProductsOutput>): FitProductsOutput => ({
+    fits: [1],
+    closest: [],
+    note: null,
+    question: null,
+    ...fields,
+  });
+
+  it("returns an answer that keeps every rule as it is", () => {
+    for (const output of [
+      answer({ fits: [1, 6], note: "Tomé 'birra' como cerveza." }),
+      answer({ fits: [], closest: [6, 2, 3, 4, 5], question: "¿Te sirve alguna?" }),
+      answer({ fits: [], question: "No encontré cerveza." }),
+    ]) {
+      assert.deepEqual(checkFitProducts(input, output), output);
+    }
+  });
+
+  it.each([
+    ["a Fit outside the Matches", answer({ fits: [7] }), "7 not among its 6 Matches"],
+    ["a Fit of zero", answer({ fits: [0] }), "0 not among its 6 Matches"],
+    [
+      "an Alternative outside the Matches",
+      answer({ fits: [], closest: [2, 9], question: "¿Cuál?" }),
+      "9 not among its 6 Matches",
+    ],
+    [
+      "a question while products fit",
+      answer({ question: "¿Cuál?" }),
+      "a question must be set exactly when no product fits",
+    ],
+    [
+      "no question when nothing fits",
+      answer({ fits: [] }),
+      "a question must be set exactly when no product fits",
+    ],
+    [
+      "Alternatives while products fit",
+      answer({ closest: [2] }),
+      "no Alternatives while products fit",
+    ],
+    [
+      `more than ${String(ALTERNATIVES_LIMIT)} Alternatives`,
+      answer({ fits: [], closest: [1, 2, 3, 4, 5, 6], question: "¿Cuál?" }),
+      "6 Alternatives, more than 5",
+    ],
+  ])("fails on %s, naming the task, the Item and the rule", (_case, output, rule) => {
+    assert.throws(() => checkFitProducts(input, output), {
+      message: `fit-products answer for Item "una cerveza" breaks a rule: ${rule}`,
+    });
+  });
+
+  it("checks the answers of a fake LLM inside matchItems", async () => {
+    const { llm } = llmOf(() => answer({ closest: [2] }));
+    await assert.rejects(
+      matchItems([item("una cerveza", "Cerveza")], { search, llm }),
+      /fit-products answer for Item "una cerveza" breaks a rule: no Alternatives while products fit/,
+    );
   });
 });

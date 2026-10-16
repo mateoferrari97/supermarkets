@@ -6,7 +6,7 @@ import {
   type ItemMatch,
   type Question,
 } from "../order-matching/match-items.ts";
-import type { ReadReplyLlm } from "../order-matching/read-reply.ts";
+import { checkedReadReply, type ReadReplyLlm } from "../order-matching/read-reply.ts";
 import { candidateOf, candidatesFor, type Candidate } from "../product-selection/candidates.ts";
 import {
   CART_WARNING,
@@ -178,7 +178,8 @@ async function replyTurn(
 ): Promise<Turn> {
   const listed = order.items.filter((entry) => entry.kind !== "ready");
   const read = await steps.run({ kind: "understand-answer" }, () =>
-    deps.llm.readReply(
+    checkedReadReply(
+      deps.llm,
       {
         items: listed.map((entry) =>
           entry.kind === "asked"
@@ -213,7 +214,7 @@ async function replyTurn(
       } else kept.push(current);
       continue;
     }
-    const answer = entry ?? { kind: "unanswered", question: null };
+    const answer = entry!;
     switch (answer.kind) {
       case "choice":
         kept.push({
