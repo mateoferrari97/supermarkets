@@ -52,6 +52,10 @@ _Avoid_: Notice, warning, message
 
 ## Conversation
 
+**Order**:
+The Items of one conversation and where each stands (read, asked, in the cart), from the first message to the last cart. It counts the questions spent on each Item and keeps the Notes about Items dropped or removed until the cart is shown.
+_Avoid_: Basket, shopping list, conversation state
+
 **Conversation Log**:
 The record of one conversation between the Owner and the Assistant, from the postal code to the last cart or to its abandonment, including what the LLM and the Online Store were asked and answered along the way. It exists to review mistakes after the fact; it is never shown to the Owner in the chat.
 _Avoid_: Transcript, chat history, order log

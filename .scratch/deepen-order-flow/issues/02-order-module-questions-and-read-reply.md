@@ -14,13 +14,20 @@ The question limit (two per Item) is checked in one place. The dropped and remov
 
 **Blocked by:** 01 (Check LLM answers in core)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The Order module is pure (no ports) and owns Item kinds, questions spent, dropped and removed Notes and the ignored preference flag
-- [ ] The question limit is checked in exactly one place
-- [ ] `takeTurn` never inspects Item kinds and holds no bookkeeping of positions
-- [ ] Plain data tests of the Order cover re-asking, dropping after two questions, Corrections, drops, choices and new Items; the matching rule tests in `take-turn.test.ts` move here
-- [ ] Messages and questions shown to the Owner are unchanged for the same LLM answers
-- [ ] **Order** is added to `GLOSSARY.md`: the Items of one conversation and where each stands (read, asked, in the cart), from the first message to the last cart
-- [ ] `docs/TESTING.md` names the Order tests as the home of conversation rules and `takeTurn` tests as wiring
-- [ ] `pnpm check` is green
+- [x] The Order module is pure (no ports) and owns Item kinds, questions spent, dropped and removed Notes and the ignored preference flag
+- [x] The question limit is checked in exactly one place
+- [x] `takeTurn` never inspects Item kinds and holds no bookkeeping of positions
+- [x] Plain data tests of the Order cover re-asking, dropping after two questions, Corrections, drops, choices and new Items; the matching rule tests in `take-turn.test.ts` move here
+- [x] Messages and questions shown to the Owner are unchanged for the same LLM answers
+- [x] **Order** is added to `GLOSSARY.md`: the Items of one conversation and where each stands (read, asked, in the cart), from the first message to the last cart
+- [x] `docs/TESTING.md` names the Order tests as the home of conversation rules and `takeTurn` tests as wiring
+- [x] `pnpm check` is green
+
+## Comments
+
+- The Order lives in `src/core/order-conversation/order.ts`: `startOrder`, `replyItems`, `applyReply` (returns a `MatchingOrder` with `to-match` placeholders and the `toMatch` Items in order), `withMatches` (fills the placeholders in that order and throws on a count mismatch) and `nextStep` (questions message or Items to buy). `MAX_QUESTIONS` is checked only in its `asking` helper.
+- `applyReply` throws when an asked Item has no entry instead of falling back; `checkedReadReply` (ticket 01) always gives one.
+- Taking the cart result is ticket 03: `takeTurn` still pairs the simulated lines with the Items to buy and builds the cart state, but through `ItemToBuyInOrder.keptReason`, `mark` and `boughtItem`, never through Item kinds. `IGNORED_PREFERENCE_NOTE` and the cart Notes order stay in `take-turn.ts` for that ticket.
+- Rule tests that end in questions or dropped Items moved to `order.test.ts`; tests whose outcome is a cart (marks, Notes under the table) stay in `take-turn.test.ts` for ticket 03.

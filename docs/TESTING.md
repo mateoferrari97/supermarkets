@@ -19,6 +19,7 @@ Tests never call Carrefour or start a Claude Code session.
 - Core use cases take their ports as arguments, so tests pass fakes of `Llm` and `OnlineStore` (see `src/core/order-conversation/take-turn.test.ts` and `src/core/order-matching/match-items.test.ts`).
 - The Carrefour adapter takes an `HttpClient`; its tests answer with recorded responses from `src/adapters/carrefour/fixtures/`, kept next to the adapter that reads them. To add one, record the real answer once and save it there as JSON; [Carrefour API](references/carrefour-api.md#fixtures) lists what each fixture records.
 - The Claude Code adapter takes a `ProcessRunner`; its tests fake the process and its JSON output (`src/adapters/claude-code/claude-code-llm.test.ts`).
+- The rules of a conversation (asking, re-asking once and dropping an Item after its second question, Corrections, drops, choices, new Items) are tested in `src/core/order-conversation/order.test.ts` with plain data and no fakes: an Order, a read reply and match results in, the next Order and what it asks or buys out. `take-turn.test.ts` covers the wiring: which ports each stage calls with what input, steps, abort, invalid LLM answers, and whole orders from text to cart.
 - A test that needs files writes them to a temporary folder from `node:os` `tmpdir()`, not into the repo.
 
 ## The eval set is not a test
