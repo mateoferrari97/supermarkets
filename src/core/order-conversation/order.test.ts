@@ -4,16 +4,25 @@ import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import type { Item } from "../order-matching/item.ts";
 import type { ItemMatch } from "../order-matching/match-items.ts";
 import { checkReadReply, type ReadReplyOutput } from "../order-matching/read-reply.ts";
-import { candidateOf, candidatesFor } from "../product-selection/candidates.ts";
+import { candidateOf, candidatesFor, type Candidate } from "../product-selection/candidates.ts";
 import {
+  CART_WARNING,
+  type Bought,
+  type CartLine,
+  type SimulatedCart,
+} from "../product-selection/cart.ts";
+import {
+  IGNORED_PREFERENCE_NOTE,
   MAX_QUESTIONS,
   QUESTIONS_HINT,
   applyReply,
-  boughtItem,
   nextStep,
   replyItems,
   startOrder,
+  takeCart,
   withMatches,
+  type Cart,
+  type CartTaken,
   type NextStep,
   type Order,
 } from "./order.ts";
@@ -88,19 +97,13 @@ const yerbaAndCarbon = () =>
 
 const inCartOrder = (lines: Item[], products: CatalogProduct[]): Order => ({
   postalCode: "1425",
-  items: lines.map((line, index) =>
-    boughtItem(
-      {
-        item: line,
-        toBuy: { original: line.original, note: null, candidates: [], kept: false },
-        questionsSpent: 0,
-        mark: null,
-        keptReason: null,
-      },
-      candidateOf(line, products[index]!),
-      "Es el más barato",
-    ),
-  ),
+  items: lines.map((line, index) => ({
+    kind: "in-cart",
+    item: line,
+    candidate: candidateOf(line, products[index]!),
+    reason: "Es el más barato",
+    questionsSpent: 0,
+  })),
   dropped: [],
   removed: [],
   ignoredPreference: false,
@@ -112,6 +115,47 @@ const applying = (order: Order, output: Partial<ReadReplyOutput>) =>
 
 const replied = (order: Order, output: Partial<ReadReplyOutput>, matched: ItemMatch[] = []) =>
   withMatches(applying(order, output).order, matched);
+
+const lineFor = (original: string, { product: bought, quantity }: Candidate, notes: string[]) => {
+  const price = bought.price ?? 0;
+  const line: CartLine = {
+    original,
+    product: bought,
+    quantity,
+    unitPrice: price,
+    total: price * quantity,
+    reason: "Es el más barato por kilo.",
+    notes,
+  };
+  return line;
+};
+
+type Simulated = { notGot?: Record<string, string>; notes?: Record<string, string[]> };
+
+const simulatedFor = (order: Order, { notGot = {}, notes = {} }: Simulated = {}): SimulatedCart => {
+  const step = nextStep(order);
+  if (step.kind !== "buy") throw new Error(`nothing to buy: ${step.kind}`);
+  const bought = step.items.map(({ toBuy }): Bought => {
+    const note = notGot[toBuy.original];
+    if (note !== undefined) return { kind: "not-got", note };
+    return {
+      kind: "bought",
+      line: lineFor(toBuy.original, toBuy.candidates[0]!, notes[toBuy.original] ?? []),
+    };
+  });
+  return { bought, total: 9999, cartLink: "cart:link" };
+};
+
+const taken = (order: Order, simulated: Simulated = {}) =>
+  takeCart(order, simulatedFor(order, simulated));
+
+const orderOf = ({ state }: CartTaken): Order => {
+  const { stage: _stage, ...order } = state;
+  return order;
+};
+
+const marksOf = (cart: Cart) =>
+  cart.lines.map((line) => [line.original, line.product.itemId, line.mark]);
 
 describe("Order", () => {
   describe("questions", () => {
@@ -434,6 +478,129 @@ describe("Order", () => {
           ["queso", ["4"]],
         ]);
       });
+    });
+  });
+
+  describe("cart", () => {
+    it("shows the bought lines with the total, the link and the warning, and keeps them in the cart", () => {
+      const { state, cart } = taken(startOrder("1425", [fits(yerbaLine, yerba)], false));
+      const [candidate] = candidatesFor(yerbaLine, [yerba]);
+      assert.deepEqual(cart, {
+        postalCode: "1425",
+        lines: [{ ...lineFor("yerba", candidate!, []), mark: null }],
+        total: 9999,
+        notes: [],
+        warning: CART_WARNING,
+        cartLink: "cart:link",
+      });
+      assert.deepEqual(state, {
+        stage: "cart",
+        postalCode: "1425",
+        items: [
+          {
+            kind: "in-cart",
+            item: yerbaLine,
+            candidate,
+            reason: "Es el más barato por kilo.",
+            questionsSpent: 0,
+          },
+        ],
+        dropped: [],
+        removed: [],
+        ignoredPreference: false,
+        cartShown: true,
+      });
+    });
+
+    it("puts the Notes under the table in order: dropped Items, Items not got, removed Items, the ignored preference", () => {
+      const queso = item("queso");
+      const wine = item("vino");
+      const asking = startOrder(
+        "1425",
+        [
+          fits(yerbaLine, yerba),
+          asks(carbonLine, carbonQuestion, carbon),
+          asks(queso, "¿Cuál queso?", sancor, serenisima),
+          fits(wine, vino),
+        ],
+        true,
+      );
+      const order = replied(replied(asking, { entries: [{ item: 2, kind: "drop" }] }), {});
+      const result = taken(order, { notGot: { yerba: 'No conseguí "yerba": no hay ninguno' } });
+      assert.deepEqual(result.cart.notes, [
+        'No conseguí "1 bolsa de carbon": te pregunté 2 veces y no encontré qué llevar',
+        'No conseguí "yerba": no hay ninguno',
+        "Saqué: queso",
+        IGNORED_PREFERENCE_NOTE,
+      ]);
+      assert.deepEqual(marksOf(result.cart), [["vino", "9", null]]);
+      assert.deepEqual(
+        orderOf(result).items.map((entry) => [entry.kind, entry.item.original]),
+        [["in-cart", "vino"]],
+      );
+      assert.deepEqual(
+        [result.state.dropped, result.state.removed, result.state.ignoredPreference],
+        [[], [], false],
+      );
+    });
+
+    it("marks corrected lines as changed and added ones as new, and shows kept Items with their reason and no Notes", () => {
+      const smaller = item("la coca de 1,5", "coca cola zero");
+      const wine = item("vino");
+      const order = replied(
+        inCartOrder([yerbaLine, item("coca zero"), item("queso")], [yerba, carbon, sancor]),
+        { entries: [{ item: 2, kind: "lines", lines: [smaller] }], newLines: [wine] },
+        [fits(smaller, serenisima), fits(wine, vino)],
+      );
+      const { cart } = taken(order, {
+        notes: { yerba: ["Tomé 'yerba' como yerba mate."], "la coca de 1,5": ["Llevo 1,5 l"] },
+      });
+      assert.deepEqual(
+        cart.lines.map(({ original, mark, reason, notes }) => [original, mark, reason, notes]),
+        [
+          ["yerba", null, "Es el más barato", []],
+          ["la coca de 1,5", "changed", "Es el más barato por kilo.", ["Llevo 1,5 l"]],
+          ["queso", null, "Es el más barato", []],
+          ["vino", "new", "Es el más barato por kilo.", []],
+        ],
+      );
+    });
+
+    it("tracks that the cart was shown: lines added after it are new once, then kept with no mark", () => {
+      const wine = item("vino");
+      const first = taken(startOrder("1425", [fits(yerbaLine, yerba)], false));
+      const second = taken(replied(orderOf(first), { newLines: [wine] }, [fits(wine, vino)]));
+      const third = taken(replied(orderOf(second), {}));
+      assert.deepEqual(
+        [first, second, third].map(({ cart }) => marksOf(cart)),
+        [
+          [["yerba", "1", null]],
+          [
+            ["yerba", "1", null],
+            ["vino", "9", "new"],
+          ],
+          [
+            ["yerba", "1", null],
+            ["vino", "9", null],
+          ],
+        ],
+      );
+    });
+
+    it("refuses a cart while a question is open", () => {
+      const order = yerbaAndCarbon();
+      assert.throws(
+        () => takeCart(order, { bought: [], total: 0, cartLink: null }),
+        /a cart taken while the Order still asks questions/,
+      );
+    });
+
+    it("refuses cart results that do not pair with the Items to buy", () => {
+      const order = startOrder("1425", [fits(yerbaLine, yerba)], false);
+      assert.throws(
+        () => takeCart(order, { bought: [], total: 0, cartLink: null }),
+        /0 cart results for 1 Items to buy/,
+      );
     });
   });
 

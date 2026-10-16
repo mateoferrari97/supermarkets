@@ -2,12 +2,20 @@ import type { Item } from "../order-matching/item.ts";
 import type { ItemMatch, Question } from "../order-matching/match-items.ts";
 import type { ReadReplyOutput, ReplyEntry, ReplyItem } from "../order-matching/read-reply.ts";
 import { candidateOf, candidatesFor, type Candidate } from "../product-selection/candidates.ts";
-import { money, type ItemToBuy } from "../product-selection/cart.ts";
+import {
+  CART_WARNING,
+  money,
+  type CartLine,
+  type ItemToBuy,
+  type SimulatedCart,
+} from "../product-selection/cart.ts";
 
 export const MAX_QUESTIONS = 2;
 
 export const QUESTIONS_HINT =
   'Respondé con el número ("la 2"), con otro producto o marca ("dale, una Patagonia") o "sacala".';
+
+export const IGNORED_PREFERENCE_NOTE = "Por ahora no tengo en cuenta tarjetas ni preferencias.";
 
 export type Mark = "new" | "changed";
 
@@ -59,6 +67,19 @@ export type ItemToBuyInOrder = {
 export type NextStep =
   | { kind: "questions"; text: string; questions: AskedQuestion[] }
   | { kind: "buy"; items: ItemToBuyInOrder[] };
+
+export type CartLineShown = CartLine & { mark: Mark | null };
+
+export type Cart = {
+  postalCode: string;
+  lines: CartLineShown[];
+  total: number;
+  notes: string[];
+  warning: string;
+  cartLink: string | null;
+};
+
+export type CartTaken = { state: { stage: "cart" } & Order; cart: Cart };
 
 export function startOrder(
   postalCode: string,
@@ -280,39 +301,95 @@ export function nextStep(order: Order): NextStep {
       })),
     };
   }
-  return {
-    kind: "buy",
-    items: order.items.flatMap((entry): ItemToBuyInOrder[] => {
-      if (entry.kind === "ready") {
-        return [{ ...entry, keptReason: null }];
-      }
-      if (entry.kind === "in-cart") {
-        return [
-          {
-            item: entry.item,
-            toBuy: {
-              original: entry.item.original,
-              note: null,
-              candidates: [entry.candidate],
-              kept: true,
-            },
-            questionsSpent: entry.questionsSpent,
-            mark: null,
-            keptReason: entry.reason,
-          },
-        ];
-      }
-      return [];
-    }),
-  };
+  return { kind: "buy", items: itemsToBuy(order) };
 }
 
-export function boughtItem(
-  { item, questionsSpent }: ItemToBuyInOrder,
-  candidate: Candidate,
-  reason: string,
-): OrderItem {
-  return { kind: "in-cart", item, candidate, reason, questionsSpent };
+function itemsToBuy(order: Order): ItemToBuyInOrder[] {
+  return order.items.flatMap((entry): ItemToBuyInOrder[] => {
+    if (entry.kind === "ready") {
+      return [{ ...entry, keptReason: null }];
+    }
+    if (entry.kind === "in-cart") {
+      return [
+        {
+          item: entry.item,
+          toBuy: {
+            original: entry.item.original,
+            note: null,
+            candidates: [entry.candidate],
+            kept: true,
+          },
+          questionsSpent: entry.questionsSpent,
+          mark: null,
+          keptReason: entry.reason,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
+export function takeCart(order: Order, simulated: SimulatedCart): CartTaken {
+  if (order.items.some((entry) => entry.kind === "asked")) {
+    throw new Error("a cart taken while the Order still asks questions");
+  }
+  const toBuy = itemsToBuy(order);
+  if (simulated.bought.length !== toBuy.length) {
+    throw new Error(
+      `${String(simulated.bought.length)} cart results for ${String(toBuy.length)} Items to buy`,
+    );
+  }
+  const lines: CartLineShown[] = [];
+  const inCart: OrderItem[] = [];
+  const notGot: string[] = [];
+  for (const [index, result] of simulated.bought.entries()) {
+    const bought = toBuy[index]!;
+    if (result.kind === "not-got") {
+      notGot.push(result.note);
+      continue;
+    }
+    const { line } = result;
+    const candidate = bought.toBuy.candidates.find(
+      ({ product, quantity }) =>
+        product.itemId === line.product.itemId && quantity === line.quantity,
+    )!;
+    const shown =
+      bought.keptReason === null
+        ? { ...line, mark: bought.mark }
+        : { ...line, reason: bought.keptReason, notes: [], mark: null };
+    lines.push(shown);
+    inCart.push({
+      kind: "in-cart",
+      item: bought.item,
+      candidate,
+      reason: shown.reason,
+      questionsSpent: bought.questionsSpent,
+    });
+  }
+  return {
+    state: {
+      stage: "cart",
+      postalCode: order.postalCode,
+      items: inCart,
+      dropped: [],
+      removed: [],
+      ignoredPreference: false,
+      cartShown: true,
+    },
+    cart: {
+      postalCode: order.postalCode,
+      lines,
+      total: simulated.total,
+      notes: [
+        ...order.dropped,
+        ...notGot,
+        ...order.removed,
+        ...(order.ignoredPreference ? [IGNORED_PREFERENCE_NOTE] : []),
+      ],
+      warning: CART_WARNING,
+      cartLink: simulated.cartLink,
+    },
+  };
 }
 
 function questionsText(asked: (OrderItem & { kind: "asked" })[]): string {
