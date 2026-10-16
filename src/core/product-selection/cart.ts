@@ -9,12 +9,21 @@ export const SIMULATIONS_CONCURRENCY = 10;
 export const CART_WARNING =
   "Antes de abrir el link, vaciá tu carrito de Carrefour: el link agrega productos pero no saca los que ya estaban.";
 
-export type ItemToBuy = {
+export type ItemToChoose = {
+  kind: "choose";
   original: string;
   note: string | null;
   candidates: Candidate[];
-  kept: boolean;
 };
+
+export type ItemToKeep = {
+  kind: "keep";
+  original: string;
+  candidate: Candidate;
+  reason: string;
+};
+
+export type ItemToBuy = ItemToChoose | ItemToKeep;
 
 export type CartLine = {
   original: string;
@@ -26,7 +35,8 @@ export type CartLine = {
   notes: string[];
 };
 
-export type Bought = { kind: "bought"; line: CartLine } | { kind: "not-got"; note: string };
+export type Bought =
+  { kind: "bought"; candidate: Candidate; line: CartLine } | { kind: "not-got"; note: string };
 
 export type SimulatedCart = { bought: Bought[]; total: number; cartLink: string | null };
 
@@ -51,21 +61,22 @@ export async function simulateCart(
   };
 
   const queue = items.flatMap((item, index) =>
-    item.kept ? [] : item.candidates.map((candidate) => ({ index, candidate })),
+    item.kind === "keep" ? [] : item.candidates.map((candidate) => ({ index, candidate })),
   );
   const priced = await inParallel(queue, SIMULATIONS_CONCURRENCY, signal, ({ candidate }) =>
     priceAlone(candidate, candidate.quantity),
   );
   const picks: Pick[] = items.map((item, index) => ({
     item,
-    ranked: item.kept
-      ? item.candidates.map((candidate) => ({ candidate, total: 0, savings: 0 }))
-      : rankBySelectionPolicy(
-          queue.flatMap((queued, position) => {
-            const simulated = priced[position];
-            return queued.index === index && simulated ? [simulated] : [];
-          }),
-        ),
+    ranked:
+      item.kind === "keep"
+        ? [{ candidate: item.candidate, total: 0, savings: 0 }]
+        : rankBySelectionPolicy(
+            queue.flatMap((queued, position) => {
+              const simulated = priced[position];
+              return queued.index === index && simulated ? [simulated] : [];
+            }),
+          ),
     chosen: 0,
     notes: [],
   }));
@@ -124,15 +135,26 @@ export async function simulateCart(
       if (!best) return { kind: "not-got", note: notGotNote(pick) };
       const line = whole.lines.get(pick)!;
       const { candidate } = best;
-      const hint = pick.item.kept ? null : await promotionHint(best, priceAlone);
+      const pricedLine = {
+        original: pick.item.original,
+        product: candidate.product,
+        quantity: candidate.quantity,
+        unitPrice: line.total / candidate.quantity,
+        total: line.total,
+      };
+      if (pick.item.kind === "keep") {
+        return {
+          kind: "bought",
+          candidate,
+          line: { ...pricedLine, reason: pick.item.reason, notes: [] },
+        };
+      }
+      const hint = await promotionHint(best, priceAlone);
       return {
         kind: "bought",
+        candidate,
         line: {
-          original: pick.item.original,
-          product: candidate.product,
-          quantity: candidate.quantity,
-          unitPrice: line.total / candidate.quantity,
-          total: line.total,
+          ...pricedLine,
           reason: reasonFor(candidate.product, line, pick.ranked.length === 1),
           notes: [pick.item.note, ...candidate.notes, ...pick.notes, hint].filter(
             (note): note is string => note !== null,
@@ -156,7 +178,7 @@ export async function simulateCart(
 
 function notGotNote({ item, ranked, notes }: Pick): string {
   const why =
-    item.candidates.length === 0
+    item.kind === "choose" && item.candidates.length === 0
       ? "no encontré cómo llevar lo que pediste"
       : ranked.length === 0
         ? "no hay ninguno disponible en tu sucursal"
