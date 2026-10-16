@@ -2,40 +2,28 @@ import type { CatalogSearch } from "../order-matching/catalog-search.ts";
 import type { ParseOrderLlm } from "../order-matching/item.ts";
 import { matchItems, type FitProductsLlm } from "../order-matching/match-items.ts";
 import { checkedReadReply, type ReadReplyLlm } from "../order-matching/read-reply.ts";
-import { CART_WARNING, simulateCart, type CartLine } from "../product-selection/cart.ts";
+import { simulateCart } from "../product-selection/cart.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
 import { postalCodeFrom } from "../product-selection/postal-code.ts";
 import {
   applyReply,
-  boughtItem,
   nextStep,
   replyItems,
   startOrder,
+  takeCart,
   withMatches,
   type AskedQuestion,
+  type Cart,
+  type CartLineShown,
   type Mark,
   type Order,
-  type OrderItem,
 } from "./order.ts";
 import { stepsFrom, type OnStep, type Steps } from "./steps.ts";
 
-export type { AskedQuestion, Mark };
+export type { AskedQuestion, Cart, CartLineShown, Mark };
 
 export const POSTAL_CODE_QUESTION = "¿A qué código postal es el envío?";
 export const ORDER_QUESTION = "¿Qué necesitás del súper?";
-export const IGNORED_PREFERENCE_NOTE = "Por ahora no tengo en cuenta tarjetas ni preferencias.";
-
-export type CartLineShown = CartLine & { mark: Mark | null };
-
-export type Cart = {
-  postalCode: string;
-  lines: CartLineShown[];
-  total: number;
-  notes: string[];
-  warning: string;
-  cartLink: string | null;
-};
-
 export type ConversationState =
   | { stage: "postal-code" }
   | { stage: "order"; postalCode: string }
@@ -156,52 +144,8 @@ async function nextTurn(
       steps.signal,
     ),
   );
-  const lines: CartLineShown[] = [];
-  const inCart: OrderItem[] = [];
-  const notGot: string[] = [];
-  for (const [index, result] of simulated.bought.entries()) {
-    const toBuy = next.items[index]!;
-    if (result.kind === "not-got") {
-      notGot.push(result.note);
-      continue;
-    }
-    const { line } = result;
-    const candidate = toBuy.toBuy.candidates.find(
-      ({ product, quantity }) =>
-        product.itemId === line.product.itemId && quantity === line.quantity,
-    )!;
-    const shown =
-      toBuy.keptReason === null
-        ? { ...line, mark: toBuy.mark }
-        : { ...line, reason: toBuy.keptReason, notes: [], mark: null };
-    lines.push(shown);
-    inCart.push(boughtItem(toBuy, candidate, shown.reason));
-  }
-  const cart: Cart = {
-    postalCode: order.postalCode,
-    lines,
-    total: simulated.total,
-    notes: [
-      ...order.dropped,
-      ...notGot,
-      ...order.removed,
-      ...(order.ignoredPreference ? [IGNORED_PREFERENCE_NOTE] : []),
-    ],
-    warning: CART_WARNING,
-    cartLink: simulated.cartLink,
-  };
-  return {
-    state: {
-      stage: "cart",
-      postalCode: order.postalCode,
-      items: inCart,
-      dropped: [],
-      removed: [],
-      ignoredPreference: false,
-      cartShown: true,
-    },
-    reply: { kind: "cart", cart },
-  };
+  const { state, cart } = takeCart(order, simulated);
+  return { state, reply: { kind: "cart", cart } };
 }
 
 function ask(state: ConversationState, text: string): Turn {
