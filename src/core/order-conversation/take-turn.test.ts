@@ -462,6 +462,73 @@ describe("takeTurn", () => {
       assert.equal(last.state.stage, "planning");
     });
 
+    describe("advice", () => {
+      const advice: PlanOutput = {
+        kind: "answer",
+        message: "Con pescado va bien un vino blanco seco, como un Sauvignon Blanc.",
+        plan: null,
+      };
+
+      const wine: PlanOutput = {
+        kind: "answer",
+        message: "Te sumo un vino para el pescado.",
+        plan: {
+          title: "Vino para pescado",
+          idea: [{ heading: "Consejo", text: "Servilo frío, entre 8 y 10 °C." }],
+          lines: [
+            { productId: "p9", quantity: 1, purpose: "para el pescado", reason: "Vino de mesa" },
+          ],
+        },
+      };
+
+      it("answers advice with no Plan and stays in planning", async () => {
+        const { last, calls } = await toPlan(["¿qué vino va con pescado?"], [advice]);
+        assert.deepEqual(calls, ["routeMessage", "plan"]);
+        assert.deepEqual(last.reply, {
+          kind: "ask",
+          text: "Con pescado va bien un vino blanco seco, como un Sauvignon Blanc.",
+        });
+        assert.equal(last.state.stage, "planning");
+        assert.equal(last.state.stage === "planning" && last.state.lastPlan, null);
+      });
+
+      it("shows a Plan when the Owner then wants to buy", async () => {
+        const { last, planInputs, routed } = await toPlan(
+          ["¿qué vino va con pescado?", "dale, comprame uno"],
+          [advice, { kind: "search", queries: ["vino"] }, wine],
+        );
+        assert.deepEqual(routed, ["¿qué vino va con pescado?"]);
+        assert.deepEqual(planInputs[1], {
+          messages: [
+            { role: "owner", text: "¿qué vino va con pescado?" },
+            {
+              role: "planner",
+              text: "Con pescado va bien un vino blanco seco, como un Sauvignon Blanc.",
+            },
+            { role: "owner", text: "dale, comprame uno" },
+          ],
+          products: [],
+          lastPlan: null,
+        });
+        assert.equal(last.reply.kind, "plan");
+        if (last.reply.kind !== "plan") return;
+        assert.deepEqual(
+          last.reply.plan.lines.map(({ product, quantity, purpose }) => [
+            product.name,
+            quantity,
+            purpose,
+          ]),
+          [["Vino tinto Toro 1 l", 1, "para el pescado"]],
+        );
+        assert.equal(last.reply.plan.total, 2500);
+        assert.equal(last.state.stage, "planning");
+        assert.equal(
+          last.state.stage === "planning" && last.state.lastPlan?.title,
+          "Vino para pescado",
+        );
+      });
+    });
+
     it("ends the turn with an error when the planner proposes a product it did not see", async () => {
       await assert.rejects(toPlan(["quiero hacer lasaña para 4"], [lasagna(4, 2)]), {
         message:
