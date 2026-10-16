@@ -1111,6 +1111,34 @@ describe("takeTurn", () => {
     });
   });
 
+  describe("invalid LLM answers", () => {
+    it("ends the turn with an error when call 2 asks while products fit", async () => {
+      await assert.rejects(
+        run(
+          {
+            items: [item("yerba", "yerba")],
+            answers: { yerba: () => ({ question: "¿Cuál?" }) },
+          },
+          ["yerba"],
+        ),
+        /fit-products answer for Item "yerba" breaks a rule/,
+      );
+    });
+
+    it("ends the turn with an error when read-reply chooses for an Item in the cart", async () => {
+      await assert.rejects(
+        run(
+          {
+            items: [item("yerba", "yerba")],
+            replies: [{ entries: [{ item: 1, kind: "choice", alternative: 1 }] }],
+          },
+          ["yerba", "la 1"],
+        ),
+        /read-reply answer for Item 1 \("yerba"\) breaks a rule: a choice only for an asked Item/,
+      );
+    });
+  });
+
   describe("abort", () => {
     it("passes the turn's signal to every call of the LLM and the store", async () => {
       const { deps, calls, signals } = conversation({ items: [item("yerba", "yerba")] });

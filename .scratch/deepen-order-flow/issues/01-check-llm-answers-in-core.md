@@ -11,14 +11,22 @@ A broken rule throws an error naming the task, the Item and the rule, so the Con
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Core exposes a checked call for `fitProducts` and one for `read-reply`; `matchItems`, `takeTurn` and the eval set's answer cases call these, never the port directly
-- [ ] The read-reply check fills an "unanswered" entry for every asked Item left out and sorts entries by Item number
-- [ ] The core fallbacks (`entry ?? unanswered`, the slice to five Alternatives) are removed
-- [ ] Rule checks are removed from the Claude Code adapter; its tests cover prompts, schemas, parsing and the process only
-- [ ] Pure tests in core, one per rule, plus a test that read-reply fills unanswered entries; the rule tests from the adapter test file move here
-- [ ] Each error message names the task, the Item and the broken rule
-- [ ] Test fakes of the LLM pass through the same checks
-- [ ] `docs/LLM.md` says the checks run in core, not in the adapter
-- [ ] `pnpm check` is green
+- [x] Core exposes a checked call for `fitProducts` and one for `read-reply`; `matchItems`, `takeTurn` and the eval set's answer cases call these, never the port directly
+- [x] The read-reply check fills an "unanswered" entry for every asked Item left out and sorts entries by Item number
+- [x] The core fallbacks (`entry ?? unanswered`, the slice to five Alternatives) are removed
+- [x] Rule checks are removed from the Claude Code adapter; its tests cover prompts, schemas, parsing and the process only
+- [x] Pure tests in core, one per rule, plus a test that read-reply fills unanswered entries; the rule tests from the adapter test file move here
+- [x] Each error message names the task, the Item and the broken rule
+- [x] Test fakes of the LLM pass through the same checks
+- [x] `docs/LLM.md` says the checks run in core, not in the adapter
+- [x] `pnpm check` is green
+
+## Comments
+
+- The checks live next to their ports: `checkFitProducts` and `checkedFitProducts` in `src/core/order-matching/match-items.ts`, `checkReadReply` and `checkedReadReply` in `src/core/order-matching/read-reply.ts`. `matchItems`, `takeTurn` and `createOrderMatcher` (the eval set's answer cases) call the checked functions; the core fallbacks are gone.
+- The adapter keeps prompts, zod schemas and line parsing; schema-level failures (an alternative of zero, a number that is not a candidate number, an empty question) stay tested there. The rule tests moved to `match-items.test.ts` and the new `read-reply.test.ts`; `take-turn.test.ts` adds two wiring tests for an invalid answer ending the turn.
+- Errors read `<task> answer for Item <n or "original"> breaks a rule: <rule>`.
+- `answerCaseErrors` still validates the labelled expected entries of the eval set; it checks committed data, not LLM answers, so it was left as is.
+- `pnpm build` is not a script in this repo; `pnpm exec next build` succeeds.
