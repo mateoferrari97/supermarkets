@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { ToolLoopAgent, type LanguageModel } from "ai";
 import { claudeCode, createAiSdkMcpServer } from "ai-sdk-provider-claude-code";
 import type { AgentTurn, ChatAgent } from "../../core/agent-chat/agent.ts";
+import { renderOrder } from "../../core/agent-chat/order.ts";
 import { renderProfile, type AgentTools } from "../../core/agent-chat/tools.ts";
 
 export const AGENT_MODEL = "sonnet";
@@ -54,19 +55,56 @@ export function createClaudeCodeAgent({
   createModel = createClaudeCodeModel,
 }: ClaudeCodeAgentOptions): ChatAgent {
   return {
-    async reply({ messages, profile, tools }: AgentTurn, signal: AbortSignal): Promise<string> {
-      const systemPrompt = `${readFileSync(join(promptsDir, AGENT_PROMPT_FILE), "utf8").trimEnd()}\n\n${renderProfile(profile)}\n`;
-      const agent = new ToolLoopAgent({ model: createModel(systemPrompt, tools, signal) });
-      const result = await agent.generate({
-        messages: messages.map((message) => ({
-          role: message.role === "owner" ? "user" : "assistant",
-          content: message.text,
-        })),
-        abortSignal: signal,
+    async reply({ messages, profile, order, tools }: AgentTurn, signal: AbortSignal) {
+      const systemPrompt = `${readFileSync(join(promptsDir, AGENT_PROMPT_FILE), "utf8").trimEnd()}\n\n${renderProfile(profile)}\n\n${renderOrder(order)}\n`;
+      const turnEnd = new AbortController();
+      let ended = false;
+      const agent = new ToolLoopAgent({
+        model: createModel(
+          systemPrompt,
+          endingTheTurn(tools, turnEnd, () => (ended = true)),
+          signal,
+        ),
       });
-      const text = result.text.trim();
-      if (text === "") throw new Error("The agent answered with no text.");
+      let text: string;
+      try {
+        const result = await agent.generate({
+          messages: messages.map((message) => ({
+            role: message.role === "owner" ? "user" : "assistant",
+            content: message.text,
+          })),
+          abortSignal: AbortSignal.any([signal, turnEnd.signal]),
+        });
+        text = result.text.trim();
+      } catch (error) {
+        if (!ended) throw error;
+        return "";
+      }
+      if (text === "" && !ended) throw new Error("The agent answered with no text.");
       return text;
     },
   };
+}
+
+function endingTheTurn(
+  tools: AgentTools,
+  turnEnd: AbortController,
+  markEnded: () => void,
+): AgentTools {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, tool]) => [
+      name,
+      tool.endsTurn
+        ? {
+            ...tool,
+            execute: async (input: unknown, signal: AbortSignal) => {
+              const output = await tool.execute(input, signal);
+              markEnded();
+              turnEnd.abort();
+              return output;
+            },
+          }
+        : tool,
+    ]),
+  );
 }

@@ -3,7 +3,8 @@ import { describe, it } from "vitest";
 import type { AgentTurn, ChatAgent } from "./agent.ts";
 import { CONTEXT_MESSAGES, chatMessageSchema, type ChatMessage } from "./chat.ts";
 import type { Profile } from "./profile.ts";
-import type { AgentTools } from "./tools.ts";
+import type { ChatOrder, Proposal } from "./order.ts";
+import type { AgentTools, ToolsForTurn, TurnOutcome } from "./tool.ts";
 import { takeAgentTurn } from "./take-agent-turn.ts";
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 16, 12, minute)).toISOString();
@@ -15,6 +16,7 @@ const message = (index: number): ChatMessage => ({
 });
 
 const noTools: AgentTools = {};
+const toolsOf: ToolsForTurn = () => noTools;
 
 function fakeAgent(answer = "Hola, ¿qué necesitás?") {
   const seen: ChatMessage[][] = [];
@@ -35,11 +37,14 @@ const turn = (
   agent: ChatAgent,
   saved: ChatMessage[] = [],
   profile: Profile | null = null,
+  tools: ToolsForTurn = toolsOf,
+  order: ChatOrder | null = null,
 ) =>
   takeAgentTurn(history, text, {
     agent,
     profile,
-    tools: noTools,
+    order,
+    tools,
     save: (saved_) => saved.push(saved_),
     now: () => new Date(at(30)),
     signal: new AbortController().signal,
@@ -73,6 +78,68 @@ describe("takeAgentTurn", () => {
     await turn([], "hola", agent, [], { postalCode: "1425" });
     assert.deepEqual(turns[0]?.profile, { postalCode: "1425" });
     assert.equal(turns[0]?.tools, noTools);
+  });
+
+  it("gives the agent the open Order", async () => {
+    const { agent, turns } = fakeAgent();
+    const open: ChatOrder = {
+      id: "order-1",
+      status: "draft",
+      openedAt: at(1),
+      items: [],
+      proposals: 0,
+      proposal: null,
+    };
+    await turn([], "hola", agent, [], null, toolsOf, open);
+    assert.equal(turns[0]?.order, open);
+  });
+
+  it("saves the card of a tool that ended the turn instead of the agent's text", async () => {
+    const proposal: Proposal = {
+      id: "order-1-1",
+      lines: [
+        {
+          description: "leche",
+          productId: "2",
+          itemId: "20",
+          name: "Leche",
+          brand: null,
+          quantity: 1,
+          unitPrice: 800,
+          total: 800,
+          reason: "Es el más barato.",
+          notes: [],
+        },
+      ],
+      notes: [],
+      total: 800,
+    };
+    const ending: ChatAgent = {
+      reply: (turn_) => {
+        turn_.tools.propose?.execute({}, new AbortController().signal).catch(() => undefined);
+        return Promise.resolve("");
+      },
+    };
+    const saved: ChatMessage[] = [];
+    const tools: ToolsForTurn = (outcome: TurnOutcome) => ({
+      propose: {
+        description: "ends",
+        inputSchema: chatMessageSchema.pick({ role: true }).partial(),
+        endsTurn: true,
+        execute: () => {
+          outcome.ended = { text: "Armé este pedido", parts: [{ type: "proposal", proposal }] };
+          return Promise.resolve({});
+        },
+      },
+    });
+    const reply = await turn([], "leche", ending, saved, null, tools);
+    assert.deepEqual(reply, {
+      role: "assistant",
+      at: at(30),
+      text: "Armé este pedido",
+      parts: [{ type: "proposal", proposal }],
+    });
+    assert.deepEqual(saved.at(-1), reply);
   });
 
   it("keeps the Owner message saved when the agent fails", async () => {

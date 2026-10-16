@@ -10,6 +10,7 @@ import {
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { chatMessageSchema, type ChatMessage } from "../../core/agent-chat/chat.ts";
+import { ordersSchema, type ChatOrder } from "../../core/agent-chat/order.ts";
 import { profileSchema, type Profile } from "../../core/agent-chat/profile.ts";
 import type { ConversationEvent } from "../../core/conversation-log/conversation-log.ts";
 import {
@@ -43,6 +44,7 @@ export const CONVERSATIONS_DIR = ".data/conversations";
 export const CHAT_DIR = ".data/chat";
 export const CHAT_MESSAGES_PATH = `${CHAT_DIR}/messages.jsonl`;
 export const CHAT_PROFILE_PATH = `${CHAT_DIR}/profile.json`;
+export const CHAT_ORDERS_PATH = `${CHAT_DIR}/orders.json`;
 
 const catalogSchema = z.object({
   products: z.array(
@@ -249,6 +251,28 @@ export function createDataFiles(root = ".") {
     writeFileSync(at(CHAT_PROFILE_PATH), `${JSON.stringify(profileSchema.parse(profile))}\n`);
   };
 
+  const loadOrders = (): Checked<ChatOrder[]> => {
+    if (!exists(CHAT_ORDERS_PATH)) return ok([]);
+    let json: unknown;
+    try {
+      json = JSON.parse(readFileSync(at(CHAT_ORDERS_PATH), "utf8"));
+    } catch {
+      return failed([`${CHAT_ORDERS_PATH} is not JSON.`]);
+    }
+    const orders = ordersSchema.safeParse(json);
+    if (orders.success) return ok(orders.data);
+    const [issue] = orders.error.issues;
+    return failed([
+      `${CHAT_ORDERS_PATH} is not a list of orders ` +
+        `(at "${issue?.path.join(".") ?? ""}": ${issue?.message ?? ""}).`,
+    ]);
+  };
+
+  const saveOrders = (orders: ChatOrder[]): void => {
+    mkdirSync(at(CHAT_DIR), { recursive: true });
+    writeFileSync(at(CHAT_ORDERS_PATH), writeJsonText(ordersSchema.parse(orders)));
+  };
+
   const headCommit = (): string | null => {
     try {
       return execFileSync("git", ["rev-parse", "HEAD"], {
@@ -287,6 +311,8 @@ export function createDataFiles(root = ".") {
     appendChatMessage,
     loadProfile,
     saveProfile,
+    loadOrders,
+    saveOrders,
     loadCatalogProducts,
     loadSnapshotFetchedAt,
     loadEvalSet,

@@ -460,3 +460,79 @@ describe("the Profile", () => {
     }
   });
 });
+
+describe("the Orders", () => {
+  const order = {
+    id: "order-1",
+    status: "proposed" as const,
+    openedAt: "2026-10-16T12:00:00.000Z",
+    items: [{ kind: "none" as const, ref: "1", description: "bicicleta", note: "No encontré." }],
+    proposals: 1,
+    proposal: null,
+  };
+
+  it("is an empty list before anything is saved", () => {
+    assert.deepEqual(createDataFiles(root).loadOrders(), { ok: true, value: [] });
+  });
+
+  it("reads back the Orders saved from another instance, the last save winning", () => {
+    createDataFiles(root).saveOrders([order]);
+    createDataFiles(root).saveOrders([order, { ...order, id: "order-2", status: "closed" }]);
+    const loaded = createDataFiles(root).loadOrders();
+    assert.equal(loaded.ok && loaded.value.length, 2);
+    assert.deepEqual(loaded.ok && loaded.value[0], order);
+  });
+
+  it("refuses to save an invalid Order and keeps the saved ones", () => {
+    createDataFiles(root).saveOrders([order]);
+    assert.throws(() => createDataFiles(root).saveOrders([{ ...order, status: "open" as never }]));
+    const loaded = createDataFiles(root).loadOrders();
+    assert.equal(loaded.ok && loaded.value.length, 1);
+  });
+
+  it("fails naming the file when it is not JSON or not a list of orders", () => {
+    write(".data/chat/orders.json", "{bad");
+    const notJson = createDataFiles(root).loadOrders();
+    assert.equal(notJson.ok, false);
+    if (!notJson.ok) assert.match(notJson.errors[0] ?? "", /orders\.json is not JSON/);
+    write(".data/chat/orders.json", [{ ...order, status: "open" }]);
+    const notOrders = createDataFiles(root).loadOrders();
+    assert.equal(notOrders.ok, false);
+    if (!notOrders.ok) {
+      assert.match(
+        notOrders.errors[0] ?? "",
+        /orders\.json is not a list of orders \(at "0\.status"/,
+      );
+    }
+  });
+});
+
+describe("a message with a proposal", () => {
+  it("is saved with its parts and read back", () => {
+    const line = {
+      description: "leche",
+      productId: "2",
+      itemId: "20",
+      name: "Leche",
+      brand: null,
+      quantity: 1,
+      unitPrice: 800,
+      total: 800,
+      reason: "Es el más barato.",
+      notes: [],
+    };
+    const message = {
+      role: "assistant" as const,
+      at: "2026-10-16T12:00:00.000Z",
+      text: "Armé este pedido",
+      parts: [
+        {
+          type: "proposal" as const,
+          proposal: { id: "order-1-1", lines: [line], notes: [], total: 800 },
+        },
+      ],
+    };
+    createDataFiles(root).appendChatMessage(message);
+    assert.deepEqual(createDataFiles(root).loadChatMessages(), { ok: true, value: [message] });
+  });
+});

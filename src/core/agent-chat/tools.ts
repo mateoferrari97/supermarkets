@@ -1,26 +1,14 @@
 import { z } from "zod";
+import type { CatalogSearch } from "../order-matching/catalog-search.ts";
+import type { FitProductsLlm } from "../order-matching/match-items.ts";
 import type { OnlineStore } from "../product-selection/online-store.ts";
+import type { OrdersStore } from "./orders-store.ts";
 import type { Profile } from "./profile.ts";
+import { proposeOrder, proposeOrderInput } from "./propose-order.ts";
+import { resolveItem, resolveItemInput } from "./resolve-item.ts";
+import { defineTool, type ToolsForTurn } from "./tool.ts";
 
-export type AgentTool = {
-  description: string;
-  inputSchema: z.ZodObject;
-  execute: (input: unknown, signal: AbortSignal) => Promise<unknown>;
-};
-
-export type AgentTools = Record<string, AgentTool>;
-
-export function defineTool<Schema extends z.ZodObject, Output>(
-  description: string,
-  inputSchema: Schema,
-  run: (input: z.infer<Schema>, signal: AbortSignal) => Promise<Output>,
-): AgentTool {
-  return {
-    description,
-    inputSchema,
-    execute: async (input, signal) => run(inputSchema.parse(input), signal),
-  };
-}
+export { defineTool, type AgentTool, type AgentTools, type ToolsForTurn } from "./tool.ts";
 
 export const updateProfileInput = z.object({
   postalCode: z.string().describe("The four-digit postal code the Owner stated."),
@@ -50,15 +38,34 @@ export async function updateProfile(
   return { kind: "saved", postalCode };
 }
 
-export function agentTools(dependencies: ProfileDependencies): AgentTools {
-  return {
+export type AgentToolsDependencies = ProfileDependencies & {
+  search: CatalogSearch;
+  llm: FitProductsLlm;
+  orders: OrdersStore;
+  loadProfile: () => Profile | null;
+  now: () => Date;
+};
+
+export const agentTools =
+  (dependencies: AgentToolsDependencies): ToolsForTurn =>
+  (outcome) => ({
     updateProfile: defineTool(
       "Saves the Owner's postal code in the Profile after checking that the Online Store delivers there. Call it whenever the Owner states or changes their postal code. Returns saved, or refused with the reason.",
       updateProfileInput,
       (input, signal) => updateProfile(input, dependencies, signal),
     ),
-  };
-}
+    resolveItem: defineTool(
+      "Finds the product to buy for one Item the Owner asked for, with the Branch's prices. Call it once per Item, in parallel for several Items, after the postal code is known. Returns picked with the product, quantity and price, none when nothing fits, or refused with the reason. The product is already chosen by code: never name any other.",
+      resolveItemInput,
+      (input, signal) => resolveItem(input, dependencies, signal),
+    ),
+    proposeOrder: defineTool(
+      "Shows the Owner the Order for confirmation and ends the turn. Pass the ref of every resolveItem result to include. The Owner sees each product, quantity and price, and what was not found. Write nothing after calling it.",
+      proposeOrderInput,
+      (input) => proposeOrder(input, { orders: dependencies.orders, outcome }),
+      true,
+    ),
+  });
 
 export function renderProfile(profile: Profile | null): string {
   return profile === null

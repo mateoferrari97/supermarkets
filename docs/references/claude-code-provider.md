@@ -41,8 +41,12 @@ Nothing in the provider ends the session when a tool is called. After `askQuesti
 
 Checked on 2026-10-16 with the agent chat of the repo: the small session with one `createAiSdkMcpServer("chat", ...)` tool (`updateProfile`) and `allowedTools: ["mcp__chat__updateProfile"]` called the tool on each message that stated a postal code, 2.8 to 7.0 s per turn including the Carrefour regions call, and did not call it when the Owner only asked for the saved one. The tool's `execute` ran in the Next.js process and its zod input was parsed before our function ran.
 
+## An ending tool in the repo
+
+Checked on 2026-10-16: with the real adapter, a tool wrapped so that it aborts a controller after its `execute` returns, and the agent given that controller's signal, `agent.generate` does not return the text so far: it throws `AI_APICallError` with the message `Claude Code process aborted by user`. `src/adapters/agent/claude-code-agent.ts` reads that error as the end of the turn when a tool with `endsTurn` has answered, returns an empty text, and rethrows any other error. With `proposeOrder` the full turn (a postal code, two `resolveItem` calls and the proposal) took 19.5 s and an order of three Items with one not found 22.0 s on the dev server, most of it in call 2 of each `resolveItem`.
+
 ## Not verified
 
 - Whether a Claude subscription may serve people other than its owner.
 - Behaviour under two turns at once, or a turn aborted by a closed tab before `askQuestions`.
-- Time and cost with real tools, the real prompt and the last 40 messages of a Chat.
+- Time and cost with the real tools and prompt over the last 40 messages of a Chat (measured only with a Chat of a few messages), and the cost in USD of a turn with `resolveItem`.

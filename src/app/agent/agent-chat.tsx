@@ -2,6 +2,68 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage } from "../../core/agent-chat/chat.ts";
+import type { Proposal } from "../../core/agent-chat/order.ts";
+
+const money = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function ProposalCard({ proposal }: { proposal: Proposal }) {
+  return (
+    <div className="msg bot wide">
+      <div className="lead block">Armé este pedido:</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th className="num">Cant.</th>
+            <th className="num">c/u</th>
+            <th className="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {proposal.lines.map((line) => (
+            <tr key={line.itemId}>
+              <td>
+                <div>{line.name}</div>
+                <div className="muted small">
+                  pediste &quot;{line.description}&quot; · {line.reason}
+                </div>
+                {line.notes.map((note) => (
+                  <div key={note} className="notice">
+                    {note}
+                  </div>
+                ))}
+              </td>
+              <td className="num">{line.quantity}</td>
+              <td className="num">{money.format(line.unitPrice)}</td>
+              <td className="num">{money.format(line.total)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={3}>
+              <strong>Total</strong>
+            </td>
+            <td className="num">
+              <strong>{money.format(proposal.total)}</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {proposal.notes.map((note) => (
+        <div key={note} className="notice block">
+          {note}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const proposalOf = (message: ChatMessage): Proposal | null =>
+  message.parts?.find((part) => part.type === "proposal")?.proposal ?? null;
 
 type Shown = ChatMessage | { role: "error"; text: string };
 
@@ -62,24 +124,28 @@ export function AgentChat({ initialMessages }: { initialMessages: ChatMessage[] 
             <div className="text">Hola, escribime lo que necesitás.</div>
           </div>
         )}
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={
-              message.role === "owner"
-                ? "msg me"
-                : message.role === "error"
-                  ? "msg bot error"
-                  : "msg bot"
-            }
-          >
-            {message.role === "assistant" ? (
-              <div className="text">{message.text}</div>
-            ) : (
-              message.text
-            )}
-          </div>
-        ))}
+        {messages.map((message, index) => {
+          const proposal = message.role === "assistant" ? proposalOf(message) : null;
+          if (proposal) return <ProposalCard key={index} proposal={proposal} />;
+          return (
+            <div
+              key={index}
+              className={
+                message.role === "owner"
+                  ? "msg me"
+                  : message.role === "error"
+                    ? "msg bot error"
+                    : "msg bot"
+              }
+            >
+              {message.role === "assistant" ? (
+                <div className="text">{message.text}</div>
+              ) : (
+                message.text
+              )}
+            </div>
+          );
+        })}
         {working && (
           <div className="msg bot">
             <span className="spinner" />

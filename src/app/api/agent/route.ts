@@ -4,13 +4,19 @@ import {
   createAgentTools,
   createChatAgent,
   loadChatMessages,
+  loadOrders,
   loadProfile,
 } from "../../../compose.ts";
+import { openOrderOf } from "../../../core/agent-chat/order.ts";
+import type { ToolsForTurn } from "../../../core/agent-chat/tools.ts";
 import { takeAgentTurn } from "../../../core/agent-chat/take-agent-turn.ts";
 
 const requestSchema = z.object({ text: z.string().trim().min(1) });
 
-const held = globalThis as typeof globalThis & { agentTurnRunning?: boolean };
+const held = globalThis as typeof globalThis & {
+  agentTurnRunning?: boolean;
+  agentTools?: ToolsForTurn;
+};
 
 const agent = createChatAgent();
 
@@ -26,12 +32,20 @@ export async function POST(request: Request): Promise<Response> {
   if (!history.ok) return failure(500, history.errors);
   const profile = loadProfile();
   if (!profile.ok) return failure(500, profile.errors);
+  const orders = loadOrders();
+  if (!orders.ok) return failure(500, orders.errors);
+  if (!held.agentTools) {
+    const tools = createAgentTools();
+    if (!tools.ok) return failure(500, tools.errors);
+    held.agentTools = tools.value;
+  }
   held.agentTurnRunning = true;
   try {
     const message = await takeAgentTurn(history.value, parsed.data.text, {
       agent,
       profile: profile.value,
-      tools: createAgentTools(),
+      order: openOrderOf(orders.value),
+      tools: held.agentTools,
       save: appendChatMessage,
       now: () => new Date(),
       signal: request.signal,

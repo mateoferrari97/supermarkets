@@ -14,7 +14,7 @@ import {
   loggedStore,
   type WriteConversationEvent,
 } from "./core/conversation-log/conversation-log.ts";
-import { agentTools, type AgentTools } from "./core/agent-chat/tools.ts";
+import { agentTools, type ToolsForTurn } from "./core/agent-chat/tools.ts";
 import type { ChatAgent } from "./core/agent-chat/agent.ts";
 import type { ConversationDependencies } from "./core/order-conversation/take-turn.ts";
 import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
@@ -53,6 +53,8 @@ export const {
   appendChatMessage,
   loadProfile,
   saveProfile,
+  loadOrders,
+  saveOrders,
   loadCatalogProducts,
   loadSnapshotFetchedAt,
   loadEvalSet,
@@ -70,8 +72,29 @@ export function createChatAgent(): ChatAgent {
   return createClaudeCodeAgent({ promptsDir: files.promptsDir });
 }
 
-export function createAgentTools(): AgentTools {
-  return agentTools({ store: createOnlineStore(), saveProfile: files.saveProfile });
+function valueOrThrow<T>(checked: Checked<T>): T {
+  if (!checked.ok) throw new Error(checked.errors.join(" "));
+  return checked.value;
+}
+
+export function createAgentTools(): Checked<ToolsForTurn> {
+  const search = createCatalogSearch();
+  if (!search.ok) return search;
+  return {
+    ok: true,
+    value: agentTools({
+      store: createOnlineStore(),
+      saveProfile: files.saveProfile,
+      loadProfile: () => valueOrThrow(files.loadProfile()),
+      search: search.value,
+      llm: createLlm({}),
+      orders: {
+        load: () => valueOrThrow(files.loadOrders()),
+        save: files.saveOrders,
+      },
+      now: () => new Date(),
+    }),
+  };
 }
 
 export function createOnlineStore(): OnlineStore {

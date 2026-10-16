@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { Delivery, OnlineStore } from "../product-selection/online-store.ts";
 import type { Profile } from "./profile.ts";
+import { catalog, llmFitting, memoryOrders, searchOf, storeOf } from "./agent-chat-fixtures.ts";
+import type { TurnOutcome } from "./tool.ts";
 import { agentTools, renderProfile, updateProfile } from "./tools.ts";
 
 function fakeStore(deliveries: Record<string, Delivery>) {
@@ -76,15 +78,66 @@ describe("updateProfile", () => {
 });
 
 describe("agentTools", () => {
-  it("exposes updateProfile and validates its input", async () => {
+  it("exposes updateProfile, resolveItem and proposeOrder, and only proposeOrder ends the turn", () => {
+    const { store } = fakeStore({});
+    const { search } = searchOf(catalog);
+    const tools = agentTools({
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => null,
+      search,
+      llm: llmFitting(),
+      orders: memoryOrders().orders,
+      now: () => new Date(),
+    })({ ended: null });
+    assert.deepEqual(Object.keys(tools), ["updateProfile", "resolveItem", "proposeOrder"]);
+    assert.deepEqual(
+      Object.values(tools).map((tool) => tool.endsTurn),
+      [false, false, true],
+    );
+  });
+
+  it("validates the input of updateProfile", async () => {
     const { store } = fakeStore({ "1425": "delivers" });
     const saved: Profile[] = [];
-    const tools = agentTools({ store, saveProfile: (profile) => saved.push(profile) });
-    assert.deepEqual(Object.keys(tools), ["updateProfile"]);
+    const { search } = searchOf(catalog);
+    const tools = agentTools({
+      store,
+      saveProfile: (profile) => saved.push(profile),
+      loadProfile: () => null,
+      search,
+      llm: llmFitting(),
+      orders: memoryOrders().orders,
+      now: () => new Date(),
+    })({ ended: null });
     const output = await tools.updateProfile?.execute({ postalCode: "1425" }, signal);
     assert.deepEqual(output, { kind: "saved", postalCode: "1425" });
     await assert.rejects(
       tools.updateProfile?.execute({ postalCode: 1425 }, signal) ?? Promise.resolve(),
+    );
+  });
+
+  it("takes an Order from text to a proposal through the tools", async () => {
+    const { store } = storeOf(catalog);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders();
+    const outcome: TurnOutcome = { ended: null };
+    const tools = agentTools({
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    })(outcome);
+    await tools.resolveItem?.execute({ description: "leche" }, signal);
+    await tools.resolveItem?.execute({ description: "bicicleta" }, signal);
+    await tools.proposeOrder?.execute({ refs: ["1", "2"] }, signal);
+    assert.equal(memory.current()[0]?.status, "proposed");
+    assert.equal(outcome.ended?.parts[0]?.type, "proposal");
+    await assert.rejects(
+      tools.resolveItem?.execute({ product: "leche" }, signal) ?? Promise.resolve(),
     );
   });
 });
