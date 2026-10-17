@@ -149,6 +149,12 @@ describe("createClaudeCodeAgent", () => {
     assert.deepEqual(Object.keys(settings.mcpServers as object), ["chat"]);
   });
 
+  it("starts the session with nonessential traffic turned off", () => {
+    const model = createClaudeCodeModel("prompt", {}, new AbortController().signal);
+    const settings = (model as unknown as { settings: Record<string, unknown> }).settings;
+    assert.deepEqual(settings.env, { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" });
+  });
+
   it("puts the open Order in the system prompt", async () => {
     const prompts: string[] = [];
     const agent = createClaudeCodeAgent({

@@ -174,6 +174,7 @@ export function createProcessRunner(command: string): ProcessRunner {
     new Promise((resolve, reject) => {
       const child = spawn(command, args, {
         cwd: tmpdir(),
+        env: { ...process.env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
         stdio: ["pipe", "pipe", "pipe"],
         signal,
       });

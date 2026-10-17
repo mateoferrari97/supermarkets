@@ -271,4 +271,22 @@ describe("createProcessRunner", () => {
     setTimeout(() => controller.abort(), 200);
     await assert.rejects(running, { name: "AbortError" });
   });
+
+  it("starts the process with the parent environment and nonessential traffic turned off", async () => {
+    process.env.PROCESS_RUNNER_TEST_PARENT = "from-parent";
+    try {
+      const run = createProcessRunner(process.execPath);
+      const result = await run(
+        [
+          "-e",
+          "process.stdout.write(JSON.stringify([process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, process.env.PROCESS_RUNNER_TEST_PARENT]))",
+        ],
+        "",
+        signal,
+      );
+      assert.deepEqual(JSON.parse(result.stdout), ["1", "from-parent"]);
+    } finally {
+      delete process.env.PROCESS_RUNNER_TEST_PARENT;
+    }
+  });
 });

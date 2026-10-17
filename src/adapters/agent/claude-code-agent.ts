@@ -48,6 +48,7 @@ export const createClaudeCodeModel: CreateAgentModel = (systemPrompt, tools, sig
     persistSession: false,
     maxTurns: AGENT_MAX_TURNS,
     maxBudgetUsd: AGENT_BUDGET_USD,
+    env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
   });
 
 export function createClaudeCodeAgent({
