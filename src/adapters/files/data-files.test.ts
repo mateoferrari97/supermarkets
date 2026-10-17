@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "vitest";
+import type { TurnLogEntry } from "../../core/agent-chat/turn-log.ts";
 import { createDataFiles } from "./data-files.ts";
 
 const repoRoot = join(import.meta.dirname, "../../..");
@@ -294,6 +295,58 @@ describe("the Chat messages", () => {
     assert.equal(loaded.errors.length, 2);
     assert.match(loaded.errors[0] ?? "", /messages\.jsonl line 2 is not JSON/);
     assert.match(loaded.errors[1] ?? "", /line 3 is not a message \(at "role"/);
+  });
+});
+
+describe("the Turn Log", () => {
+  const entry: TurnLogEntry = {
+    startedAt: "2026-10-16T12:00:00.000Z",
+    ownerText: "leche",
+    durationMs: 900,
+    outcome: "ended-by-tool",
+    error: null,
+    agent: { startMs: 5, endMs: 890, reported: null },
+    events: [
+      { kind: "tool", name: "resolveItem", startMs: 100, endMs: 400, ok: true, error: null },
+      { kind: "tool", name: "proposeOrder", startMs: 450, endMs: 470, ok: true, error: null },
+    ],
+  };
+
+  it("is not found before the first turn", () => {
+    assert.deepEqual(createDataFiles(root).loadTurnLog(), {
+      found: false,
+      entries: [],
+      errors: [],
+    });
+  });
+
+  it("appends one line per entry and reads them back, oldest first", () => {
+    createDataFiles(root).appendTurnLogEntry(entry);
+    createDataFiles(root).appendTurnLogEntry({ ...entry, ownerText: "yogur", outcome: "replied" });
+    const lines = readFileSync(join(root, ".data/chat/turn-log.jsonl"), "utf8").split("\n");
+    assert.equal(lines.length, 3);
+    assert.equal(lines[2], "");
+    assert.deepEqual(createDataFiles(root).loadTurnLog(), {
+      found: true,
+      entries: [entry, { ...entry, ownerText: "yogur", outcome: "replied" }],
+      errors: [],
+    });
+  });
+
+  it("refuses to save an invalid entry", () => {
+    assert.throws(() => createDataFiles(root).appendTurnLogEntry({ ...entry, durationMs: -1 }));
+  });
+
+  it("names a line that is not JSON or not an entry and keeps the others", () => {
+    write(
+      ".data/chat/turn-log.jsonl",
+      `${JSON.stringify(entry)}\nnot json\n${JSON.stringify({ ...entry, outcome: "slow" })}\n`,
+    );
+    const loaded = createDataFiles(root).loadTurnLog();
+    assert.deepEqual(loaded.entries, [entry]);
+    assert.equal(loaded.errors.length, 2);
+    assert.match(loaded.errors[0] ?? "", /turn-log\.jsonl line 2 is not JSON/);
+    assert.match(loaded.errors[1] ?? "", /line 3 is not a Turn Log entry \(at "outcome"/);
   });
 });
 

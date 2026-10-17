@@ -1,10 +1,16 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ToolLoopAgent, type LanguageModel } from "ai";
+import {
+  ToolLoopAgent,
+  type LanguageModel,
+  type LanguageModelUsage,
+  type ProviderMetadata,
+} from "ai";
 import { claudeCode, createAiSdkMcpServer } from "ai-sdk-provider-claude-code";
 import type { AgentTurn, ChatAgent } from "../../core/agent-chat/agent.ts";
 import { renderOrder, renderPastOrders } from "../../core/agent-chat/order.ts";
 import { renderProfile, type AgentTools } from "../../core/agent-chat/tools.ts";
+import type { AgentSessionReport } from "../../core/agent-chat/turn-log.ts";
 
 export const AGENT_MODEL = "claude-sonnet-5-5";
 export const AGENT_EFFORT = "low";
@@ -59,7 +65,7 @@ export function createClaudeCodeAgent({
 }: ClaudeCodeAgentOptions): ChatAgent {
   return {
     async reply(
-      { messages, profile, order, pastOrders, tools, turnEnded }: AgentTurn,
+      { messages, profile, order, pastOrders, tools, turnEnded, reportSession }: AgentTurn,
       signal: AbortSignal,
     ) {
       const systemPrompt = `${readFileSync(join(promptsDir, AGENT_PROMPT_FILE), "utf8").trimEnd()}\n\n${renderProfile(profile)}\n\n${renderOrder(order)}\n\n${renderPastOrders(pastOrders)}\n`;
@@ -82,6 +88,7 @@ export function createClaudeCodeAgent({
           abortSignal: AbortSignal.any([signal, turnEnd.signal]),
         });
         text = result.text.trim();
+        reportSession(sessionReport(result.providerMetadata, result.totalUsage));
       } catch (error) {
         if (!ended) throw error;
         return "";
@@ -89,6 +96,26 @@ export function createClaudeCodeAgent({
       if (text === "" && !ended) throw new Error("The agent answered with no text.");
       return text;
     },
+  };
+}
+
+const PROVIDER_METADATA_KEY = "claude-code";
+
+const numberOrNull = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+
+export function sessionReport(
+  metadata: ProviderMetadata | undefined,
+  usage: LanguageModelUsage,
+): AgentSessionReport {
+  const session = metadata?.[PROVIDER_METADATA_KEY];
+  return {
+    durationMs: numberOrNull(session?.durationMs),
+    costUsd: numberOrNull(session?.costUsd),
+    inputTokens: numberOrNull(usage.inputTokenDetails.noCacheTokens),
+    outputTokens: numberOrNull(usage.outputTokens),
+    cacheReadTokens: numberOrNull(usage.inputTokenDetails.cacheReadTokens),
+    cacheWriteTokens: numberOrNull(usage.inputTokenDetails.cacheWriteTokens),
   };
 }
 

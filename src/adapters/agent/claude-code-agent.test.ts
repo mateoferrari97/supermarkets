@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import type { ChatMessage } from "../../core/agent-chat/chat.ts";
 import { z } from "zod";
 import type { AgentTurn } from "../../core/agent-chat/agent.ts";
+import type { AgentSessionReport } from "../../core/agent-chat/turn-log.ts";
 import { defineTool, renderProfile } from "../../core/agent-chat/tools.ts";
 import { renderOrder, renderPastOrders } from "../../core/agent-chat/order.ts";
 import { createClaudeCodeAgent, createClaudeCodeModel } from "./claude-code-agent.ts";
@@ -39,6 +40,7 @@ const turn = (overrides: Partial<AgentTurn> = {}): AgentTurn => ({
   pastOrders: [],
   tools: {},
   turnEnded: () => true,
+  reportSession: () => undefined,
   ...overrides,
 });
 
@@ -218,9 +220,14 @@ describe("createClaudeCodeAgent", () => {
           },
         }),
     });
-    const reply = await agent.reply(turn({ tools }), new AbortController().signal);
+    const reports: AgentSessionReport[] = [];
+    const reply = await agent.reply(
+      turn({ tools, reportSession: (report) => reports.push(report) }),
+      new AbortController().signal,
+    );
     assert.equal(reply, "");
     assert.deepEqual(executed, ["look", "propose"]);
+    assert.deepEqual(reports, []);
   });
 
   it("keeps the session going when a tool that may end the turn refused", async () => {
@@ -258,6 +265,54 @@ describe("createClaudeCodeAgent", () => {
     );
     assert.equal(abortedAfterRefusal, false);
     assert.equal(reply, "No pude armar el carrito.");
+  });
+
+  it("reports the session's duration, cost and tokens when it returns a result", async () => {
+    const agent = createClaudeCodeAgent({
+      promptsDir,
+      createModel: () =>
+        new MockLanguageModelV4({
+          doGenerate: {
+            content: [{ type: "text", text: "Hola" }],
+            finishReason: { unified: "stop", raw: "stop" },
+            usage: {
+              inputTokens: { total: 5130, noCache: 30, cacheRead: 4000, cacheWrite: 1100 },
+              outputTokens: { total: 85, text: 85, reasoning: 0 },
+            },
+            providerMetadata: {
+              "claude-code": { sessionId: "s-1", costUsd: 0.0123, durationMs: 2500 },
+            },
+            warnings: [],
+          },
+        }),
+    });
+    const reports: AgentSessionReport[] = [];
+    await agent.reply(
+      turn({ reportSession: (report) => reports.push(report) }),
+      new AbortController().signal,
+    );
+    assert.deepEqual(reports, [
+      {
+        durationMs: 2500,
+        costUsd: 0.0123,
+        inputTokens: 30,
+        outputTokens: 85,
+        cacheReadTokens: 4000,
+        cacheWriteTokens: 1100,
+      },
+    ]);
+  });
+
+  it("reports null for what the provider does not give", async () => {
+    const reports: AgentSessionReport[] = [];
+    const agent = createClaudeCodeAgent({ promptsDir, createModel: () => answering("Hola") });
+    await agent.reply(
+      turn({ reportSession: (report) => reports.push(report) }),
+      new AbortController().signal,
+    );
+    assert.equal(reports[0]?.durationMs, null);
+    assert.equal(reports[0]?.costUsd, null);
+    assert.equal(reports[0]?.outputTokens, 1);
   });
 
   it("rethrows a failure of the session when no tool ended the turn", async () => {

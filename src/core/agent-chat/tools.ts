@@ -15,6 +15,7 @@ import { proposePlan, proposePlanInput } from "./propose-plan.ts";
 import { resolveItem, resolveItemInput } from "./resolve-item.ts";
 import { searchCatalog, searchCatalogInput } from "./search-catalog.ts";
 import { defineTool, type ToolsForTurn } from "./tool.ts";
+import { silentReporter } from "./turn-log.ts";
 
 export { defineTool, type AgentTool, type AgentTools, type ToolsForTurn } from "./tool.ts";
 
@@ -56,7 +57,7 @@ export type AgentToolsDependencies = ProfileDependencies & {
 
 export const agentTools =
   (dependencies: AgentToolsDependencies): ToolsForTurn =>
-  (outcome, messages = []) => {
+  (outcome, messages = [], reporter = silentReporter) => {
     const turn = newPlanTurn();
     return {
       updateProfile: defineTool(
@@ -67,7 +68,7 @@ export const agentTools =
       resolveItem: defineTool(
         "Finds the product to buy for one Item the Owner asked for, with the Branch's prices. Call it once per Item, in parallel for several Items, after the postal code is known. Returns picked with the product, quantity and price; choose with up to 3 options when nothing fits, which you put to the Owner with askQuestions; none when nothing fits and there are no options; or refused with the reason. The product is already chosen by code: never name any other. When the Owner asks for more options, call it again for the same Item with excludeProductIds.",
         resolveItemInput,
-        (input, signal) => resolveItem(input, dependencies, signal),
+        (input, signal) => resolveItem(input, { ...dependencies, onStep: reporter.onStep }, signal),
       ),
       chooseAlternative: defineTool(
         "Records the option the Owner chose for an Item that resolveItem answered choose, and prices it in the Branch. Pass the ref and the productId of the option, or recommended true when the Owner accepts the recommended answers. Returns picked, unavailable when the Branch cannot sell it now, or refused with the reason.",

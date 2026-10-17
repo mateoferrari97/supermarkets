@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { stepsFrom } from "../order-matching/steps.ts";
+import { stepsFrom, type StepEvent } from "../order-matching/steps.ts";
 import { matchItems } from "../order-matching/match-items.ts";
 import { parseLine } from "../order-matching/item.ts";
 import { simulateCart } from "../product-selection/cart.ts";
@@ -15,6 +15,7 @@ import {
 } from "./agent-chat-fixtures.ts";
 import type { ChatOrder } from "./order.ts";
 import { resolveItem, type ResolveItemDependencies } from "./resolve-item.ts";
+import { agentTools } from "./tools.ts";
 
 const signal = new AbortController().signal;
 const now = () => new Date("2026-10-16T12:00:00.000Z");
@@ -36,6 +37,24 @@ function setup(overrides: Partial<ResolveItemDependencies> = {}, orders: ChatOrd
 }
 
 describe("resolveItem", () => {
+  it("reports its step to the reporter of the turn", async () => {
+    const { dependencies } = setup();
+    const steps: StepEvent[] = [];
+    const tools = agentTools({ ...dependencies, saveProfile: () => undefined })(
+      { ended: null },
+      [],
+      { onStep: (event) => steps.push(event), onLlmCall: () => undefined },
+    );
+    await tools.resolveItem?.execute({ description: "leche" }, signal);
+    assert.deepEqual(
+      steps.map(({ status, step }) => [status, step]),
+      [
+        ["started", { kind: "choose-products", original: "leche" }],
+        ["done", { kind: "choose-products", original: "leche" }],
+      ],
+    );
+  });
+
   it("picks the same product today's order flow buys for the same Item", async () => {
     const { dependencies } = setup();
     const output = await resolveItem({ description: "leche" }, dependencies, signal);

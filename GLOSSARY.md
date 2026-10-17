@@ -60,6 +60,10 @@ _Avoid_: User, customer, shopper, client
 The one continuous thread of messages between the Owner and the Assistant, with no end and no restart, as on WhatsApp. Every Order, question and answer happens inside it, and the Assistant reads it to understand what the Owner means now.
 _Avoid_: Session, conversation, thread, history
 
+**Turn Log**:
+The record of one turn of the Assistant in the Chat, with its timeline and costs: when it started, the Owner's text, how long it took, how it ended, and what happened inside it. It exists to find where a turn's time goes; it is never shown to the Owner.
+_Avoid_: Conversation Log, trace, metrics
+
 **Profile**:
 What the Assistant remembers about the Owner across Orders, such as their postal code. The Owner states it once in the Chat, can change it at any time, and is not asked for it again.
 _Avoid_: Preferences, settings, account, user data

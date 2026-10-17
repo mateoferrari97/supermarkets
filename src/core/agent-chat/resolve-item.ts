@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { stepsFrom } from "../order-matching/steps.ts";
+import { stepsFrom, type OnStep } from "../order-matching/steps.ts";
 import type { CatalogProduct } from "../order-matching/catalog-product.ts";
 import { MATCHES_LIMIT, type CatalogSearch } from "../order-matching/catalog-search.ts";
 import { parseLine, type Item } from "../order-matching/item.ts";
@@ -133,6 +133,7 @@ export type ResolveItemDependencies = {
   orders: OrdersStore;
   loadProfile: () => Profile | null;
   now: () => Date;
+  onStep?: OnStep;
 };
 
 function withoutExcluded(search: CatalogSearch, excluded: Set<string>): CatalogSearch {
@@ -148,7 +149,7 @@ function withoutExcluded(search: CatalogSearch, excluded: Set<string>): CatalogS
 
 export async function resolveItem(
   input: z.infer<typeof resolveItemInput>,
-  { search, llm, store, orders, loadProfile, now }: ResolveItemDependencies,
+  { search, llm, store, orders, loadProfile, now, onStep }: ResolveItemDependencies,
   signal: AbortSignal,
 ): Promise<ResolveItemOutput> {
   const profile = loadProfile();
@@ -179,7 +180,7 @@ export async function resolveItem(
   const [match] = await matchItems(
     [item],
     { search: withoutExcluded(search, excluded), llm },
-    stepsFrom({ signal }),
+    stepsFrom({ signal, onStep }),
   );
   const notFound = `No encontré "${description}".`;
   let outcome: Outcome;

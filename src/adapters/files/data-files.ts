@@ -4,6 +4,7 @@ import { z } from "zod";
 import { chatMessageSchema, type ChatMessage } from "../../core/agent-chat/chat.ts";
 import { ordersSchema, type ChatOrder } from "../../core/agent-chat/order.ts";
 import { profileSchema, type Profile } from "../../core/agent-chat/profile.ts";
+import { turnLogEntrySchema, type TurnLogEntry } from "../../core/agent-chat/turn-log.ts";
 import {
   catalogProductsFrom,
   type CatalogProduct,
@@ -25,6 +26,9 @@ export const CHAT_DIR = ".data/chat";
 export const CHAT_MESSAGES_PATH = `${CHAT_DIR}/messages.jsonl`;
 export const CHAT_PROFILE_PATH = `${CHAT_DIR}/profile.json`;
 export const CHAT_ORDERS_PATH = `${CHAT_DIR}/orders.json`;
+export const TURN_LOG_PATH = `${CHAT_DIR}/turn-log.jsonl`;
+
+export type LoadedTurnLog = { found: boolean; entries: TurnLogEntry[]; errors: string[] };
 
 const catalogSchema = z.object({
   products: z.array(
@@ -151,6 +155,40 @@ export function createDataFiles(root = ".") {
     appendFileSync(at(CHAT_MESSAGES_PATH), `${JSON.stringify(chatMessageSchema.parse(message))}\n`);
   };
 
+  const loadTurnLog = (): LoadedTurnLog => {
+    if (!exists(TURN_LOG_PATH)) return { found: false, entries: [], errors: [] };
+    const entries: TurnLogEntry[] = [];
+    const errors: string[] = [];
+    readFileSync(at(TURN_LOG_PATH), "utf8")
+      .split("\n")
+      .forEach((line, index) => {
+        if (line.trim() === "") return;
+        let json: unknown;
+        try {
+          json = JSON.parse(line);
+        } catch {
+          errors.push(`${TURN_LOG_PATH} line ${index + 1} is not JSON.`);
+          return;
+        }
+        const entry = turnLogEntrySchema.safeParse(json);
+        if (entry.success) {
+          entries.push(entry.data);
+          return;
+        }
+        const [issue] = entry.error.issues;
+        errors.push(
+          `${TURN_LOG_PATH} line ${index + 1} is not a Turn Log entry ` +
+            `(at "${issue?.path.join(".") ?? ""}": ${issue?.message ?? ""}).`,
+        );
+      });
+    return { found: true, entries, errors };
+  };
+
+  const appendTurnLogEntry = (entry: TurnLogEntry): void => {
+    mkdirSync(at(CHAT_DIR), { recursive: true });
+    appendFileSync(at(TURN_LOG_PATH), `${JSON.stringify(turnLogEntrySchema.parse(entry))}\n`);
+  };
+
   const loadProfile = (): Checked<Profile | null> => {
     if (!exists(CHAT_PROFILE_PATH)) return ok(null);
     let json: unknown;
@@ -199,6 +237,8 @@ export function createDataFiles(root = ".") {
     promptsDir: at(PROMPTS_DIR),
     loadChatMessages,
     appendChatMessage,
+    loadTurnLog,
+    appendTurnLogEntry,
     loadProfile,
     saveProfile,
     loadOrders,

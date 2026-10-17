@@ -79,6 +79,7 @@ describe("createClaudeCodeLlm", () => {
         task: "fit-products",
         model: "claude-sonnet-5-5",
         effort: "low",
+        item: "yerba",
         systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
         input: calls[0]!.input,
         rawOutput: result.stdout,

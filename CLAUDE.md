@@ -54,6 +54,7 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - `pnpm agent:eval [filter...] [--runs N]`: runs the agent eval set, scripted Owner messages over a given Chat, Profile and past Orders, with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-agent-eval-set)).
 - `pnpm agent:eval-set`: validates `evals/agent.json` with the same loader `pnpm agent:eval` uses.
 - `pnpm agent:label <words> [--brand <brand>]`: lists likely products from the Catalog Snapshot to label an agent eval case.
+- `pnpm chat:turns [N]`: prints the last N turns of the Chat from the Turn Log in `.data/chat/turn-log.jsonl` (10 by default): each turn's start, the start of the Owner's text, how it ended and its total time, then the agent's wall time and reported duration, each tool call with its time, and the time and cost of its `fit-products` calls. A line that cannot be read is reported by number and skipped; with no Turn Log it says so.
 - `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `products.json` in `.data/carrefour/`, or in the directory given as its argument. `.data/` is not committed.
 
 ## Workflow

@@ -35,6 +35,7 @@ export type LlmCall = {
   task: string;
   model: string;
   effort: Effort | null;
+  item: string | null;
   systemPromptSha256: string;
   input: unknown;
   rawOutput: string;
@@ -73,6 +74,7 @@ function createSessions({
     systemPrompt: string,
     schema: z.ZodType<T>,
     input: unknown,
+    item: string | null,
     signal: AbortSignal,
   ): Promise<T> => {
     const { model, effort } = models[task] ?? TASK_MODELS[task];
@@ -108,6 +110,7 @@ function createSessions({
       task,
       model,
       effort,
+      item,
       systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
       input,
       rawOutput: result.stdout,
@@ -140,6 +143,7 @@ export function createClaudeCodeLlm(options: ClaudeCodeLlmOptions): Llm {
         prompt("fit-products"),
         fitProductsOutputSchema,
         renderLine(input),
+        input.item.original,
         signal,
       ),
   };

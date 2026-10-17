@@ -1,5 +1,7 @@
 export type Step = { kind: "choose-products"; original: string };
 
+export const stepLabel = (step: Step): string => `Eligiendo productos para '${step.original}'`;
+
 export type StepEvent =
   | { status: "started"; id: number; step: Step }
   | { status: "done"; id: number; step: Step; durationMs: number };

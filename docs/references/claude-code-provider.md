@@ -17,6 +17,15 @@ The defaults load the Claude Code system prompt, the user's settings and the use
 
 Turn with `resolveItem` twice and `askQuestions` once, small session, `sonnet`: 7.2 s and 7.8 s with `agent.generate`, 5.9 s to the round when the stream is aborted after `askQuestions`. In the aborted stream the first tool call started at 2.2 s, the second result arrived at 3.4 s and `askQuestions` was complete at 5.8 s. A reply turn with no tool call, over the replayed history, took 3.6 s. These are single runs of a fake in-memory tool; real tools add their own time.
 
+## What a session reports
+
+Read in `node_modules/ai-sdk-provider-claude-code/dist/index.js` of version 4.3.3. When the Claude Code session sends its `result` message, `doGenerate` returns:
+
+- `providerMetadata["claude-code"]` with `costUsd` (`total_cost_usd`), `durationMs` (`duration_ms`), `sessionId`, `modelUsage` and, when Claude Code sends them, `ttftMs`, `ttftStreamMs`, `timeToRequestMs`, `warmSpareClaimed`, `terminalReason` and `apiRetries`. A field Claude Code does not send is left out, not set to `null`.
+- `usage` from the result's `usage` through `convertClaudeCodeUsage`: `inputTokens.noCache` is `input_tokens`, `inputTokens.cacheRead` is `cache_read_input_tokens`, `inputTokens.cacheWrite` is `cache_creation_input_tokens`, `inputTokens.total` is their sum and `outputTokens.total` is `output_tokens`; `outputTokens.text` and `reasoning` stay unset. A cache field Claude Code leaves out becomes `0`, so `0` cache tokens may mean "not reported". The AI SDK result exposes them as `totalUsage.inputTokenDetails.noCacheTokens`, `cacheReadTokens`, `cacheWriteTokens` and `totalUsage.outputTokens`.
+
+The agent adapter reports `durationMs`, `costUsd`, the input tokens with no cache, the output tokens and the cache-read and cache-write tokens to the Turn Log through `reportSession`. When a tool ends the turn the session is aborted before its `result` message, so nothing is reported. In one live text turn on 2026-10-17 the agent took 2,589 ms of wall time and Claude Code reported 2,388 ms, so the start-up was about 0.2 s; that session cost 0.080 USD with 2 input tokens, 102 output tokens, 10,535 cache-read and 9,534 cache-write tokens ([Turn Log](../../ARCHITECTURE.md#an-agent-turn-end-to-end)).
+
 ## Ending a turn
 
 Nothing in the provider ends the session when a tool is called. After `askQuestions` the model went on and wrote text that contradicted the round ("quedó registrada tu elección de yogur"). Aborting the `AbortSignal` passed to the agent from the tool (`setTimeout(() => ac.abort(), 30)` inside `execute`, so its result is emitted first) ends the stream cleanly: the last parts are `tool-output-available` and `{"type":"abort"}`, nothing is thrown, and `onFinish` of the UI stream receives `isAborted: true` with every part so far.

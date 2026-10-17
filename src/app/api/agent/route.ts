@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   appendChatMessage,
+  appendTurnLogEntry,
   createAgentTools,
   createChatAgent,
   loadChatMessages,
@@ -51,6 +52,8 @@ export async function POST(request: Request): Promise<Response> {
       tools: held.agentTools.tools,
       save: appendChatMessage,
       now: () => new Date(),
+      clock: () => performance.now(),
+      saveTurnLog: appendTurnLogEntry,
       signal: request.signal,
     });
     return Response.json({ message });

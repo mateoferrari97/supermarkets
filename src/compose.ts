@@ -10,6 +10,7 @@ import {
 import { createDataFiles, type Checked } from "./adapters/files/data-files.ts";
 import { agentTools, type ToolsForTurn } from "./core/agent-chat/tools.ts";
 import type { ChatAgent } from "./core/agent-chat/agent.ts";
+import type { LlmCallReport, TurnLogEntry, TurnReporter } from "./core/agent-chat/turn-log.ts";
 import { runAgentCase, type AgentRun } from "./core/agent-chat/eval-run.ts";
 import type { AgentCase } from "./core/agent-chat/eval-set.ts";
 import type { CatalogProduct } from "./core/order-matching/catalog-product.ts";
@@ -18,7 +19,7 @@ import type { Llm } from "./core/order-matching/llm.ts";
 import type { OnlineStore } from "./core/product-selection/online-store.ts";
 
 export type { LlmCall } from "./adapters/claude-code/claude-code-llm.ts";
-export type { Checked } from "./adapters/files/data-files.ts";
+export type { Checked, LoadedTurnLog } from "./adapters/files/data-files.ts";
 
 export type LlmOptions = Omit<ClaudeCodeLlmOptions, "run" | "promptsDir">;
 
@@ -29,6 +30,7 @@ const files = createDataFiles();
 export const {
   loadChatMessages,
   appendChatMessage,
+  loadTurnLog,
   loadProfile,
   saveProfile,
   loadOrders,
@@ -38,6 +40,16 @@ export const {
   loadAgentEvalSet,
   saveAgentEvalRun,
 } = files;
+
+export function appendTurnLogEntry(entry: TurnLogEntry): void {
+  try {
+    files.appendTurnLogEntry(entry);
+  } catch (error) {
+    console.error(
+      `Could not write the Turn Log: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
 
 export function createLlm(options: LlmOptions): Llm {
   return createClaudeCodeLlm({ ...options, promptsDir: files.promptsDir });
@@ -52,23 +64,44 @@ function valueOrThrow<T>(checked: Checked<T>): T {
   return checked.value;
 }
 
+const llmCallReport = ({
+  task,
+  model,
+  effort,
+  item,
+  durationMs,
+  costUsd,
+}: LlmCall): LlmCallReport => ({
+  task,
+  model,
+  effort,
+  item,
+  durationMs,
+  costUsd,
+});
+
 export function createAgentTools(): Checked<ToolsForTurn> {
   const search = createCatalogSearch();
   if (!search.ok) return search;
+  let turnReporter: TurnReporter | null = null;
+  const tools = agentTools({
+    store: createOnlineStore(),
+    saveProfile: files.saveProfile,
+    loadProfile: () => valueOrThrow(files.loadProfile()),
+    search: search.value,
+    llm: createLlm({ onCall: (call) => turnReporter?.onLlmCall(llmCallReport(call)) }),
+    orders: {
+      load: () => valueOrThrow(files.loadOrders()),
+      save: files.saveOrders,
+    },
+    now: () => new Date(),
+  });
   return {
     ok: true,
-    value: agentTools({
-      store: createOnlineStore(),
-      saveProfile: files.saveProfile,
-      loadProfile: () => valueOrThrow(files.loadProfile()),
-      search: search.value,
-      llm: createLlm({}),
-      orders: {
-        load: () => valueOrThrow(files.loadOrders()),
-        save: files.saveOrders,
-      },
-      now: () => new Date(),
-    }),
+    value: (outcome, messages, reporter) => {
+      turnReporter = reporter ?? null;
+      return tools(outcome, messages, reporter);
+    },
   };
 }
 

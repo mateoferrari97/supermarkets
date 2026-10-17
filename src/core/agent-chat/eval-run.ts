@@ -130,9 +130,9 @@ export function pastOrderOf(
 }
 
 export function recording(tools: ToolsForTurn, calls: RecordedCall[]): ToolsForTurn {
-  return (outcome, messages) => {
+  return (outcome, messages, reporter) => {
     const recorded: AgentTools = {};
-    for (const [name, tool] of Object.entries(tools(outcome, messages))) {
+    for (const [name, tool] of Object.entries(tools(outcome, messages, reporter))) {
       recorded[name] = {
         ...tool,
         execute: async (input, signal) => {
@@ -215,6 +215,8 @@ export async function runAgentCase(
       tools: recording(tools, calls),
       save: (message) => messages.push(message),
       now,
+      clock: () => performance.now(),
+      saveTurnLog: () => undefined,
       signal,
     });
     return {
