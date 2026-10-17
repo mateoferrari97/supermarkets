@@ -18,6 +18,8 @@ The Assistant becomes one agent that reads the Chat and calls tools:
 
 This amends ADR 0004: the Owner still writes free text and is asked only when in doubt, but the Chat, the Profile and past Orders are kept. It amends ADR 0011: the postal code is stored; payment cards and preferences are still ignored. It amends ADR 0012: call 1 is gone, since the agent reads the Owner's words into tool calls; the search, call 2 and the code picking stay inside the tool. It amends ADR 0013: a Plan is built by the agent with a search tool instead of a search loop in core, under the same checks. It amends ADR 0006: the agent is reached through a port, and `ai` stays out of `src/core/`.
 
+ADR 0015 amends the model of the agent: it now runs on `claude-sonnet-5-5` with low effort.
+
 ## Considered Options
 
 - **A form with fixed slots driven by code.** Deterministic and easy to evaluate, but rigid: intents such as "algo para un asado de 8" do not fit slots, and every new kind of request needs a new state.

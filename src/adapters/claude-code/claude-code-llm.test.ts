@@ -78,7 +78,7 @@ describe("createClaudeCodeLlm", () => {
       {
         task: "fit-products",
         model: "claude-sonnet-5-5",
-        effort: null,
+        effort: "low",
         systemPromptSha256: createHash("sha256").update(systemPrompt).digest("hex"),
         input: calls[0]!.input,
         rawOutput: result.stdout,
@@ -177,7 +177,7 @@ describe("fitProducts", () => {
       structured_output: { fits: [1], closest: [], note: null, question: null, ...fields },
     });
 
-  it("runs Sonnet at its default effort with its prompt and the line it renders", async () => {
+  it("runs Sonnet at low effort with its prompt and the line it renders", async () => {
     const calls: LlmCall[] = [];
     const argsSeen: string[][] = [];
     const inputsSeen: string[] = [];
@@ -196,7 +196,7 @@ describe("fitProducts", () => {
     });
     const args = argsSeen[0]!;
     assert.equal(args[args.indexOf("--model") + 1], "claude-sonnet-5-5");
-    assert.equal(args.includes("--effort"), false);
+    assert.equal(args[args.indexOf("--effort") + 1], "low");
     assert.equal(args[args.indexOf("--system-prompt") + 1], "Fit the products.");
     const line = [
       "<line>",
@@ -213,7 +213,7 @@ describe("fitProducts", () => {
     assert.deepEqual(inputsSeen, [line]);
     assert.deepEqual(
       calls.map(({ task, model, effort, input }) => ({ task, model, effort, input })),
-      [{ task: "fit-products", model: "claude-sonnet-5-5", effort: null, input: line }],
+      [{ task: "fit-products", model: "claude-sonnet-5-5", effort: "low", input: line }],
     );
   });
 

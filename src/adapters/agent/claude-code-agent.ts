@@ -6,7 +6,8 @@ import type { AgentTurn, ChatAgent } from "../../core/agent-chat/agent.ts";
 import { renderOrder, renderPastOrders } from "../../core/agent-chat/order.ts";
 import { renderProfile, type AgentTools } from "../../core/agent-chat/tools.ts";
 
-export const AGENT_MODEL = "sonnet";
+export const AGENT_MODEL = "claude-sonnet-5-5";
+export const AGENT_EFFORT = "low";
 export const AGENT_BUDGET_USD = 0.5;
 export const AGENT_MAX_TURNS = 10;
 export const AGENT_PROMPT_FILE = "agent/system.md";
@@ -48,6 +49,7 @@ export const createClaudeCodeModel: CreateAgentModel = (systemPrompt, tools, sig
     persistSession: false,
     maxTurns: AGENT_MAX_TURNS,
     maxBudgetUsd: AGENT_BUDGET_USD,
+    effort: AGENT_EFFORT,
     env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
   });
 

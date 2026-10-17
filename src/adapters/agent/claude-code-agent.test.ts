@@ -149,6 +149,13 @@ describe("createClaudeCodeAgent", () => {
     assert.deepEqual(Object.keys(settings.mcpServers as object), ["chat"]);
   });
 
+  it("runs Sonnet 5.5 at low effort", () => {
+    const model = createClaudeCodeModel("prompt", {}, new AbortController().signal);
+    const settings = (model as unknown as { settings: Record<string, unknown> }).settings;
+    assert.equal((model as unknown as { modelId: string }).modelId, "claude-sonnet-5-5");
+    assert.equal(settings.effort, "low");
+  });
+
   it("starts the session with nonessential traffic turned off", () => {
     const model = createClaudeCodeModel("prompt", {}, new AbortController().signal);
     const settings = (model as unknown as { settings: Record<string, unknown> }).settings;

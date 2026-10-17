@@ -13,7 +13,7 @@ export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 export type TaskModel = { model: string; effort: Effort | null };
 
 export const TASK_MODELS: Record<LlmTask, TaskModel> = {
-  "fit-products": { model: "claude-sonnet-5-5", effort: null },
+  "fit-products": { model: "claude-sonnet-5-5", effort: "low" },
 };
 
 export const TASK_BUDGETS_USD: Record<LlmTask, number> = {

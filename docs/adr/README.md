@@ -16,3 +16,4 @@ One file per decision, numbered in order, with a `Status` front matter of `propo
 - [0012](0012-match-items-to-catalog-products-with-two-llm-calls-around-a-search.md): Match Items to catalog products with two LLM calls around a search
 - [0013](0013-in-a-plan-the-llm-proposes-seen-products-and-the-owner-confirms.md): In a Plan the LLM proposes products it saw, code checks them, and the Owner confirms
 - [0014](0014-an-agent-with-tools-over-a-persisted-chat.md): The Assistant is an agent with tools over a persisted Chat; code still picks the products
+- [0015](0015-the-agent-and-fit-products-run-on-sonnet-5-5-at-low-effort.md): The agent and `fit-products` run on Sonnet 5.5 at low effort
