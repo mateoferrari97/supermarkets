@@ -52,9 +52,17 @@ _Avoid_: Notice, warning, message
 
 ## Conversation
 
-**Topic**:
-The label the first message of a conversation gets: `order` when it names what to buy, `plan` when it states an intent that becomes a Plan, or `off-topic` when it is not about shopping.
-_Avoid_: Intent, category, route
+**Owner**:
+The person the Assistant shops for. There is one Owner for now; it has no account or identity, only one Chat and one Profile.
+_Avoid_: User, customer, shopper, client
+
+**Chat**:
+The one continuous thread of messages between the Owner and the Assistant, with no end and no restart, as on WhatsApp. Every Order, question and answer happens inside it, and the Assistant reads it to understand what the Owner means now.
+_Avoid_: Session, conversation, thread, history
+
+**Profile**:
+What the Assistant remembers about the Owner across Orders, such as their postal code. The Owner states it once in the Chat, can change it at any time, and is not asked for it again.
+_Avoid_: Preferences, settings, account, user data
 
 **Plan**:
 A proposal of products with quantities and the Idea behind them, built by the LLM from products a code search returned. The Owner revises and confirms it before it becomes a cart; until then nothing is bought (ADR 0013).
@@ -69,9 +77,5 @@ What a Plan is for: a recipe with its steps, a menu per day, gift ideas with the
 _Avoid_: Recipe list, suggestion, description
 
 **Order**:
-The Items of one conversation and where each stands (read, asked, in the cart), from the first message to the last cart. It counts the questions spent on each Item and keeps the Notes about Items dropped or removed until the cart is shown.
+One purchase inside the Chat: its Items and where each stands (read, asked, in the cart). It opens with the first message about something to buy and closes when its cart link is given, and a clear Correction soon after reopens it; closed Orders stay in the Chat as past Orders the Assistant can refer to.
 _Avoid_: Basket, shopping list, conversation state
-
-**Conversation Log**:
-The record of one conversation between the Owner and the Assistant, from the postal code to the last cart or to its abandonment, including what the LLM and the Online Store were asked and answered along the way. It exists to review mistakes after the fact; it is never shown to the Owner in the chat.
-_Avoid_: Transcript, chat history, order log

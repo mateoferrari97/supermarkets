@@ -10,6 +10,8 @@ Code still picks the products, as ADR 0002 decided, but with one fixed Selection
 
 A cheaper product with a card promotion the Owner could get is missed, and an Owner who wants only one brand must name it on each Item. Both come back as their own effort once matching is settled.
 
+ADR 0014 amends this decision: the postal code is kept in the Profile. Payment cards and preferences are still ignored, and code still picks the products.
+
 ## Considered Options
 
 - **Keep both and fold them into the new matching flow.** Every matching decision (search, Fits, size rule, Alternatives) would also have to handle brand rules and card prices before matching works at all.

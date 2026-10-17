@@ -4,6 +4,10 @@ import { candidateOf, snapshotTotal } from "../product-selection/selection.ts";
 
 export const PLAN_QUERIES_LIMIT = 8;
 
+export const PLAN_MATCHES_LIMIT = 20;
+
+export const SEARCH_ROUNDS_LIMIT = 3;
+
 export const PLAN_LINES_LIMIT = 60;
 
 export type IdeaSection = { heading: string; text: string };
@@ -11,31 +15,6 @@ export type IdeaSection = { heading: string; text: string };
 export type PlanLine = { productId: string; quantity: number; purpose: string; reason: string };
 
 export type Plan = { title: string; idea: IdeaSection[]; lines: PlanLine[] };
-
-export type PlanIdea = { title: string; sections: IdeaSection[] };
-
-export type PlanMessage = { role: "owner" | "planner"; text: string };
-
-export type OverBudget = { budget: number; total: number };
-
-export type PlanSearch = { query: string; found: number };
-
-export type PlanInput = {
-  messages: PlanMessage[];
-  products: CatalogProduct[];
-  lastPlan: Plan | null;
-  overBudget?: OverBudget;
-  searches?: PlanSearch[];
-};
-
-export type PlanOutput =
-  | { kind: "search"; queries: string[] }
-  | { kind: "answer"; message: string; plan: Plan | null; budget: number | null }
-  | { kind: "confirm" };
-
-export type PlanLlm = {
-  plan(input: PlanInput, signal: AbortSignal): Promise<PlanOutput>;
-};
 
 export type PlanLineShown = {
   product: CatalogProduct;
@@ -54,39 +33,11 @@ export type PlanShown = {
   plan: Plan;
 };
 
-export type CheckedPlanOutput =
-  | { kind: "search"; queries: string[] }
-  | { kind: "answer"; message: string; plan: PlanShown | null; budget: number | null }
-  | { kind: "confirm" };
+export type OverBudget = { budget: number; total: number };
 
-export async function checkedPlan(
-  llm: PlanLlm,
-  input: PlanInput,
-  signal: AbortSignal,
-): Promise<CheckedPlanOutput> {
-  return checkPlan(input, await llm.plan(input, signal));
-}
-
-export function checkPlan(input: PlanInput, output: PlanOutput): CheckedPlanOutput {
-  if (output.kind === "search") {
-    if (output.queries.length > PLAN_QUERIES_LIMIT) {
-      fail(`${String(output.queries.length)} queries, more than ${String(PLAN_QUERIES_LIMIT)}`);
-    }
-    return output;
-  }
-  if (output.kind === "confirm") {
-    if (input.lastPlan === null) fail("a confirm with no Plan shown");
-    return output;
-  }
-  if (output.budget !== null && !(output.budget > 0)) {
-    fail(`budget ${String(output.budget)} is not positive`);
-  }
-  return {
-    kind: "answer",
-    message: output.message,
-    plan: output.plan === null ? null : shownPlan(output.plan, input.products),
-    budget: output.budget,
-  };
+export function checkPlan(plan: Plan, seen: CatalogProduct[], budget: number | null): PlanShown {
+  if (budget !== null && !(budget > 0)) fail(`budget ${String(budget)} is not positive`);
+  return shownPlan(plan, seen);
 }
 
 export function overBudget({ total }: PlanShown, budget: number | null): number | null {

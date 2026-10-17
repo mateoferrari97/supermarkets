@@ -27,13 +27,13 @@
 
 ## Before every push
 
-Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test`, `pnpm order:eval-set` and `pnpm plan:eval-set`.
+Never push a broken project. Before any `git push`, run `pnpm check` and push only if it exits 0 (the `.githooks/pre-push` hook runs it too). It runs, in order: `pnpm typecheck`, `pnpm lint`, `pnpm format --check`, `pnpm no-comments`, `pnpm docs:check`, `pnpm test` and `pnpm agent:eval-set`.
 
 If a step fails, fix it or tell the user; never push with a failing step, and never skip a step to make it pass. When a test, build or check is added, add it to `pnpm check`.
 
 ## Map
 
-- [ARCHITECTURE.md](ARCHITECTURE.md): the product, layers and ports, an order end to end, and the data folders.
+- [ARCHITECTURE.md](ARCHITECTURE.md): the product, layers and ports, an agent turn end to end, and the data folders.
 - [GLOSSARY.md](GLOSSARY.md): domain terms; use them in code, docs and tickets.
 - [docs/adr/](docs/adr/README.md): architecture decisions.
 - [docs/product-specs/](docs/product-specs/README.md): rules the product follows.
@@ -45,17 +45,15 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 
 ## Commands
 
-- `pnpm dev`: runs `next dev`, the Owner's chat at http://localhost:3000, where every order is placed. It needs the Catalog Snapshot in `.data/carrefour/` (`pnpm carrefour:catalog`).
+- `pnpm dev`: runs `next dev`, the Owner's chat at http://localhost:3000, the one place where orders are placed; its Chat, Profile and Orders are kept in `.data/chat/`. It needs the Catalog Snapshot in `.data/carrefour/` (`pnpm carrefour:catalog`).
 - `pnpm check`: every check, in the order above.
 - `pnpm test`: Vitest over `src/` and `scripts/`.
 - `pnpm docs:check`: checks the knowledge base (ADR 0010) and prints file, line and rule for each finding.
 - `pnpm typecheck`, `pnpm lint`, `pnpm format` (`--check` to only check), `pnpm no-comments`.
 - The operator commands below run one file each in `src/cli/` and read and write data only through the loaders and savers of `src/compose.ts`.
-- `pnpm order:eval [filter...] [--runs N]`: runs the order matching eval set with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-eval-set)).
-- `pnpm order:label <words> [--brand <brand>]`: lists likely products from the Catalog Snapshot to label an eval case.
-- `pnpm order:eval-set`: validates the committed data in `evals/` with the same loader every command uses.
-- `pnpm plan:eval [filter...] [--runs N]`: runs the planning eval set (routing and plan cases) with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-planning-eval-set)).
-- `pnpm plan:eval-set`: validates `evals/planning.json` with the same loader `pnpm plan:eval` uses.
+- `pnpm agent:eval [filter...] [--runs N]`: runs the agent eval set, scripted Owner messages over a given Chat, Profile and past Orders, with real Claude Code sessions, 3 runs per case by default ([LLM](docs/LLM.md#the-agent-eval-set)).
+- `pnpm agent:eval-set`: validates `evals/agent.json` with the same loader `pnpm agent:eval` uses.
+- `pnpm agent:label <words> [--brand <brand>]`: lists likely products from the Catalog Snapshot to label an agent eval case.
 - `pnpm carrefour:catalog`: downloads the whole Carrefour catalog into `products.json` in `.data/carrefour/`, or in the directory given as its argument. `.data/` is not committed.
 
 ## Workflow
@@ -63,7 +61,7 @@ If a step fails, fix it or tell the user; never push with a failing step, and ne
 - Open questions about a large effort live in a wayfinder map with one ticket per question, `.scratch/<effort>/map.md` and `.scratch/<effort>/issues/`.
 - A feature is built from a spec, `.scratch/<feature>/spec.md`, and one file per ticket in `.scratch/<feature>/issues/`. Notes go under `## Comments`; the `Status:` line follows [triage labels](docs/agents/triage-labels.md).
 - Record a hard-to-reverse decision as an ADR in `docs/adr/` and add it to its index; add or sharpen domain terms in `GLOSSARY.md`.
-- Each ticket updates the docs it touches: `ARCHITECTURE.md` when folders or the order flow change, the Commands above when a command changes, a reference when an external system's behaviour is learned.
+- Each ticket updates the docs it touches: `ARCHITECTURE.md` when folders or the agent turn change, the Commands above when a command changes, a reference when an external system's behaviour is learned.
 
 ## File naming
 

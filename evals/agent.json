@@ -1,0 +1,655 @@
+{
+  "cases": [
+    {
+      "id": "postal-code-asked-once",
+      "covers": ["postal-code-once", "confirm-first"],
+      "setup": {
+        "postalCode": null
+      },
+      "turns": [
+        {
+          "owner": "Hola, necesito 2 leches descremadas La Serenísima",
+          "ends": "text",
+          "noCalls": ["resolveItem", "proposeOrder", "buildCart"]
+        },
+        {
+          "owner": "Mi código postal es 1425",
+          "ends": "proposal",
+          "calls": ["updateProfile", "resolveItem", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Dale, confirmo",
+          "ends": "cart",
+          "calls": ["buildCart"],
+          "noCalls": ["updateProfile", "askQuestions"]
+        }
+      ],
+      "postalCode": "1425",
+      "cart": {
+        "lines": [
+          {
+            "product": "Leche descremada La Serenísima",
+            "fits": ["653793", "661341", "663213", "679516", "720720", "720721"],
+            "quantity": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "change-postal-code",
+      "covers": ["change-postal-code"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Ahora estoy viviendo en 5000, mandá todo ahí",
+          "ends": "text",
+          "calls": ["updateProfile"],
+          "noCalls": ["resolveItem", "buildCart"]
+        }
+      ],
+      "postalCode": "5000"
+    },
+    {
+      "id": "postal-code-not-delivered",
+      "covers": ["change-postal-code"],
+      "setup": {
+        "postalCode": "1425",
+        "doesNotDeliver": ["9999"]
+      },
+      "turns": [
+        {
+          "owner": "Me mudé, mi nuevo código postal es 9999",
+          "ends": "text",
+          "calls": ["updateProfile"],
+          "noCalls": ["resolveItem", "buildCart"]
+        }
+      ],
+      "postalCode": "1425"
+    },
+    {
+      "id": "precise-products-no-questions",
+      "covers": ["precise-product", "confirm-first"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero 2 leches descremadas La Serenísima y 2 Coca-Cola de 2,25 litros",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Leche descremada La Serenísima",
+            "fits": ["653793", "661341", "663213", "679516", "720720", "720721"],
+            "quantity": 2
+          },
+          {
+            "product": "Coca-Cola sabor original 2,25 l",
+            "fits": ["6225", "30138", "625279", "630677", "630679", "763994"],
+            "quantity": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "size-words-pick-the-biggest",
+      "covers": ["precise-product", "confirm-first"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero dos cocas grandes",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Coca-Cola sabor original 2,25 l",
+            "fits": ["30138"],
+            "quantity": 2
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "id": "preferences-are-ignored",
+      "covers": ["precise-product", "confirm-first"],
+      "expectedToFail": "In 1 of 2 runs and 1 of 3 runs on 2026-10-16 the agent answered the first message in text, explaining it does not handle payment and asking \"¿Confirmás el pedido así?\", instead of calling proposeOrder, so the Owner confirmed a proposal that did not exist yet",
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero aceite de girasol, nada de Marolio, y pago con visa",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Aceite de girasol",
+            "fits": [
+              "6307",
+              "6309",
+              "244757",
+              "253384",
+              "255169",
+              "332888",
+              "664054",
+              "664061",
+              "680457",
+              "699030",
+              "700951",
+              "700952",
+              "757629"
+            ],
+            "quantity": 1
+          }
+        ],
+        "exact": true
+      }
+    },
+    {
+      "id": "repeat-last-order",
+      "covers": ["repeat-order"],
+      "setup": {
+        "postalCode": "1425",
+        "pastOrders": [
+          {
+            "lines": [
+              {
+                "productId": "653793",
+                "quantity": 2
+              },
+              {
+                "productId": "669429",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "lines": [
+              {
+                "productId": "6225",
+                "quantity": 2
+              }
+            ]
+          }
+        ]
+      },
+      "turns": [
+        {
+          "owner": "Lo mismo que la última vez",
+          "ends": "proposal",
+          "calls": ["repeatOrder", "proposeOrder"],
+          "noCalls": ["askQuestions", "resolveItem", "buildCart"]
+        },
+        {
+          "owner": "Dale",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Coca-Cola 2,25 l",
+            "fits": ["6225"],
+            "quantity": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "repeat-an-earlier-order",
+      "covers": ["repeat-order"],
+      "setup": {
+        "postalCode": "1425",
+        "pastOrders": [
+          {
+            "lines": [
+              {
+                "productId": "653793",
+                "quantity": 2
+              },
+              {
+                "productId": "669429",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "lines": [
+              {
+                "productId": "6225",
+                "quantity": 2
+              }
+            ]
+          }
+        ]
+      },
+      "turns": [
+        {
+          "owner": "Repetime el pedido de la leche y la yerba",
+          "ends": "proposal",
+          "calls": ["repeatOrder", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Está bien así",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Leche descremada La Serenísima",
+            "fits": ["653793"],
+            "quantity": 2
+          },
+          {
+            "product": "Yerba Playadito 1 kg",
+            "fits": ["669429"],
+            "quantity": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "add-to-the-last-order",
+      "covers": ["add-to-past-order"],
+      "setup": {
+        "postalCode": "1425",
+        "pastOrders": [
+          {
+            "lines": [
+              {
+                "productId": "653793",
+                "quantity": 2
+              },
+              {
+                "productId": "669429",
+                "quantity": 1
+              }
+            ]
+          }
+        ]
+      },
+      "turns": [
+        {
+          "owner": "Agregá yogur",
+          "ends": "text",
+          "noCalls": ["resolveItem", "repeatOrder", "askQuestions", "proposeOrder", "buildCart"]
+        },
+        {
+          "owner": "Lo mismo que la última vez más el yogur",
+          "ends": "proposal",
+          "calls": ["repeatOrder", "resolveItem", "proposeOrder"],
+          "noCalls": ["buildCart"]
+        },
+        {
+          "owner": "Dale",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Leche descremada La Serenísima",
+            "fits": ["653793"],
+            "quantity": 2
+          },
+          {
+            "product": "Yerba Playadito 1 kg",
+            "fits": ["669429"],
+            "quantity": 1
+          },
+          {
+            "product": "Yogur",
+            "fits": [
+              "640506",
+              "658509",
+              "658511",
+              "660738",
+              "672742",
+              "672743",
+              "686542",
+              "686543",
+              "686544",
+              "704484",
+              "704486",
+              "704490",
+              "718162",
+              "718163",
+              "719268",
+              "721998",
+              "722426",
+              "722427",
+              "723148",
+              "726424",
+              "727803",
+              "727805",
+              "728266",
+              "728272",
+              "729327",
+              "730470",
+              "739099",
+              "739101",
+              "740536",
+              "741420",
+              "741421",
+              "743748",
+              "744851",
+              "744852",
+              "746240",
+              "746241",
+              "746242",
+              "746243",
+              "746403",
+              "746404",
+              "760571",
+              "760572",
+              "762115",
+              "762116",
+              "762117",
+              "767878",
+              "767879",
+              "771214",
+              "771428",
+              "772802",
+              "772803",
+              "772804",
+              "772807",
+              "772808",
+              "772809",
+              "772810",
+              "772811",
+              "773577",
+              "774675",
+              "774676",
+              "774685",
+              "774686",
+              "774689",
+              "775689",
+              "775693",
+              "783644",
+              "783645",
+              "783646",
+              "783647",
+              "783648",
+              "783649",
+              "783814",
+              "783815",
+              "784713",
+              "784714"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "correction-removes-an-item",
+      "covers": ["correction", "confirm-first"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero 2 leches descremadas La Serenísima y 2 Coca-Cola de 2,25 litros",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"]
+        },
+        {
+          "owner": "Dale",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        },
+        {
+          "owner": "Sacá las Coca-Colas",
+          "ends": "cart",
+          "calls": ["reopenLastOrder", "proposeOrder", "buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Leche descremada La Serenísima",
+            "fits": ["653793", "661341", "663213", "679516", "720720", "720721"],
+            "quantity": 2
+          }
+        ]
+      },
+      "expectedToFail": "In 1 of 3 runs on 2026-10-16 the agent called buildCart with a proposal id that was no longer the latest (stale-proposal) before calling it again with the right one"
+    },
+    {
+      "id": "correction-replaces-an-item",
+      "covers": ["correction"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero 2 Coca-Cola de 2,25 litros y 2 leches descremadas La Serenísima",
+          "ends": "proposal",
+          "calls": ["resolveItem", "proposeOrder"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        },
+        {
+          "owner": "Cambiá la Coca por una Coca Zero grande",
+          "ends": "cart",
+          "calls": ["reopenLastOrder", "resolveItem", "proposeOrder", "buildCart"],
+          "noCalls": ["askQuestions"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Coca-Cola Zero, la más grande",
+            "fits": ["393964", "530217", "636689", "649300", "763995"]
+          },
+          {
+            "product": "Leche descremada La Serenísima",
+            "fits": ["653793", "661341", "663213", "679516", "720720", "720721"],
+            "quantity": 2
+          }
+        ]
+      },
+      "expectedToFail": "After the Correction the agent sometimes passes proposeOrder the ref of the replaced Coca-Cola and leaves out the ref of the milk, so the cart keeps the old Coca-Cola and loses the milk (2 of 3 runs, then 1 of 3, on 2026-10-16)"
+    },
+    {
+      "id": "recipe-plan",
+      "covers": ["plan", "confirm-first"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero hacer una lasaña de carne para 4 personas, armame todo lo que necesito",
+          "ends": "proposal",
+          "calls": ["searchCatalog", "proposePlan"],
+          "noCalls": ["resolveItem", "buildCart"]
+        },
+        {
+          "owner": "Confirmar",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        }
+      ],
+      "cart": {
+        "minLines": 4
+      }
+    },
+    {
+      "id": "gift-plan",
+      "covers": ["plan"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Necesito un regalo para el cumpleaños de mi mamá: le encanta cocinar y hornear, tengo hasta $40.000. Armame una propuesta con productos de Carrefour",
+          "ends": "proposal",
+          "calls": ["searchCatalog", "proposePlan"],
+          "noCalls": ["resolveItem", "buildCart"]
+        }
+      ]
+    },
+    {
+      "id": "advice-without-a-purchase",
+      "covers": ["plan", "off-topic"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "¿Qué vino va bien con un pescado al horno?",
+          "ends": "text",
+          "noCalls": [
+            "resolveItem",
+            "searchCatalog",
+            "proposeOrder",
+            "proposePlan",
+            "askQuestions",
+            "buildCart",
+            "repeatOrder",
+            "reopenLastOrder"
+          ]
+        }
+      ],
+      "cart": null
+    },
+    {
+      "id": "off-topic-question",
+      "covers": ["off-topic"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "¿Qué capital tiene Australia?",
+          "ends": "text",
+          "noCalls": [
+            "resolveItem",
+            "searchCatalog",
+            "proposeOrder",
+            "proposePlan",
+            "askQuestions",
+            "buildCart",
+            "repeatOrder",
+            "reopenLastOrder"
+          ]
+        }
+      ],
+      "cart": null
+    },
+    {
+      "id": "asks-one-round-with-recommended-answers",
+      "covers": ["one-round", "confirm-first"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero una cerveza artesanal de tamarindo, un jugo de mburucuyá, una bolsa de carbón de 10 kg y una Coca-Cola Zero grande",
+          "ends": "round",
+          "calls": ["resolveItem", "askQuestions"],
+          "minQuestions": 2,
+          "noCalls": ["proposeOrder", "buildCart"]
+        },
+        {
+          "owner": "Aceptar las recomendadas",
+          "ends": "proposal",
+          "calls": ["chooseAlternative", "proposeOrder"],
+          "noCalls": ["askQuestions", "buildCart"]
+        },
+        {
+          "owner": "Dale",
+          "ends": "cart",
+          "calls": ["buildCart"]
+        }
+      ],
+      "cart": {
+        "lines": [
+          {
+            "product": "Cerveza artesanal",
+            "fits": ["684384", "684385", "684386", "772398", "746912", "783679"]
+          },
+          {
+            "product": "Coca-Cola Zero, la más grande",
+            "fits": ["393964", "530217", "636689", "649300", "763995"]
+          }
+        ],
+        "exact": false,
+        "minLines": 3
+      }
+    },
+    {
+      "id": "asks-for-more-options",
+      "covers": ["more-options"],
+      "setup": {
+        "postalCode": "1425"
+      },
+      "turns": [
+        {
+          "owner": "Quiero una cerveza artesanal de tamarindo",
+          "ends": "round",
+          "calls": ["resolveItem", "askQuestions"],
+          "minQuestions": 1,
+          "noCalls": ["proposeOrder", "buildCart"]
+        },
+        {
+          "owner": "Mostrame más opciones",
+          "ends": "round",
+          "calls": ["resolveItem", "askQuestions"],
+          "moreOptions": true,
+          "noCalls": ["buildCart"]
+        },
+        {
+          "owner": "La segunda",
+          "ends": "proposal",
+          "calls": ["chooseAlternative", "proposeOrder"],
+          "noCalls": ["buildCart"]
+        }
+      ]
+    }
+  ]
+}

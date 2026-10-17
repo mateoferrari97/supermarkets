@@ -1,4 +1,4 @@
-import { stepsFrom, type Steps } from "../order-conversation/steps.ts";
+import { stepsFrom, type Steps } from "./steps.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import { MATCHES_LIMIT, type CatalogSearch } from "./catalog-search.ts";
 import { inParallel } from "./in-parallel.ts";

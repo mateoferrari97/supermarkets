@@ -12,15 +12,13 @@
     "format": "node scripts/format.mjs",
     "no-comments": "tsx scripts/no-comments.ts",
     "docs:check": "tsx scripts/check-docs.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm format --check && pnpm no-comments && pnpm docs:check && pnpm test && pnpm order:eval-set && pnpm plan:eval-set",
+    "check": "pnpm typecheck && pnpm lint && pnpm format --check && pnpm no-comments && pnpm docs:check && pnpm test && pnpm agent:eval-set",
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "carrefour:catalog": "tsx src/cli/carrefour-catalog.ts",
     "test": "vitest run",
-    "order:eval": "tsx src/cli/order-eval.ts",
-    "order:eval-set": "tsx src/cli/order-eval-set.ts",
-    "order:label": "tsx src/cli/order-label.ts",
-    "plan:eval": "tsx src/cli/plan-eval.ts",
-    "plan:eval-set": "tsx src/cli/plan-eval-set.ts"
+    "agent:eval": "tsx src/cli/agent-eval.ts",
+    "agent:eval-set": "tsx src/cli/agent-eval-set.ts",
+    "agent:label": "tsx src/cli/agent-label.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -37,6 +35,8 @@
     "vitest": "^5.0.4"
   },
   "dependencies": {
+    "ai": "7.0.143",
+    "ai-sdk-provider-claude-code": "4.3.3",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

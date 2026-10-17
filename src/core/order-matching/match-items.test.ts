@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { stepsFrom, type StepEvent } from "../order-conversation/steps.ts";
+import { stepsFrom, type StepEvent } from "./steps.ts";
 import type { CatalogProduct } from "./catalog-product.ts";
 import type { CatalogSearch } from "./catalog-search.ts";
 import type { Item } from "./item.ts";
@@ -199,8 +199,7 @@ describe("matchItems", () => {
         return Promise.resolve({ fits: [1], closest: [], note: null, question: null });
       },
     };
-    const onStep = ({ status, step }: StepEvent) =>
-      log.push(`${status} ${step.kind === "choose-products" ? step.original : step.kind}`);
+    const onStep = ({ status, step }: StepEvent) => log.push(`${status} ${step.original}`);
     await matchItems(
       [item("1 bolsa de carbon", "Carbón para asado"), item("birra", "Cerveza")],
       { search: watched, llm },

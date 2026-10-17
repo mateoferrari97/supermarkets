@@ -13,12 +13,17 @@ const zod = "zod$";
 const nodeBuiltin = "node:";
 const vitest = "vitest$";
 const nodeAssert = "node:assert/strict$";
+const aiSdk = "ai$";
+const aiSdkTest = "ai/test$";
+const claudeCodeProvider = "ai-sdk-provider-claude-code$";
 const sameFolder = "\\./";
 const coreFromFeature = ["\\./", "\\.\\./(?!\\.\\./)", "\\.\\./\\.\\./core/"];
 const coreFromAdapter = "\\.\\./\\.\\./core/";
 
 const coreMessage = "core imports only core and zod (ADR 0006).";
 const adaptersMessage = "adapters import only core, node:* and zod (ADR 0006).";
+const agentAdapterMessage =
+  "the agent adapter imports only core, node:*, zod, ai and ai-sdk-provider-claude-code (ADR 0014).";
 const deliveryMessage = "cli and app import core and compose, never adapters (ADR 0006).";
 const cliFilesMessage = "cli reads and writes files through compose, never fs (ADR 0006).";
 const adapters = "(^|/)adapters(/|$)";
@@ -52,6 +57,20 @@ export default tseslint.config(
   {
     files: ["src/adapters/**/*.test.ts"],
     rules: onlyImports([zod, nodeBuiltin, vitest, sameFolder, coreFromAdapter], adaptersMessage),
+  },
+  {
+    files: ["src/adapters/agent/**"],
+    rules: onlyImports(
+      [zod, nodeBuiltin, sameFolder, coreFromAdapter, aiSdk, claudeCodeProvider],
+      agentAdapterMessage,
+    ),
+  },
+  {
+    files: ["src/adapters/agent/**/*.test.ts"],
+    rules: onlyImports(
+      [zod, nodeBuiltin, vitest, sameFolder, coreFromAdapter, aiSdk, aiSdkTest, claudeCodeProvider],
+      agentAdapterMessage,
+    ),
   },
   {
     files: ["src/compose.ts"],

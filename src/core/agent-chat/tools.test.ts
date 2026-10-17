@@ -1,0 +1,511 @@
+import assert from "node:assert/strict";
+import { describe, it } from "vitest";
+import type { Delivery, OnlineStore } from "../product-selection/online-store.ts";
+import type { ChatMessage } from "./chat.ts";
+import type { Profile } from "./profile.ts";
+import {
+  catalog,
+  llmFitting,
+  memoryOrders,
+  product,
+  searchOf,
+  storeOf,
+} from "./agent-chat-fixtures.ts";
+import type { TurnOutcome } from "./tool.ts";
+import { agentTools, renderProfile, updateProfile } from "./tools.ts";
+
+function fakeStore(deliveries: Record<string, Delivery>) {
+  const asked: string[] = [];
+  const store: OnlineStore = {
+    checkDelivery: (postalCode) => {
+      asked.push(postalCode);
+      return Promise.resolve(deliveries[postalCode] ?? "postal-code-rejected");
+    },
+    simulate: () => Promise.reject(new Error("not used")),
+    cartLink: () => {
+      throw new Error("not used");
+    },
+  };
+  return { store, asked };
+}
+
+const signal = new AbortController().signal;
+
+describe("updateProfile", () => {
+  it("checks the postal code with the Online Store and saves it", async () => {
+    const { store, asked } = fakeStore({ "1425": "delivers" });
+    const saved: Profile[] = [];
+    const output = await updateProfile(
+      { postalCode: " 1425 " },
+      { store, saveProfile: (profile) => saved.push(profile) },
+      signal,
+    );
+    assert.deepEqual(output, { kind: "saved", postalCode: "1425" });
+    assert.deepEqual(asked, ["1425"]);
+    assert.deepEqual(saved, [{ postalCode: "1425" }]);
+  });
+
+  it("saves a new postal code over the old one", async () => {
+    const { store } = fakeStore({ "1425": "delivers", "5000": "delivers" });
+    const saved: Profile[] = [];
+    const dependencies = { store, saveProfile: (profile: Profile) => saved.push(profile) };
+    await updateProfile({ postalCode: "1425" }, dependencies, signal);
+    await updateProfile({ postalCode: "5000" }, dependencies, signal);
+    assert.deepEqual(saved.at(-1), { postalCode: "5000" });
+  });
+
+  it("refuses a postal code no Branch serves and saves nothing", async () => {
+    const { store } = fakeStore({ "9999": "does-not-deliver", "0001": "postal-code-rejected" });
+    const saved: Profile[] = [];
+    const dependencies = { store, saveProfile: (profile: Profile) => saved.push(profile) };
+    assert.deepEqual(await updateProfile({ postalCode: "9999" }, dependencies, signal), {
+      kind: "refused",
+      postalCode: "9999",
+      reason: "not-delivered",
+    });
+    assert.deepEqual(await updateProfile({ postalCode: "0001" }, dependencies, signal), {
+      kind: "refused",
+      postalCode: "0001",
+      reason: "not-delivered",
+    });
+    assert.deepEqual(saved, []);
+  });
+
+  it("refuses text that is not a four-digit postal code without asking the store", async () => {
+    const { store, asked } = fakeStore({});
+    const saved: Profile[] = [];
+    const output = await updateProfile(
+      { postalCode: "C1425" },
+      { store, saveProfile: (profile) => saved.push(profile) },
+      signal,
+    );
+    assert.deepEqual(output, { kind: "refused", postalCode: "C1425", reason: "not-a-postal-code" });
+    assert.deepEqual(asked, []);
+    assert.deepEqual(saved, []);
+  });
+});
+
+describe("agentTools", () => {
+  it("exposes the tools, and only askQuestions, proposeOrder, proposePlan and buildCart end the turn", () => {
+    const { store } = fakeStore({});
+    const { search } = searchOf(catalog);
+    const tools = agentTools({
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => null,
+      search,
+      llm: llmFitting(),
+      orders: memoryOrders().orders,
+      now: () => new Date(),
+    })({ ended: null });
+    assert.deepEqual(Object.keys(tools), [
+      "updateProfile",
+      "resolveItem",
+      "chooseAlternative",
+      "reopenLastOrder",
+      "repeatOrder",
+      "searchCatalog",
+      "askQuestions",
+      "proposeOrder",
+      "proposePlan",
+      "buildCart",
+    ]);
+    assert.deepEqual(
+      Object.values(tools).map((tool) => tool.endsTurn),
+      [false, false, false, false, false, false, true, true, true, true],
+    );
+  });
+
+  it("validates the input of updateProfile", async () => {
+    const { store } = fakeStore({ "1425": "delivers" });
+    const saved: Profile[] = [];
+    const { search } = searchOf(catalog);
+    const tools = agentTools({
+      store,
+      saveProfile: (profile) => saved.push(profile),
+      loadProfile: () => null,
+      search,
+      llm: llmFitting(),
+      orders: memoryOrders().orders,
+      now: () => new Date(),
+    })({ ended: null });
+    const output = await tools.updateProfile?.execute({ postalCode: "1425" }, signal);
+    assert.deepEqual(output, { kind: "saved", postalCode: "1425" });
+    await assert.rejects(
+      tools.updateProfile?.execute({ postalCode: 1425 }, signal) ?? Promise.resolve(),
+    );
+  });
+
+  it("takes an Order from text to a proposal through the tools", async () => {
+    const { store } = storeOf(catalog);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders();
+    const outcome: TurnOutcome = { ended: null };
+    const tools = agentTools({
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    })(outcome);
+    await tools.resolveItem?.execute({ description: "leche" }, signal);
+    await tools.resolveItem?.execute({ description: "bicicleta" }, signal);
+    await tools.proposeOrder?.execute({ refs: ["1", "2"] }, signal);
+    assert.equal(memory.current()[0]?.status, "proposed");
+    assert.equal(outcome.ended?.parts[0]?.type, "proposal");
+    await assert.rejects(
+      tools.resolveItem?.execute({ product: "leche" }, signal) ?? Promise.resolve(),
+    );
+  });
+});
+
+describe("rounds of questions through the tools", () => {
+  it("takes an Item with no Fit from a round to a proposal", async () => {
+    const options = [
+      product("11", "Yogur frutilla Ilolay 190 g", 500),
+      product("12", "Yogur vainilla Ilolay 190 g", 520),
+      product("13", "Yogur durazno Ilolay 190 g", 540),
+      product("14", "Yogur natural Ilolay 190 g", 560),
+    ];
+    const { store } = storeOf(options);
+    const { search } = searchOf(options);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(() => ({ fits: [], closest: [], question: "¿Cuál?" })),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const asking: TurnOutcome = { ended: null };
+    const tools = agentTools(dependencies)(asking);
+    const resolved = await tools.resolveItem?.execute({ description: "yogur" }, signal);
+    assert.equal((resolved as { kind: string }).kind, "choose");
+    await tools.askQuestions?.execute(
+      {
+        questions: [
+          {
+            ref: "1",
+            text: "¿Qué yogur querés?",
+            options: [{ productId: "11" }, { productId: "12" }, { productId: "13" }],
+            recommended: 1,
+          },
+        ],
+      },
+      signal,
+    );
+    assert.equal(asking.ended?.parts[0]?.type, "round");
+    assert.match(asking.ended?.text ?? "", /1\. ¿Qué yogur querés\?/);
+
+    const answering: TurnOutcome = { ended: null };
+    const next = agentTools(dependencies)(answering);
+    const picked = await next.chooseAlternative?.execute({ ref: "1", productId: "12" }, signal);
+    assert.equal((picked as { kind: string }).kind, "picked");
+    await next.proposeOrder?.execute({ refs: ["1"] }, signal);
+    assert.equal(answering.ended?.parts[0]?.type, "proposal");
+    assert.equal(memory.current()[0]?.status, "proposed");
+  });
+});
+
+describe("renderProfile", () => {
+  it("says the postal code when known and that it is unknown otherwise", () => {
+    assert.match(renderProfile({ postalCode: "1425" }), /postalCode: 1425/);
+    assert.match(renderProfile(null), /has not told their postal code/);
+  });
+
+  it("takes an Order from text to a closed Order with a cart link once the Owner confirms", async () => {
+    const { store } = storeOf(catalog);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const first: TurnOutcome = { ended: null };
+    const proposing = agentTools(dependencies)(first, [
+      { role: "owner", at: "2026-10-16T12:00:00.000Z", text: "leche" },
+    ]);
+    await proposing.resolveItem?.execute({ description: "leche" }, signal);
+    await proposing.proposeOrder?.execute({ refs: ["1"] }, signal);
+    const proposalMessage: ChatMessage = {
+      role: "assistant",
+      at: "2026-10-16T12:00:01.000Z",
+      text: first.ended?.text ?? "",
+      parts: first.ended?.parts,
+    };
+    const unanswered: TurnOutcome = { ended: null };
+    const early = agentTools(dependencies)(unanswered, [proposalMessage]);
+    assert.deepEqual(await early.buildCart?.execute({ proposalId: "order-1-1" }, signal), {
+      kind: "refused",
+      reason: "unanswered",
+    });
+    assert.equal(unanswered.ended, null);
+    assert.equal(memory.current()[0]?.status, "proposed");
+
+    const second: TurnOutcome = { ended: null };
+    const confirming = agentTools(dependencies)(second, [
+      proposalMessage,
+      { role: "owner", at: "2026-10-16T12:00:02.000Z", text: "Confirmar" },
+    ]);
+    const built = await confirming.buildCart?.execute({ proposalId: "order-1-1" }, signal);
+    assert.deepEqual(built, {
+      kind: "built",
+      cartLink: "https://example.test/cart",
+      total: 800,
+    });
+    assert.equal(memory.current()[0]?.status, "closed");
+    assert.equal(second.ended?.parts[0]?.type, "cart");
+  });
+
+  it("gives a new cart for the same Order when the Owner corrects it after the link, with no question", async () => {
+    const { store, simulated } = storeOf(catalog);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const first: TurnOutcome = { ended: null };
+    const proposing = agentTools(dependencies)(first, []);
+    await proposing.resolveItem?.execute({ description: "leche" }, signal);
+    await proposing.proposeOrder?.execute({ refs: ["1"] }, signal);
+    const proposalMessage: ChatMessage = {
+      role: "assistant",
+      at: "2026-10-16T12:00:01.000Z",
+      text: "",
+      parts: first.ended?.parts,
+    };
+    const confirmation: ChatMessage = {
+      role: "owner",
+      at: "2026-10-16T12:00:02.000Z",
+      text: "Confirmar",
+    };
+    await agentTools(dependencies)({ ended: null }, [
+      proposalMessage,
+      confirmation,
+    ]).buildCart?.execute({ proposalId: "order-1-1" }, signal);
+    assert.equal(memory.current()[0]?.status, "closed");
+
+    const correction: ChatMessage = {
+      role: "owner",
+      at: "2026-10-16T12:00:03.000Z",
+      text: "cambiá la leche por yogur",
+    };
+    const outcome: TurnOutcome = { ended: null };
+    const correcting = agentTools(dependencies)(outcome, [
+      proposalMessage,
+      confirmation,
+      correction,
+    ]);
+    assert.deepEqual(await correcting.reopenLastOrder?.execute({}, signal), {
+      kind: "reopened",
+      orderId: "order-1",
+    });
+    await correcting.resolveItem?.execute({ description: "yogur" }, signal);
+    await correcting.proposeOrder?.execute({ refs: ["2"] }, signal);
+    const endedByProposal = outcome.ended;
+    assert.equal(endedByProposal, null);
+    const built = await correcting.buildCart?.execute({ proposalId: "order-1-2" }, signal);
+    assert.deepEqual(built, {
+      kind: "built",
+      cartLink: "https://example.test/cart",
+      total: 500,
+    });
+    assert.equal(memory.current().length, 1);
+    const [order] = memory.current();
+    assert.equal(order?.status, "closed");
+    assert.equal(order?.reopened, undefined);
+    assert.deepEqual(
+      order?.cart?.lines.map((each) => each.productId),
+      ["4"],
+    );
+    assert.deepEqual(simulated.at(-1)?.items, [{ itemId: "40", quantity: 1 }]);
+    assert.equal(outcome.ended?.parts[0]?.type, "cart");
+  });
+});
+
+describe("repeating a past Order through the tools", () => {
+  it("repeats the last Order priced today, adds an Item and proposes both", async () => {
+    const { store } = storeOf(catalog, ["30"]);
+    const { search } = searchOf(catalog);
+    const memory = memoryOrders([
+      {
+        id: "order-1",
+        status: "closed",
+        openedAt: "2026-10-12T12:00:00.000Z",
+        items: [],
+        proposals: 1,
+        proposal: null,
+        cart: {
+          postalCode: "1425",
+          lines: [
+            {
+              description: "leche",
+              productId: "2",
+              itemId: "20",
+              name: "Leche entera Sancor 1 l",
+              brand: null,
+              quantity: 1,
+              unitPrice: 700,
+              total: 700,
+              reason: "",
+              notes: [],
+            },
+            {
+              description: "leche verónica",
+              productId: "3",
+              itemId: "30",
+              name: "Leche entera Verónica 1 l",
+              brand: null,
+              quantity: 1,
+              unitPrice: 900,
+              total: 900,
+              reason: "",
+              notes: [],
+            },
+          ],
+          notes: [],
+          total: 1600,
+          warning: "",
+          cartLink: "https://example.test/old",
+        },
+      },
+    ]);
+    const outcome: TurnOutcome = { ended: null };
+    const tools = agentTools({
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    })(outcome, []);
+    const repeated = await tools.repeatOrder?.execute({ orderId: "order-1" }, signal);
+    assert.deepEqual(repeated, {
+      kind: "repeated",
+      items: [
+        {
+          kind: "picked",
+          ref: "1",
+          product: { productId: "2", name: "Leche entera Sancor 1 l", brand: null },
+          quantity: 1,
+          unitPrice: 800,
+          total: 800,
+          reason: "Repetido del pedido order-1",
+          notes: [],
+        },
+        { kind: "none", ref: "2", note: '"Leche entera Verónica 1 l" ya no está disponible.' },
+      ],
+    });
+    const added = await tools.resolveItem?.execute({ description: "yogur" }, signal);
+    assert.equal((added as { ref: string }).ref, "3");
+    await tools.proposeOrder?.execute({ refs: ["1", "2", "3"] }, signal);
+    const proposal = outcome.ended?.parts[0];
+    assert.equal(proposal?.type, "proposal");
+    if (proposal?.type !== "proposal") return;
+    assert.deepEqual(
+      proposal.proposal.lines.map((each) => each.productId),
+      ["2", "4"],
+    );
+    assert.deepEqual(proposal.proposal.notes, [
+      '"Leche entera Verónica 1 l" ya no está disponible.',
+    ]);
+    assert.equal(memory.current()[0]?.status, "closed");
+    assert.equal(memory.current()[1]?.id, "order-2");
+  });
+});
+
+describe("a Plan through the tools", () => {
+  it("searches, proposes the Plan, waits for the Owner and builds its cart with the Idea", async () => {
+    const pasta = product("11", "Tapas para lasaña 500 g", 2500, {
+      department: "Almacén",
+      sale: { kind: "packaged", size: { dimension: "weight", amount: 500 } },
+    });
+    const meat = product("12", "Carne picada especial x kg", 9000, {
+      department: "Carnes",
+      sale: { kind: "by-weight", saleStepKg: 0.5 },
+    });
+    const { store, simulated } = storeOf([pasta, meat]);
+    const { search } = searchOf([pasta, meat]);
+    const memory = memoryOrders();
+    const dependencies = {
+      store,
+      saveProfile: () => undefined,
+      loadProfile: () => ({ postalCode: "1425" }),
+      search,
+      llm: llmFitting(),
+      orders: memory.orders,
+      now: () => new Date("2026-10-16T12:00:00.000Z"),
+    };
+    const first: TurnOutcome = { ended: null };
+    const tools = agentTools(dependencies)(first, []);
+    const found = await tools.searchCatalog?.execute({ queries: ["tapas", "carne"] }, signal);
+    assert.equal((found as { kind: string }).kind, "found");
+    const proposed = await tools.proposePlan?.execute(
+      {
+        title: "Lasaña para 4",
+        idea: [{ heading: "Pasos", text: "Armá las capas." }],
+        lines: [
+          { productId: "11", quantity: 1, purpose: "para la lasaña", reason: "Tapas listas" },
+          { productId: "12", quantity: 600, purpose: "para la salsa", reason: "Carne común" },
+        ],
+      },
+      signal,
+    );
+    assert.deepEqual(proposed, {
+      kind: "proposed",
+      proposalId: "order-1-1",
+      total: 11500,
+      overBudget: null,
+    });
+    const proposal = first.ended?.parts[0];
+    assert.equal(proposal?.type, "proposal");
+    const proposalMessage: ChatMessage = {
+      role: "assistant",
+      at: "2026-10-16T12:00:01.000Z",
+      text: first.ended?.text ?? "",
+      parts: first.ended?.parts,
+    };
+    const unanswered = agentTools(dependencies)({ ended: null }, [proposalMessage]);
+    assert.deepEqual(await unanswered.buildCart?.execute({ proposalId: "order-1-1" }, signal), {
+      kind: "refused",
+      reason: "unanswered",
+    });
+    const second: TurnOutcome = { ended: null };
+    const answered = agentTools(dependencies)(second, [
+      proposalMessage,
+      { role: "owner", at: "2026-10-16T12:00:02.000Z", text: "Confirmo" },
+    ]);
+    const built = await answered.buildCart?.execute({ proposalId: "order-1-1" }, signal);
+    assert.deepEqual(built, { kind: "built", cartLink: "https://example.test/cart", total: 20500 });
+    assert.deepEqual(simulated.at(-1)?.items, [
+      { itemId: "110", quantity: 1 },
+      { itemId: "120", quantity: 2 },
+    ]);
+    const [order] = memory.current();
+    assert.equal(order?.status, "closed");
+    assert.deepEqual(order?.cart?.idea, {
+      title: "Lasaña para 4",
+      sections: [{ heading: "Pasos", text: "Armá las capas." }],
+    });
+    assert.match(
+      second.ended?.text ?? "",
+      /^Lasaña para 4\nPasos: Armá las capas\.\nListo, este es tu carrito/,
+    );
+  });
+});

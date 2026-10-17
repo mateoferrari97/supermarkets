@@ -52,10 +52,6 @@ h1 {
   font-size: 13px;
 }
 
-.ok {
-  color: var(--accent);
-}
-
 .log {
   display: flex;
   flex-direction: column;
@@ -96,27 +92,6 @@ h1 {
 .msg.error {
   color: var(--error);
   white-space: pre-wrap;
-}
-
-.chips {
-  margin-top: 8px;
-}
-
-.question {
-  margin: 6px 0;
-}
-
-.chip {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 999px;
-  padding: 3px 10px;
-  margin: 2px 0 2px 6px;
-  font-size: 13px;
-}
-
-.chip:hover {
-  border-color: var(--accent);
 }
 
 .spinner {
@@ -207,26 +182,4 @@ th.num {
 .btn:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-.btn.ghost {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-}
-
-.mark {
-  display: inline-block;
-  border-radius: 4px;
-  padding: 0 6px;
-  margin-right: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--accent);
-}
-
-.plan-title {
-  font-size: 17px;
-  margin: 12px 0 4px;
 }
